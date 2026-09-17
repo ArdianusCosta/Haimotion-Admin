@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function GET(req: Request) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
     const threadId = searchParams.get('threadId');
     
-    if (!userId || !threadId) {
-      return NextResponse.json({ error: 'userId and threadId are required' }, { status: 400 });
+    if (!threadId) {
+      return NextResponse.json({ error: 'threadId is required' }, { status: 400 });
     }
 
     const history = await prisma.ai_chat_history.findMany({
       where: { 
-        user_id: parseInt(userId),
+        user_id: uid,
         thread_id: threadId
       },
       orderBy: { created_at: 'asc' },
@@ -33,8 +39,14 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+
     const envKeys = process.env.GEMINI_API_KEYS ? process.env.GEMINI_API_KEYS.split(',') : [process.env.GOOGLE_GENERATIVE_AI_API_KEY].filter(Boolean);
-    const { messages, identity, threadId, customApiKey } = await req.json();
+    const { messages, threadId, customApiKey } = await req.json();
 
     let apiKeys = envKeys;
     if (customApiKey && customApiKey.trim() !== '') {
@@ -45,14 +57,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'API key is missing or invalid' }, { status: 500 });
     }
     
-    if (identity?.id && threadId && messages.length > 0) {
+    if (threadId && messages.length > 0) {
       const latestMessage = messages[messages.length - 1];
       if (latestMessage.role === 'user') {
         try {
           await prisma.ai_chat_history.create({
             data: {
               thread_id: threadId,
-              user_id: parseInt(identity.id),
+              user_id: uid,
               role: 'user',
               content: latestMessage.content
             }
@@ -69,13 +81,13 @@ export async function POST(req: Request) {
     }));
 
     let userContext = "the user";
-    if (identity?.firstname) {
-      userContext = `${identity.firstname} ${identity.lastname || ''}`.trim();
-      if (identity.type === 1) userContext += ' (Administrator)';
-      else if (identity.type === 2) userContext += ' (Staff)';
+    if (user.firstname) {
+      userContext = `${user.firstname} ${user.lastname || ''}`.trim();
+      if (user.type === 1) userContext += ' (Administrator)';
+      else if (user.type === 2) userContext += ' (Staff)';
     }
 
-    const systemPromptText = `You are a helpful AI assistant integrated into a dashboard called HaiMotion. Your job is to assist ${userContext} with their business tasks, code, data analysis, or anything they need. Always be polite and occasionally address them by their name. If the user asks you to generate, create, or show an image/photo, you MUST reply with a markdown image using this EXACT format on a new line: \`![deskripsi gambar bahasa inggris](https://image.pollinations.ai/prompt/DESKRIPSI_GAMBAR_BAHASA_INGGRIS_DENGAN_UNDERSCORE?width=1920&height=1080&nologo=true)\`. Do not say you cannot generate images. Just return the markdown.`;
+    const systemPromptText = `You are a helpful AI assistant integrated into a dashboard called HaiMotion. Your job is to assist ${userContext} with their business tasks, code, data analysis, or anything they need. Always be polite and occasionally address them by their name. If the user asks you to generate, create, or show an image/photo, you MUST reply with a markdown image using this EXACT format on a new line: \`![deskripsi gambar bahasa inggris](https://image.pollinations.ai/prompt/DESKRIPSI_GAMBAR_BAHASA_INGGRIS_DENGAN_UNDERSCORE?width=3840&height=2160&nologo=true&model=flux)\`. Do not say you cannot generate images. Just return the markdown.`;
 
     let response;
     let success = false;

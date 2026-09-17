@@ -2,19 +2,19 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { deleteFile as deleteMinioFile } from '@/lib/storage/minio';
 import { checkAccess } from '@/lib/file-auth';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+
     const { id } = await params;
     const folderId = parseInt(id);
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    const uid = parseInt(userId);
     const hasAccess = await checkAccess(uid, folderId, 'folder', 'manager');
 
     const folder = await prisma.folder.findUnique({
@@ -58,16 +58,17 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+
     const { id } = await params;
     const folderId = parseInt(id);
     const body = await req.json();
-    const { action, name, parentId, userId } = body;
+    const { action, name, parentId } = body;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    const uid = parseInt(userId);
     const hasAccess = await checkAccess(uid, folderId, 'folder', 'editor');
 
     const folder = await prisma.folder.findUnique({

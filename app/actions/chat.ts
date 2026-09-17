@@ -2,14 +2,43 @@
 
 import prisma from '@/lib/prisma'
 import { pusherServer } from '@/lib/pusher'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 
-export async function getConversations(userId: number) {
+export async function getUnreadChatCount() {
+  try {
+    const user = await requireAuth();
+    const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+
+    const unreadCount = await prisma.chatMessage.count({
+      where: {
+        is_read: false,
+        sender_id: { not: uid },
+        thread: {
+          OR: [
+            { user1_id: uid },
+            { user2_id: uid }
+          ]
+        }
+      }
+    });
+    
+    return { success: true, count: unreadCount };
+  } catch (error) {
+    return { success: false, count: 0 };
+  }
+}
+
+export async function getConversations(userId: number | string) {
+  const user = await requireAuth();
+  
+  const uid = typeof userId === 'string' ? parseInt(userId) : userId;
+  
   // Get 1-on-1 threads
   const threads = await prisma.chatThread.findMany({
     where: {
       OR: [
-        { user1_id: userId },
-        { user2_id: userId }
+        { user1_id: uid },
+        { user2_id: uid }
       ]
     },
     include: {
@@ -18,6 +47,16 @@ export async function getConversations(userId: number) {
       messages: {
         orderBy: { created_at: 'desc' },
         take: 1
+      },
+      _count: {
+        select: {
+          messages: {
+            where: {
+              is_read: false,
+              sender_id: { not: uid }
+            }
+          }
+        }
       }
     },
     orderBy: {
@@ -26,7 +65,7 @@ export async function getConversations(userId: number) {
   })
 
   return threads.map(t => {
-    const otherUser = t.user1_id === userId ? t.user2 : t.user1
+    const otherUser = t.user1_id === uid ? t.user2 : t.user1
     const lastMessage = t.messages[0]
     
     return {
@@ -38,11 +77,40 @@ export async function getConversations(userId: number) {
       preview: lastMessage?.message_content || 'No messages yet',
       time: lastMessage?.created_at || t.last_message_at,
       otherUserId: otherUser.id,
+      unreadCount: t._count.messages
     }
   })
 }
 
+export async function markThreadAsRead(threadId: number) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+
+  // Mark all unread messages in the thread not sent by current user as read
+  await prisma.chatMessage.updateMany({
+    where: {
+      thread_id: threadId,
+      sender_id: { not: uid },
+      is_read: false,
+    },
+    data: { is_read: true }
+  });
+
+  // Notify sender that their messages were read
+  await pusherServer.trigger(`private-thread-${threadId}`, 'thread:read', { threadId, readerId: uid });
+  return { success: true };
+}
+
+export async function triggerTyping(threadId: number) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+  
+  await pusherServer.trigger(`private-thread-${threadId}`, 'typing', { threadId, senderId: uid });
+  return { success: true };
+}
+
 export async function getMessages(threadId: number) {
+  const user = await requireAuth();
   const messages = await prisma.chatMessage.findMany({
     where: { thread_id: threadId },
     include: {
@@ -75,6 +143,7 @@ export async function getMessages(threadId: number) {
 }
 
 export async function sendMessage(threadId: number, senderId: number, content: string, attachment?: string, replyToId?: number) {
+  const user = await requireAuth();
   const message = await prisma.chatMessage.create({
     data: {
       thread_id: threadId,
@@ -101,6 +170,7 @@ export async function sendMessage(threadId: number, senderId: number, content: s
 }
 
 export async function createCallSession(threadId: number, callerId: number, type: 'voice' | 'video') {
+  const user = await requireAuth();
   const roomName = `room-${threadId}-${Date.now()}`
   
   const call = await prisma.call.create({
@@ -124,6 +194,7 @@ export async function createCallSession(threadId: number, callerId: number, type
 }
 
 export async function endCallSession(roomName: string, durationSeconds: number) {
+  const user = await requireAuth();
   const call = await prisma.call.findUnique({ where: { room_name: roomName } })
   if (!call) return null
 
@@ -149,6 +220,7 @@ export async function endCallSession(roomName: string, durationSeconds: number) 
 }
 
 export async function searchUsers(query: string, currentUserId: number) {
+  const user = await requireAuth();
   if (!query) return []
   return await prisma.user.findMany({
     where: {
@@ -165,6 +237,7 @@ export async function searchUsers(query: string, currentUserId: number) {
 }
 
 export async function getOrCreateThread(userId1: number, userId2: number) {
+  const user = await requireAuth();
   const minId = Math.min(userId1, userId2)
   const maxId = Math.max(userId1, userId2)
 

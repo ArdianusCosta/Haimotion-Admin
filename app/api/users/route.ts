@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 
 export async function GET(request: Request) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, 'users.view');
+    
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
@@ -61,6 +65,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, 'users.create');
+    
     const data = await request.json()
     
     // Default password if not provided

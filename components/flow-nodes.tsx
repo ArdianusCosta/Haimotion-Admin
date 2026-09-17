@@ -9,7 +9,7 @@ export interface FlowNodeData {
   label: string
   type: 'database' | 'api' | 'service' | 'ui' | 'validation' | 'testing' | 'deployment' | 'documentation' | 'milestone' | 'condition' | 'custom'
   tech?: string
-  status?: 'completed' | 'in-progress' | 'planned' | 'error'
+  status?: 'completed' | 'in-progress' | 'planned' | 'error' | 'failed' | 'running' | 'pending'
   owner?: string
   description?: string
 }
@@ -47,8 +47,12 @@ const getColorClasses = (type: FlowNodeData['type']) => {
 const getStatusIndicator = (status?: FlowNodeData['status']) => {
   switch (status) {
     case 'completed': return 'bg-green-500'
-    case 'in-progress': return 'bg-blue-500'
-    case 'error': return 'bg-red-500'
+    case 'in-progress': 
+    case 'running': return 'bg-blue-500'
+    case 'error': 
+    case 'failed': return 'bg-red-500'
+    case 'planned':
+    case 'pending': return 'bg-zinc-400'
     default: return 'bg-zinc-400'
   }
 }

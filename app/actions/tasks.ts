@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { requireAuth, requirePermission, canAccessTask } from '@/lib/auth/authorization'
 
 // Status Map
 const TASK_STATUS_MAP: Record<number, string> = {
@@ -46,12 +47,16 @@ function getTagColor(tag: string | null) {
 
 export async function getTasksData() {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "tasks.view");
     const projects = await prisma.project_list.findMany({
-      orderBy: { date_created: 'desc' }
+      orderBy: { date_created: 'desc' },
+      include: { members: true }
     })
     
     const tasks = await prisma.task_list.findMany({
-      orderBy: { date_created: 'desc' }
+      orderBy: { date_created: 'desc' },
+      include: { assignees: true }
     })
     
     const users = await prisma.user.findMany({
@@ -85,7 +90,7 @@ export async function getTasksData() {
       const pendingTasks = projectTasks.filter(t => t.status === 0 || t.status === 1).length
       const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100)
       
-      const memberIds = project.user_ids ? project.user_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : []
+      const memberIds = project.members.map(m => m.user_id)
       if (project.manager_id && !memberIds.includes(project.manager_id)) {
         memberIds.push(project.manager_id)
       }
@@ -109,7 +114,7 @@ export async function getTasksData() {
     })
 
     const formattedTasks = tasks.map(task => {
-      const assignedIds = task.user_ids ? task.user_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : []
+      const assignedIds = task.assignees.map(a => a.user_id)
       const assignees = formattedUsers.filter(u => assignedIds.includes(u.id))
       const comments = commentsCount.find(c => c.task_id === task.id)?._count.id || 0
       const attachments = attachmentsCount.find(c => c.task_id === task.id)?._count.id || 0
@@ -135,23 +140,27 @@ export async function getTasksData() {
       }
     })
 
-    return { success: true, projects: formattedProjects, tasks: formattedTasks, users: formattedUsers }
+    return { success: true, projects: formattedProjects, tasks: formattedTasks, users: formattedUsers, currentUserId: typeof user.id === 'string' ? parseInt(user.id) : user.id }
   } catch (error: any) {
     console.error('Error fetching tasks data:', error)
     return { success: false, error: error.message }
   }
 }
 
-export async function createTask(data: { title: string, description: string, status: number, assignees: string, projectId: number, dueDate?: string }) {
+export async function createTask(data: { title: string, description: string, status: number, assignees: number[], projectId: number, dueDate?: string }) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "tasks.create");
     const task = await prisma.task_list.create({
       data: {
         task: data.title,
         description: data.description || '',
         status: data.status,
-        user_ids: data.assignees || null,
         project_id: data.projectId,
-        end_date: data.dueDate ? new Date(data.dueDate) : null
+        end_date: data.dueDate ? new Date(data.dueDate) : null,
+        assignees: {
+          create: data.assignees.map(uid => ({ user_id: Number(uid) }))
+        }
       }
     })
     revalidatePath('/kanban')
@@ -162,20 +171,31 @@ export async function createTask(data: { title: string, description: string, sta
   }
 }
 
-export async function updateTask(id: number, data: { title: string, description: string, status: number, assignees: string, projectId: number, dueDate?: string }) {
+export async function updateTask(id: number, data: { title: string, description: string, status: number, assignees: number[], projectId: number, dueDate?: string }) {
   try {
-    const task = await prisma.task_list.update({
-      where: { id },
-      data: {
-        task: data.title,
-        description: data.description || '',
-        status: data.status,
-        user_ids: data.assignees || null,
-        project_id: data.projectId,
-        end_date: data.dueDate ? new Date(data.dueDate) : null,
-        date_updated: new Date()
-      }
-    })
+    const user = await requireAuth();
+    const hasAccess = await canAccessTask(user, id, 'editor');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+    
+    const task = await prisma.$transaction(async (tx) => {
+      await tx.taskAssignee.deleteMany({ where: { task_id: id } });
+      
+      return tx.task_list.update({
+        where: { id },
+        data: {
+          task: data.title,
+          description: data.description || '',
+          status: data.status,
+          project_id: data.projectId,
+          end_date: data.dueDate ? new Date(data.dueDate) : null,
+          date_updated: new Date(),
+          assignees: {
+            create: data.assignees.map(uid => ({ user_id: Number(uid) }))
+          }
+        }
+      });
+    });
+    
     revalidatePath('/kanban')
     return { success: true, data: task }
   } catch (error: any) {
@@ -186,6 +206,9 @@ export async function updateTask(id: number, data: { title: string, description:
 
 export async function deleteTask(id: number) {
   try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessTask(user, id, 'manager');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
     // Delete related comments and attachments first (cascade simulation)
     await prisma.task_comments.deleteMany({ where: { task_id: id } })
     await prisma.task_attachments.deleteMany({ where: { task_id: id } })
@@ -199,5 +222,80 @@ export async function deleteTask(id: number) {
   } catch (error: any) {
     console.error('Error deleting task:', error)
     return { success: false, error: error.message }
+  }
+}
+
+export async function getTaskComments(taskId: number) {
+  try {
+    const user = await requireAuth();
+    // Assuming canAccessTask checks if user can view this task
+    const hasAccess = await canAccessTask(user, taskId, 'viewer');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+
+    const comments = await prisma.task_comments.findMany({
+      where: { task_id: taskId },
+      orderBy: { created_at: 'asc' }
+    });
+    
+    return { success: true, comments };
+  } catch (error: any) {
+    console.error('Error fetching task comments:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createTaskComment(taskId: number, commentText: string, parentId?: number) {
+  try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessTask(user, taskId, 'viewer');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+
+    if (!commentText.trim()) {
+      return { success: false, error: 'Comment cannot be empty' };
+    }
+
+    const newComment = await prisma.task_comments.create({
+      data: {
+        task_id: taskId,
+        user_id: typeof user.id === 'string' ? parseInt(user.id) : user.id,
+        comment: commentText.trim(),
+        parent_id: parentId || null
+      }
+    });
+    
+    return { success: true, comment: newComment };
+  } catch (error: any) {
+    console.error('Error creating task comment:', error);
+    return { success: false, error: error.message };
+  }
+}
+export async function getTaskForEdit(taskId: number) {
+  try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessTask(user, taskId, 'viewer');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+
+    const task = await prisma.task_list.findUnique({
+      where: { id: taskId },
+      include: { assignees: true }
+    });
+
+    if (!task) return { success: false, error: 'Task not found' };
+
+    return {
+      success: true,
+      task: {
+        id: task.id,
+        title: task.task,
+        description: task.description || '',
+        status: task.status ?? 1,
+        projectId: task.project_id,
+        assignees: task.assignees.map(a => Number(a.user_id)),
+        dueDate: task.end_date ? task.end_date.toISOString().split('T')[0] : ''
+      }
+    };
+  } catch (error: any) {
+    console.error('Error fetching task for edit:', error);
+    return { success: false, error: error.message };
   }
 }

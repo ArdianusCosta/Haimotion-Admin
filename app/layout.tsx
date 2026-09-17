@@ -1,8 +1,16 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { Inter, Roboto, Outfit, Playfair_Display, Fira_Code, Oswald } from 'next/font/google'
 import { QueryProvider } from '@/components/query-provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' })
+const roboto = Roboto({ weight: ['400', '500', '700'], subsets: ['latin'], variable: '--font-roboto' })
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' })
+const firaCode = Fira_Code({ subsets: ['latin'], variable: '--font-fira-code' })
+const oswald = Oswald({ subsets: ['latin'], variable: '--font-oswald' })
 
 export const metadata: Metadata = {
   title: 'HaiMotion — Business workspace',
@@ -42,7 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className={`${inter.variable} ${outfit.variable} ${roboto.variable} ${playfair.variable} ${firaCode.variable} ${oswald.variable} antialiased font-sans`}>
         <QueryProvider>
           {children}
           {process.env.NODE_ENV === 'production' && <Analytics />}

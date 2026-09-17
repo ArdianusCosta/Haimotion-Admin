@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { ShareDialog } from './share-dialog'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface FileManagerProps {
   user: any;
@@ -69,15 +70,16 @@ export default function FileManager({ user }: FileManagerProps) {
 
   // Fetch Folders
   const { data: foldersData, isLoading: foldersLoading } = useQuery({
-    queryKey: ['file-manager-folders', userId, currentFolderId],
+    queryKey: ['file-manager-folders', userId, currentFolderId, filter],
     queryFn: async () => {
       let url = `/api/file-manager/folders?userId=${userId}`
       if (currentFolderId) url += `&parentId=${currentFolderId}`
+      if (filter) url += `&filter=${filter}`
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch folders')
       return res.json()
     },
-    enabled: !!userId && !filter && !query, // Only fetch folders if no search/filter active
+    enabled: !!userId && (!filter || filter === 'shared') && !query, // Fetch folders if no search/filter active, or if filter is shared
   })
 
   // Fetch Files
@@ -312,7 +314,8 @@ export default function FileManager({ user }: FileManagerProps) {
         kind: 'folder',
         updatedAt: f.updated_at,
         permission: f.permission || 'owner',
-        sharedBy: f.sharedBy
+        sharedBy: f.sharedBy,
+        shares: f.shares || []
       })))
     }
     
@@ -338,7 +341,8 @@ export default function FileManager({ user }: FileManagerProps) {
           updatedAt: f.updated_at,
           fileData: f,
           permission: f.permission || 'owner',
-          sharedBy: f.sharedBy
+          sharedBy: f.sharedBy,
+          shares: f.shares || []
         }
       }))
     }
@@ -557,9 +561,24 @@ export default function FileManager({ user }: FileManagerProps) {
                     {item.name}
                     {item.isStarred && <Star className="size-3 text-yellow-500 fill-yellow-500" />}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {item.type} {item.kind !== 'folder' && `· ${item.size}`}
-                    {filter === 'shared' && item.sharedBy && ` · Shared by ${item.sharedBy} (${item.permission})`}
+                  <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{item.type} {item.kind !== 'folder' && `· ${item.size}`}</span>
+                    {filter === 'shared' && item.sharedBy && <span>· Shared by {item.sharedBy} ({item.permission})</span>}
+                    {item.shares && item.shares.length > 0 && (
+                      <span className="flex items-center gap-1.5 ml-2 border-l border-border pl-2">
+                        <span className="flex -space-x-1.5">
+                          {item.shares.slice(0, 3).map((share: any) => (
+                            <Avatar key={share.shared_with_user.id} className="size-5 border-2 border-card ring-0">
+                              <AvatarImage src={share.shared_with_user.avatar || ''} />
+                              <AvatarFallback className="text-[9px] font-medium uppercase">{share.shared_with_user.firstname?.[0]}</AvatarFallback>
+                            </Avatar>
+                          ))}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                          {item.shares.length} {item.shares.length === 1 ? 'person' : 'people'}
+                        </span>
+                      </span>
+                    )}
                   </p>
                 </div>
                 

@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ProjectFormDialog } from '@/components/project-form-dialog'
@@ -67,12 +68,20 @@ function stripHtmlTags(html: string) {
 }
 
 export function ProjectPage() {
+  const STATUS_LABELS: Record<number, { label: string; color: string }> = {
+    0: { label: 'On Hold', color: 'bg-amber-500/10 text-amber-600' },
+    1: { label: 'Pending', color: 'bg-muted text-muted-foreground' },
+    2: { label: 'Active', color: 'bg-blue-500/10 text-blue-600' },
+    5: { label: 'Completed', color: 'bg-emerald-500/10 text-emerald-600' },
+    6: { label: 'In Review', color: 'bg-purple-500/10 text-purple-600' },
+  }
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState('Dependencies')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<number | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false)
   const [isContributorsOpen, setIsContributorsOpen] = useState(false)
   const router = useRouter()
   
@@ -161,13 +170,14 @@ export function ProjectPage() {
               <DropdownMenuTrigger render={
                 <Button variant="outline" size="sm" className="h-9 gap-2">
                   <Filter className="size-4" /> 
-                  {statusFilter === null ? 'Filter' : statusFilter === 2 ? 'Active' : statusFilter === 5 ? 'Done' : 'Pending'}
+                  {statusFilter === null ? 'Filter' : statusFilter === 2 ? 'Active' : statusFilter === 5 ? 'Done' : statusFilter === 0 ? 'On Hold' : 'Pending'}
                 </Button>
               } />
               <DropdownMenuContent align="end">
                 <DropdownMenuCheckboxItem checked={statusFilter === null} onCheckedChange={() => setStatusFilter(null)}>All Status</DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem checked={statusFilter === 2} onCheckedChange={() => setStatusFilter(2)}>Active</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem checked={statusFilter === 0} onCheckedChange={() => setStatusFilter(0)}>Pending</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={statusFilter === 1} onCheckedChange={() => setStatusFilter(1)}>Pending</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={statusFilter === 0} onCheckedChange={() => setStatusFilter(0)}>On Hold</DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem checked={statusFilter === 5} onCheckedChange={() => setStatusFilter(5)}>Completed</DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -214,8 +224,8 @@ export function ProjectPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                        Status: {project.status}
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_LABELS[project.status]?.color ?? 'bg-muted text-muted-foreground'}`}>
+                        {STATUS_LABELS[project.status]?.label ?? `Status ${project.status}`}
                       </span>
                     </div>
                   </div>
@@ -332,9 +342,9 @@ export function ProjectPage() {
                 </button>
               } />
               <DropdownMenuContent align="end">
-                <DropdownMenuCheckboxItem checked={false} onCheckedChange={() => duplicateMutation.mutate(selectedProject.id)}>Duplicate project</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem checked={false} onCheckedChange={() => archiveMutation.mutate(selectedProject.id)}>Archive project</DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem checked={false} onCheckedChange={() => exportMutation.mutate(selectedProject.id)}>Export project</DropdownMenuCheckboxItem>
+                <DropdownMenuItem onClick={() => duplicateMutation.mutate(selectedProject.id)}>Duplicate project</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsArchiveDialogOpen(true)}>Archive project</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportMutation.mutate(selectedProject.id)}>Export project data</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -343,7 +353,7 @@ export function ProjectPage() {
         <div className="mb-6 space-y-4">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{selectedProject.name}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">Status: {selectedProject.status}</div>
+            <div className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${STATUS_LABELS[selectedProject.status]?.color ?? 'bg-muted text-muted-foreground'}`}>{STATUS_LABELS[selectedProject.status]?.label ?? `Status ${selectedProject.status}`}</div>
             <div className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold">
               <Users className="size-3.5" /> {selectedProject.members.length} contributors
             </div>
@@ -449,7 +459,7 @@ export function ProjectPage() {
         {/* Tab Content */}
         <div className="rounded-[14px] border border-border bg-card shadow-sm">
           {activeTab === 'Dependencies' ? (
-            <div className="flex h-auto min-h-[320px] items-start justify-center sm:min-h-[360px] p-4">
+            <div className="p-4">
               <DependencyGraph tasks={selectedProject.tasks || []} />
             </div>
           ) : (
@@ -489,7 +499,7 @@ export function ProjectPage() {
             </div>
           </div>
           <button onClick={() => router.push('/tasks?projectId=' + selectedProject.id)} className="mt-4 flex h-8 w-full items-center justify-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
-            View full task board <ChevronRight className="size-3.5" />
+            View tasks for this project <ChevronRight className="size-3.5" />
           </button>
         </section>
 
@@ -563,6 +573,33 @@ export function ProjectPage() {
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={deleteMutation.isPending}>Cancel</Button>
             <Button variant="destructive" onClick={() => deleteMutation.mutate(selectedProject.id)} disabled={deleteMutation.isPending}>
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Archive Project</DialogTitle>
+            <DialogDescription>
+              Project <strong>{selectedProject.name}</strong> akan disembunyikan dari daftar aktif. Kamu bisa mengembalikannya nanti jika diperlukan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)} disabled={archiveMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={archiveMutation.isPending}
+              onClick={() => {
+                archiveMutation.mutate(selectedProject.id)
+                setIsArchiveDialogOpen(false)
+              }}
+            >
+              {archiveMutation.isPending ? 'Archiving...' : 'Archive Project'}
             </Button>
           </DialogFooter>
         </DialogContent>

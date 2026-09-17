@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const uid = Number(user.id);
 
     const pref = await prisma.userPreference.findUnique({
-      where: { user_id: parseInt(userId) },
+      where: { user_id: uid },
     });
 
     return NextResponse.json({ preference: pref });
@@ -25,9 +25,14 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+
     const body = await req.json();
     const { 
-      userId, 
       file_manager_view_mode,
       layout_style,
       theme_color,
@@ -35,12 +40,9 @@ export async function PATCH(req: Request) {
       theme_mode,
       content_width,
       header_style,
-      sidebar_style
+      sidebar_style,
+      font_family
     } = body;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
 
     const updateData: any = {};
     if (file_manager_view_mode !== undefined) updateData.file_manager_view_mode = file_manager_view_mode;
@@ -51,12 +53,13 @@ export async function PATCH(req: Request) {
     if (content_width !== undefined) updateData.content_width = content_width;
     if (header_style !== undefined) updateData.header_style = header_style;
     if (sidebar_style !== undefined) updateData.sidebar_style = sidebar_style;
+    if (font_family !== undefined) updateData.font_family = font_family;
 
     const pref = await prisma.userPreference.upsert({
-      where: { user_id: parseInt(userId) },
+      where: { user_id: uid },
       update: updateData,
       create: {
-        user_id: parseInt(userId),
+        user_id: uid,
         ...updateData,
       },
     });

@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getFileUrl } from '@/lib/storage/minio';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
     const { id } = await params;
     const fileId = parseInt(id);
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
 
     const file = await prisma.file.findUnique({
       where: { id: fileId },
@@ -25,9 +25,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     // Check permissions
-    const uid = parseInt(userId);
+    const uid = Number(user.id);
     const isOwner = file.owner_id === uid;
-    const isShared = file.shares.some(s => s.user_id === uid);
+    const isShared = file.shares.some(s => s.shared_with_user_id === uid);
 
     if (!isOwner && !isShared) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });

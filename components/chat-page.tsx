@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply } from 'lucide-react'
+import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply, Download, X, Check, CheckCheck } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getConversations, getMessages, sendMessage, createCallSession, searchUsers, getOrCreateThread } from '@/app/actions/chat'
+import { getConversations, getMessages, sendMessage, createCallSession, searchUsers, getOrCreateThread, triggerTyping, markThreadAsRead } from '@/app/actions/chat'
 import { pusherClient } from '@/lib/pusher-client'
 import { JitsiCallUI } from './jitsi-meet'
 import {
@@ -22,6 +22,9 @@ export function ChatPage() {
   const queryClient = useQueryClient()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [onlineUsers, setOnlineUsers] = useState<Set<number>>(new Set())
+  const [isTyping, setIsTyping] = useState(false)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastTypingTime = useRef<number>(0)
   
   // Call State
   const [activeCall, setActiveCall] = useState<{ roomName: string, type: 'voice'|'video', startedAt: number } | null>(null)
@@ -45,10 +48,14 @@ export function ChatPage() {
   // Reply State
   const [replyingToMessage, setReplyingToMessage] = useState<any | null>(null)
 
+  // Image Modal State
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+
   useEffect(() => {
     const savedUser = localStorage.getItem('auth_user')
     if (savedUser) {
       const user = JSON.parse(savedUser)
+      user.id = parseInt(user.id, 10)
       setCurrentUser(user)
     }
   }, [])
@@ -113,6 +120,13 @@ export function ChatPage() {
         return [...oldData, newMessage]
       })
       setTimeout(() => scrollToBottom(), 100)
+      
+      // If the message is from someone else and we are viewing the thread, mark it as read immediately
+      if (newMessage.sender_id !== currentUser.id) {
+        markThreadAsRead(activeThreadId).then(() => {
+          refetchConversations()
+        })
+      }
     })
 
     channel.bind('call:incoming', (callData: any) => {
@@ -127,12 +141,44 @@ export function ChatPage() {
       }
     })
 
+    channel.bind('typing', (data: any) => {
+      if (data.senderId !== currentUser.id) {
+        setIsTyping(true)
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000)
+        scrollToBottom()
+      }
+    })
+
+    channel.bind('thread:read', (data: any) => {
+      queryClient.setQueryData(['messages', activeThreadId], (oldData: any) => {
+        if (!oldData) return oldData
+        return oldData.map((m: any) => {
+          if (data.readerId !== currentUser.id && m.sender_id === currentUser.id) {
+            return { ...m, is_read: true }
+          }
+          if (data.readerId === currentUser.id && m.sender_id !== currentUser.id) {
+            return { ...m, is_read: true }
+          }
+          return m
+        })
+      })
+      refetchConversations()
+    })
+
+    // When we open this thread, mark it as read
+    markThreadAsRead(activeThreadId).then(() => {
+      refetchConversations()
+    })
+
     return () => {
       channel.unbind('message:created')
       channel.unbind('call:incoming')
+      channel.unbind('typing')
+      channel.unbind('thread:read')
       pusherClient.unsubscribe(channelName)
     }
-  }, [activeThreadId, currentUser, queryClient])
+  }, [activeThreadId, currentUser, queryClient, conversations])
 
   // Pusher Presence Subscription
   useEffect(() => {
@@ -159,7 +205,8 @@ export function ChatPage() {
     })
 
     return () => {
-      pusherClient.unsubscribe('presence-chat')
+      // Don't unsubscribe, we want presence to be maintained globally
+      presenceChannel.unbind_all()
     }
   }, [currentUser])
 
@@ -293,6 +340,23 @@ export function ChatPage() {
         </div>
       )}
 
+      {/* Image Modal Overlay */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => setSelectedImage(null)}>
+          <div className="relative max-h-full max-w-4xl flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -top-14 right-0 flex gap-4">
+              <a href={selectedImage} download className="rounded-full bg-white/20 p-2 text-white hover:bg-white/40 transition-colors" title="Download">
+                <Download className="size-5" />
+              </a>
+              <button onClick={() => setSelectedImage(null)} className="rounded-full bg-white/20 p-2 text-white hover:bg-white/40 transition-colors" title="Close">
+                <X className="size-5" />
+              </button>
+            </div>
+            <img src={selectedImage} alt="Fullscreen Attachment" className="max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <MessageCircle className="size-4 text-primary" />Apps / Chat
@@ -368,12 +432,19 @@ export function ChatPage() {
                       {isOnline && <span className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-background bg-green-500" />}
                     </div>
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium">{item.name}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(item.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </span>
-                      </span>
+                      <div className="flex w-full items-center justify-between">
+                        <span className="font-semibold text-sm">{item.name}</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] text-muted-foreground">
+                            {item.time ? new Date(item.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                          </span>
+                          {item.unreadCount > 0 && (
+                            <span className="flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                              {item.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <span className="mt-1 block truncate text-xs text-muted-foreground">{item.preview}</span>
                     </span>
                   </button>
@@ -485,32 +556,6 @@ export function ChatPage() {
                 <div 
                   key={`msg-${item.id || index}`} 
                   className={`flex gap-3 relative group ${isOwn ? 'flex-row-reverse' : ''} transition-transform duration-200`}
-                  onPointerDown={(e) => {
-                    e.currentTarget.setPointerCapture(e.pointerId)
-                    e.currentTarget.dataset.startX = e.clientX.toString()
-                  }}
-                  onPointerMove={(e) => {
-                    const startX = parseFloat(e.currentTarget.dataset.startX || '0')
-                    if (startX > 0) {
-                      const diffX = e.clientX - startX
-                      // Swipe right to reply
-                      if (diffX > 60) {
-                        setReplyingToMessage(item)
-                        e.currentTarget.dataset.startX = '0'
-                      }
-                      // visual feedback
-                      e.currentTarget.style.transform = `translateX(${Math.max(0, Math.min(diffX, 50))}px)`
-                    }
-                  }}
-                  onPointerUp={(e) => {
-                    e.currentTarget.dataset.startX = '0'
-                    e.currentTarget.releasePointerCapture(e.pointerId)
-                    e.currentTarget.style.transform = 'translateX(0px)'
-                  }}
-                  onPointerCancel={(e) => {
-                    e.currentTarget.dataset.startX = '0'
-                    e.currentTarget.style.transform = 'translateX(0px)'
-                  }}
                 >
                   <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${isOwn ? 'bg-accent text-accent-foreground' : 'bg-primary text-primary-foreground'}`}>
                     {initials}
@@ -527,9 +572,37 @@ export function ChatPage() {
                       {item.attachment && (
                         <div className="mt-2 overflow-hidden rounded-xl bg-background/10">
                           {decodeURIComponent(item.attachment).includes('type=image') ? (
-                            <img src={item.attachment} alt="Attachment" className="max-w-[200px] h-auto rounded-xl border border-border/20" />
+                            <img 
+                              src={item.attachment} 
+                              alt="Attachment" 
+                              className="max-w-[200px] h-auto rounded-xl border border-border/20 cursor-pointer hover:opacity-90"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedImage(item.attachment);
+                              }}
+                            />
                           ) : (
-                            <a href={item.attachment} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 hover:bg-background/20 rounded-xl transition-colors">
+                            <a 
+                              href={item.attachment} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="flex items-center gap-2 p-2 hover:bg-background/20 rounded-xl transition-colors cursor-pointer"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                // 1. Trigger Download
+                                const downloadLink = document.createElement('a');
+                                downloadLink.href = item.attachment;
+                                downloadLink.download = new URLSearchParams(item.attachment.split('?')[1]).get('name') || 'download';
+                                document.body.appendChild(downloadLink);
+                                downloadLink.click();
+                                document.body.removeChild(downloadLink);
+                                
+                                // 2. Open in New Tab for viewing
+                                window.open(`/api/chat/view?file=${encodeURIComponent(item.attachment.split('?')[0])}`, '_blank');
+                              }}
+                            >
                               <Paperclip className="size-4 shrink-0" />
                               <span className="truncate max-w-[150px] text-xs font-medium underline-offset-4 hover:underline">
                                 {new URLSearchParams(item.attachment.split('?')[1]).get('name') || 'Download File'}
@@ -539,21 +612,40 @@ export function ChatPage() {
                         </div>
                       )}
                     </div>
-                    <div className={`flex items-center gap-2 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-center gap-1.5 px-1 mt-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
                       <span className="text-[10px] text-muted-foreground">{time}</span>
+                      {isOwn && (
+                        <span className="flex items-center">
+                          {item.is_read ? <CheckCheck className="size-3 text-blue-500" /> : <Check className="size-3 text-muted-foreground/60" />}
+                        </span>
+                      )}
                       <button 
-                        onClick={() => setReplyingToMessage(item)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReplyingToMessage(item);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground mx-1"
                         aria-label="Reply to message"
                       >
-                        <Reply className="size-3.5" />
+                        <Reply className="size-3" />
                       </button>
                     </div>
                   </div>
                 </div>
               )
             })}
-            <div ref={messagesEndRef} />
+            {/* TYPING INDICATOR */}
+            {isTyping && (
+              <div className="flex items-center gap-2 px-5 py-2 text-xs italic text-muted-foreground">
+                <div className="flex space-x-1">
+                  <div className="size-1.5 animate-bounce rounded-full bg-primary/60"></div>
+                  <div className="size-1.5 animate-bounce rounded-full bg-primary/60" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="size-1.5 animate-bounce rounded-full bg-primary/60" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+                <span>typing...</span>
+              </div>
+            )}
+            <div ref={messagesEndRef} className="h-1" />
           </div>
 
           <div className="shrink-0 border-t border-border p-4 relative">
@@ -622,7 +714,16 @@ export function ChatPage() {
               <textarea 
                 rows={1} 
                 value={message} 
-                onChange={(event) => setMessage(event.target.value)} 
+                onChange={(e) => {
+                  setMessage(e.target.value)
+                  if (activeThreadId) {
+                    const now = Date.now()
+                    if (now - lastTypingTime.current > 2000) {
+                      lastTypingTime.current = now
+                      triggerTyping(activeThreadId)
+                    }
+                  }
+                }} 
                 onKeyDown={(event) => { 
                   if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { 
                     event.preventDefault(); 

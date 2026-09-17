@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { checkAccess } from '@/lib/file-auth';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function GET(req: Request) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+    
     const { searchParams } = new URL(req.url);
     const itemId = searchParams.get('itemId');
     const itemType = searchParams.get('itemType'); // 'file' or 'folder'
-    const userId = searchParams.get('userId');
 
-    if (!itemId || !itemType || !userId) {
+    if (!itemId || !itemType) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    const hasAccess = await checkAccess(parseInt(userId), parseInt(itemId), itemType as 'file' | 'folder', 'manager');
+    const hasAccess = await checkAccess(uid, parseInt(itemId), itemType as 'file' | 'folder', 'manager');
     // If not manager, but owner, it's fine. checkAccess for manager includes owner.
     
     // Wait, we should allow any user who has access to view who it is shared with?
@@ -44,14 +50,20 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { itemId, itemType, sharedWithUserId, permission, userId } = body;
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
 
-    if (!itemId || !itemType || !sharedWithUserId || !permission || !userId) {
+    const body = await req.json();
+    const { itemId, itemType, sharedWithUserId, permission } = body;
+
+    if (!itemId || !itemType || !sharedWithUserId || !permission) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    const hasAccess = await checkAccess(parseInt(userId), parseInt(itemId), itemType, 'manager');
+    const hasAccess = await checkAccess(uid, parseInt(itemId), itemType, 'manager');
     if (!hasAccess) {
       return NextResponse.json({ error: 'Unauthorized to share' }, { status: 403 });
     }
@@ -70,7 +82,7 @@ export async function POST(req: Request) {
           file_id: parseInt(itemId),
           shared_with_user_id: parseInt(sharedWithUserId),
           permission,
-          shared_by_user_id: parseInt(userId),
+          shared_by_user_id: uid,
         }
       });
     } else {
@@ -86,7 +98,7 @@ export async function POST(req: Request) {
           folder_id: parseInt(itemId),
           shared_with_user_id: parseInt(sharedWithUserId),
           permission,
-          shared_by_user_id: parseInt(userId),
+          shared_by_user_id: uid,
         }
       });
     }
@@ -100,17 +112,22 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+    
     const { searchParams } = new URL(req.url);
     const itemId = searchParams.get('itemId');
     const itemType = searchParams.get('itemType');
     const sharedWithUserId = searchParams.get('sharedWithUserId');
-    const userId = searchParams.get('userId');
 
-    if (!itemId || !itemType || !sharedWithUserId || !userId) {
+    if (!itemId || !itemType || !sharedWithUserId) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    const hasAccess = await checkAccess(parseInt(userId), parseInt(itemId), itemType as 'file'|'folder', 'manager');
+    const hasAccess = await checkAccess(uid, parseInt(itemId), itemType as 'file'|'folder', 'manager');
     if (!hasAccess) {
       return NextResponse.json({ error: 'Unauthorized to remove share' }, { status: 403 });
     }

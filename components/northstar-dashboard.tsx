@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { SectionPage } from '@/components/section-page'
 import { ChatPage } from '@/components/chat-page'
@@ -17,19 +17,41 @@ import { ProjectPage } from '@/components/project-page'
 import { LayoutsPage } from '@/components/layouts-page'
 import { AiPage } from '@/components/ai-page'
 import { TasksPage } from '@/components/tasks-page'
+import { TimesheetsPage } from '@/components/timesheets-page'
 import { SetupProjectPage } from '@/components/setup-project-page'
 import { MilestonePage } from '@/components/milestone-page'
 import { ModuleFlowPage } from '@/components/module-flow-page'
 import { RolesPermissionsPage } from '@/components/roles-permissions-page'
 import { UsersPage } from '@/components/users-page'
+import { MeetingsPage } from '@/components/meetings-page'
+import { TransactionsPage } from '@/components/finance/transactions-page'
+import { InvoicesPage } from '@/components/finance/invoices-page'
+import { FinanceOverviewPage } from '@/components/finance/finance-overview-page'
+import { ExpensesPage } from '@/components/finance/expenses-page'
+import { CashBankPage } from '@/components/finance/cash-bank-page'
+import { ReportsPage } from '@/components/finance/reports-page'
+import { HROverviewPage } from '@/components/hr/hr-overview-page'
+import { EmployeesPage } from '@/components/hr/employees-page'
+import { AttendancePage } from '@/components/hr/attendance-page'
+import { PayrollPage } from '@/components/hr/payroll-page'
+import { RecruitmentPage } from '@/components/hr/recruitment-page'
+
 import FileManager from '@/components/file-manager/file-manager'
 import { useLanguage } from '@/components/language-provider'
+import { authClient } from '@/lib/auth/client'
+import { getUnreadChatCount } from '@/app/actions/chat'
+import { pusherClient } from '@/lib/pusher-client'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { AccountSettings } from '@/components/account-settings'
 import {
   Activity, ArrowDownRight, ArrowUpRight, Bell, CalendarDays, Check,
   ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, Download,
   File, FileImage, FileSpreadsheet, Folder, FolderOpen, Grid2X2, LayoutDashboard,
   List, Mail, Menu, MessageCircle, MoreHorizontal, Package, PanelLeft,
-  Plus, Search, Settings, ShoppingCart, Sparkles, Sun, Users, X, Zap, ClipboardList, LayoutTemplate, Paintbrush, ListTodo, UserCheck, Blocks, Flag, GitPullRequest, ShieldAlert, ShieldCheck, LogOut
+  Plus, Search, Settings, ShoppingCart, Sparkles, Sun, Users, X, Zap, ClipboardList, LayoutTemplate, Paintbrush, ListTodo, UserCheck, Blocks, Flag, GitPullRequest, ShieldAlert, ShieldCheck, LogOut, DollarSign, Receipt,
+  PieChart, CreditCard, Wallet, Banknote, TrendingDown, TrendingUp, BookOpen, Target, BarChart3, Scale, Clock, FileText, Briefcase, Video
 } from 'lucide-react'
 
 const nav = [
@@ -37,11 +59,22 @@ const nav = [
   { label: 'Orders', icon: ShoppingCart, badge: '12' }, { label: 'Products', icon: Package },
   { label: 'Customers', icon: Users },
 ]
+const chatsMenu = [
+  { label: 'Messenger', icon: MessageCircle, badge: '4' },
+  { label: 'Email', icon: Mail },
+]
+const aiMenu = [
+  { label: 'AI Assistant', icon: Sparkles }
+]
+const workMenu = [
+  { label: 'Project', icon: ClipboardList },
+  { label: 'Kanban', icon: Check },
+  { label: 'Tasks', icon: ListTodo },
+  { label: 'Calendar', icon: CalendarDays },
+  { label: 'Meetings', icon: Video },
+  { label: 'Timesheets', icon: Clock },
+]
 const apps = [
-  { label: 'Chat', icon: MessageCircle, badge: '4' }, { label: 'Mail', icon: Mail },
-  { label: 'Kanban', icon: Check }, { label: 'Calendar', icon: CalendarDays },
-  { label: 'Project', icon: ClipboardList }, { label: 'Tasks', icon: ListTodo },
-  { label: 'AI Assistant', icon: Sparkles },
   { label: 'Layouts', icon: LayoutTemplate }
 ]
 const developer = [
@@ -49,6 +82,21 @@ const developer = [
   { label: 'Milestones', icon: Flag },
   { label: 'Module Flows', icon: GitPullRequest }
 ]
+const financeMenu = [
+  { label: 'Finance Overview', icon: LayoutDashboard },
+  { label: 'Invoices', icon: Receipt },
+  { label: 'Expenses', icon: TrendingDown },
+  { label: 'Cash & Bank', icon: Wallet },
+  { label: 'Reports', icon: FileSpreadsheet },
+]
+const hrMenu = [
+  { label: 'HR Overview', icon: LayoutDashboard },
+  { label: 'Employees', icon: Users },
+  { label: 'Attendance & Leave', icon: CalendarDays },
+  { label: 'Payroll', icon: Receipt },
+  { label: 'Recruitment', icon: Briefcase },
+]
+
 const administration = [
   { label: 'Roles & Permissions', icon: ShieldCheck },
   { label: 'User Management', icon: Users },
@@ -67,40 +115,187 @@ const orders = [
 
 function Icon({ icon: I, className = '' }: { icon: React.ElementType; className?: string }) { return <I className={className} aria-hidden="true" /> }
 
-export default function HaiMotionDashboard({ initialSection = 'Dashboard', user }: { initialSection?: string, user?: any }) {
+export default function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { initialSection?: string, user?: any, slug?: string[] }) {
   const { t } = useLanguage()
   const router = useRouter()
 
-  const [layoutStyle, setLayoutStyle] = useState<'sidebar' | 'topnav' | 'sidebar-mini'>('sidebar')
   const [collapsed, setCollapsed] = useState(false)
   const [section, setSection] = useState(initialSection)
+  const [isAccountOpen, setIsAccountOpen] = useState(false)
+  const [openFinanceGroups, setOpenFinanceGroups] = useState<Record<string, boolean>>({'Overview': true})
+
+  const toggleFinanceGroup = (group: string) => {
+    setOpenFinanceGroups(prev => ({ ...prev, [group]: !prev[group] }))
+  }
 
   // Keep state in sync with URL prop changes (e.g. browser back button)
   useEffect(() => {
     setSection(initialSection)
   }, [initialSection])
 
-  const handleNavigate = (newSection: string) => {
-    setSection(newSection)
-    const slug = newSection.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')
-    router.push('/' + (slug === 'dashboard' ? '' : slug))
+  // Maintain Global Pusher Presence
+  useEffect(() => {
+    if (!user?.id) return
+    pusherClient.subscribe('presence-chat')
+    return () => {
+      pusherClient.unsubscribe('presence-chat')
+    }
+  }, [user?.id])
+
+  // Voice Greeting on Login
+  useEffect(() => {
+    const shouldPlayVoice = localStorage.getItem('play_welcome_voice')
+    if (shouldPlayVoice === 'true' && user?.firstname) {
+      localStorage.removeItem('play_welcome_voice')
+      
+      const hour = new Date().getHours()
+      let timeGreeting = "pagi"
+      if (hour >= 11 && hour < 15) timeGreeting = "siang"
+      else if (hour >= 15 && hour < 18) timeGreeting = "sore"
+      else if (hour >= 18 || hour < 3) timeGreeting = "malam"
+      
+      const message = `Hai, selamat ${timeGreeting} ${user.firstname}. Selamat bekerja!`
+      
+      if ('speechSynthesis' in window) {
+        const speakGreeting = () => {
+          const utterance = new SpeechSynthesisUtterance(message)
+          utterance.lang = 'id-ID'
+          
+          const voices = window.speechSynthesis.getVoices()
+          const idVoices = voices.filter(v => v.lang.includes('id'))
+          
+          if (idVoices.length > 0) {
+            // Try to find a high-quality/natural voice
+            const bestVoice = idVoices.find(v => 
+              v.name.toLowerCase().includes('online') || 
+              v.name.toLowerCase().includes('natural') ||
+              v.name.toLowerCase().includes('premium') ||
+              v.name.toLowerCase().includes('gadis')
+            )
+            utterance.voice = bestVoice || idVoices[0]
+          }
+          
+          utterance.rate = 1.05
+          utterance.pitch = 1.15
+          window.speechSynthesis.speak(utterance)
+        }
+
+        setTimeout(() => {
+          if (window.speechSynthesis.getVoices().length > 0) {
+            speakGreeting()
+          } else {
+            window.speechSynthesis.addEventListener('voiceschanged', speakGreeting, { once: true })
+          }
+        }, 200)
+      }
+    }
+  }, [user?.firstname])
+
+  const sidebarRef = useRef<HTMLDivElement>(null)
+  
+  useEffect(() => {
+    if (sidebarRef.current) {
+      const savedScroll = sessionStorage.getItem('sidebarScroll')
+      if (savedScroll) {
+        sidebarRef.current.scrollTop = parseInt(savedScroll, 10)
+      }
+    }
+  }, [])
+
+  const handleSidebarScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    sessionStorage.setItem('sidebarScroll', e.currentTarget.scrollTop.toString())
   }
 
-  const handleLogout = () => {
+  const handleNavigate = (newSection: string) => {
+    setSection(newSection)
+    
+    // Custom routing for finance module
+    const financeRouteMap: Record<string, string> = {
+      'Finance Overview': 'finance/overview',
+      'Invoices': 'finance/invoices',
+      'Expenses': 'finance/expenses',
+      'Cash & Bank': 'finance/cash-bank',
+      'Reports': 'finance/reports'
+    }
+    
+    // Custom routing for HR module
+    const hrRouteMap: Record<string, string> = {
+      'HR Overview': 'hr/overview',
+      'Employees': 'hr/employees',
+      'Attendance & Leave': 'hr/attendance',
+      'Payroll': 'hr/payroll',
+      'Recruitment': 'hr/recruitment'
+    }
+    
+    if (financeRouteMap[newSection]) {
+      router.push('/' + financeRouteMap[newSection], { scroll: false })
+    } else if (hrRouteMap[newSection]) {
+      router.push('/' + hrRouteMap[newSection], { scroll: false })
+    } else {
+      const slug = newSection.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')
+      router.push('/' + (slug === 'dashboard' ? '' : slug), { scroll: false })
+    }
+  }
+
+  const handleLogout = async () => {
     localStorage.removeItem('auth_state')
     localStorage.removeItem('auth_user')
+    await authClient.signOut()
     window.location.reload()
   }
 
   const [command, setCommand] = useState(false)
-  const [customizerOpen, setCustomizerOpen] = useState(false)
-  const [activeColor, setActiveColor] = useState('Green')
-  const [activeRadius, setActiveRadius] = useState('0.5')
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>('system')
-  const [contentWidth, setContentWidth] = useState<'centered' | 'full'>('centered')
-  const [headerStyle, setHeaderStyle] = useState<'sticky' | 'scroll' | 'inset'>('sticky')
-  const [sidebarStyle, setSidebarStyle] = useState<'sidebar' | 'floating' | 'icon' | 'offcanvas'>('sidebar')
+  useEffect(() => {
+    if (!command) setSearchQuery('')
+  }, [command])
+
+  const allSearchableItems = useMemo(() => {
+    return [
+      ...nav,
+      ...chatsMenu,
+      ...aiMenu,
+      ...workMenu,
+      ...apps,
+      ...developer,
+      ...financeMenu,
+      ...hrMenu,
+      ...administration,
+      { label: 'Settings', icon: Settings },
+      { label: 'File Manager', icon: Folder }
+    ]
+  }, [])
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return allSearchableItems.slice(0, 5) // Show top 5 by default
+    const lowerQ = searchQuery.toLowerCase()
+    return allSearchableItems.filter(item => item.label.toLowerCase().includes(lowerQ))
+  }, [searchQuery, allSearchableItems])
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setCommand((open) => !open)
+      }
+      if (e.key === 'Escape') {
+        setCommand(false)
+      }
+    }
+    document.addEventListener('keydown', down)
+    return () => document.removeEventListener('keydown', down)
+  }, [])
+  const [customizerOpen, setCustomizerOpen] = useState(false)
+  const [layoutStyle, setLayoutStyle] = useState<'sidebar' | 'topnav'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_layout_style') as any) || 'sidebar' : 'sidebar')
+  const [activeColor, setActiveColor] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_theme_color') || 'Green' : 'Green')
+  const [activeRadius, setActiveRadius] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_theme_radius') || '0.5' : '0.5')
+  const [activeFont, setActiveFont] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_font_family') || 'Inter' : 'Inter')
+
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_theme_mode') as any) || 'system' : 'system')
+  const [contentWidth, setContentWidth] = useState<'centered' | 'full'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_content_width') as any) || 'centered' : 'centered')
+  const [headerStyle, setHeaderStyle] = useState<'sticky' | 'scroll' | 'inset'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_header_style') as any) || 'sticky' : 'sticky')
+  const [sidebarStyle, setSidebarStyle] = useState<'sidebar' | 'floating' | 'icon' | 'offcanvas'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_sidebar_style') as any) || 'sidebar' : 'sidebar')
   const [resolvedDark, setResolvedDark] = useState(false)
 
   const [range, setRange] = useState('Last 30 days')
@@ -115,13 +310,14 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
       const data = await res.json()
       const pref = data.preference
       if (pref) {
-        if (pref.layout_style) setLayoutStyle(pref.layout_style as any)
-        if (pref.theme_color) setActiveColor(pref.theme_color)
-        if (pref.theme_radius) setActiveRadius(pref.theme_radius)
-        if (pref.theme_mode) setThemeMode(pref.theme_mode as any)
-        if (pref.content_width) setContentWidth(pref.content_width as any)
-        if (pref.header_style) setHeaderStyle(pref.header_style as any)
-        if (pref.sidebar_style) setSidebarStyle(pref.sidebar_style as any)
+        if (pref.layout_style) { setLayoutStyle(pref.layout_style as any); localStorage.setItem('pref_layout_style', pref.layout_style); }
+        if (pref.theme_color) { setActiveColor(pref.theme_color); localStorage.setItem('pref_theme_color', pref.theme_color); }
+        if (pref.theme_radius) { setActiveRadius(pref.theme_radius); localStorage.setItem('pref_theme_radius', pref.theme_radius); }
+        if (pref.font_family) { setActiveFont(pref.font_family); localStorage.setItem('pref_font_family', pref.font_family); }
+        if (pref.theme_mode) { setThemeMode(pref.theme_mode as any); localStorage.setItem('pref_theme_mode', pref.theme_mode); }
+        if (pref.content_width) { setContentWidth(pref.content_width as any); localStorage.setItem('pref_content_width', pref.content_width); }
+        if (pref.header_style) { setHeaderStyle(pref.header_style as any); localStorage.setItem('pref_header_style', pref.header_style); }
+        if (pref.sidebar_style) { setSidebarStyle(pref.sidebar_style as any); localStorage.setItem('pref_sidebar_style', pref.sidebar_style); }
       }
       return pref
     },
@@ -141,8 +337,23 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
 
   const handlePrefChange = (key: string, value: string, setter: (val: any) => void) => {
     setter(value)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`pref_${key}`, value)
+    }
     updatePreference.mutate({ [key]: value })
   }
+
+  // Unread Chat Count
+  const { data: unreadChatCount } = useQuery({
+    queryKey: ['unreadChatCount', user?.id],
+    queryFn: async () => {
+      const res = await getUnreadChatCount();
+      return res.count || 0;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 3000
+  })
+
   // -------------------------
 
   useEffect(() => {
@@ -189,22 +400,87 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
     className={resolvedDark ? 'dark h-screen bg-background overflow-hidden' : 'h-screen bg-background overflow-hidden'}
     style={{
       '--primary': colorPresets[activeColor],
-      '--radius': `${activeRadius}rem`
+      '--radius': `${activeRadius}rem`,
+      fontFamily: `var(--font-${activeFont.toLowerCase().replace(' ', '-')})`
     } as React.CSSProperties}
   >
     <div className="flex h-screen overflow-hidden text-foreground">
       {!isTopnav && (
         <aside className={asideClasses}>
           <div className={`flex items-center gap-3 border-b border-sidebar-border px-5 ${sidebarStyle === 'floating' ? 'h-14' : 'h-16'}`}>
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Sparkles className="size-4" /></div>
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl overflow-hidden"><img src="/logohm.jpeg" alt="Logo" className="w-full h-full object-cover" /></div>
             {!effectiveCollapsed && <span className="font-semibold tracking-tight">HaiMotion</span>}
           </div>
-          <div className="flex flex-1 flex-col gap-7 px-3 py-6 overflow-y-auto">
+          <div ref={sidebarRef} onScroll={handleSidebarScroll} className="flex flex-1 flex-col gap-7 px-3 py-6 overflow-y-auto">
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Workspace')}</p>
               {nav.map(({ label, icon, badge }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <><span className="flex-1 text-left">{t(label)}</span>{badge && <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{badge}</span>}</>}</button>)}
             </div>
+            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Chats')}</p>
+              {chatsMenu.map(({ label, icon, badge }) => {
+                const displayBadge = label === 'Messenger' ? (unreadChatCount || undefined) : badge;
+                return (
+                  <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}>
+                    <Icon icon={icon} className="size-4 shrink-0" />
+                    {!effectiveCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{t(label)}</span>
+                        {displayBadge && <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">{displayBadge}</span>}
+                      </>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('AI')}</p>
+              {aiMenu.map(({ label, icon, badge }) => {
+                return (
+                  <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}>
+                    <Icon icon={icon} className="size-4 shrink-0" />
+                    {!effectiveCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{t(label)}</span>
+                        {badge && <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">{badge}</span>}
+                      </>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Work')}</p>
+              {workMenu.map(({ label, icon, badge }) => {
+                return (
+                  <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}>
+                    <Icon icon={icon} className="size-4 shrink-0" />
+                    {!effectiveCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{t(label)}</span>
+                        {badge && <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">{badge}</span>}
+                      </>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Apps')}</p>
-              {apps.map(({ label, icon, badge }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <><span className="flex-1 text-left">{t(label)}</span>{badge && <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">{badge}</span>}</>}</button>)}
+              {apps.map(({ label, icon, badge }) => {
+                return (
+                  <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}>
+                    <Icon icon={icon} className="size-4 shrink-0" />
+                    {!effectiveCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{t(label)}</span>
+                        {badge && <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground">{badge}</span>}
+                      </>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Finance')}</p>
+              {financeMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
+            </div>
+            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Human Resources')}</p>
+              {hrMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Developer')}</p>
               {developer.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
@@ -212,14 +488,17 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Administration')}</p>
               {administration.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
-            <div className="flex flex-col gap-1"><button onClick={() => handleNavigate('File Manager')} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isFiles ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><FolderOpen className="size-4 shrink-0" />{!effectiveCollapsed && <span>{t('File Manager')}</span>}</button><button onClick={() => handleNavigate('Settings')} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === 'Settings' ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Settings className="size-4 shrink-0" />{!effectiveCollapsed && <span>{t('Settings')}</span>}</button></div>
+            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Folder & Settings')}</p><button onClick={() => handleNavigate('File Manager')} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isFiles ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><FolderOpen className="size-4 shrink-0" />{!effectiveCollapsed && <span>{t('File Manager')}</span>}</button><button onClick={() => handleNavigate('Settings')} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === 'Settings' ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Settings className="size-4 shrink-0" />{!effectiveCollapsed && <span>{t('Settings')}</span>}</button></div>
           </div>
           <div className="border-t border-sidebar-border p-3">
             <div className="flex flex-col gap-1">
               <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent">
-                <div className="flex size-8 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                  {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
-                </div>
+                <Avatar className="size-8">
+                  <AvatarImage src={user?.avatar || ''} />
+                  <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                    {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
+                  </AvatarFallback>
+                </Avatar>
                 {!effectiveCollapsed && (
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{user?.firstname ? `${user.firstname} ${user.lastname || ''}` : 'Admin'}</p>
@@ -242,9 +521,9 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
             {!isTopnav && <button onClick={() => setCollapsed(!collapsed)} className="hidden rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:block" aria-label="Toggle sidebar"><PanelLeft className="size-4" /></button>}
             {isTopnav && (
               <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2 font-semibold tracking-tight"><div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Sparkles className="size-4" /></div><span className="hidden lg:inline">HaiMotion</span></div>
+                <div className="flex items-center gap-2 font-semibold tracking-tight"><div className="flex size-8 shrink-0 items-center justify-center rounded-xl overflow-hidden"><img src="/logohm.jpeg" alt="Logo" className="w-full h-full object-cover" /></div><span className="hidden lg:inline">HaiMotion</span></div>
                 <div className="hidden md:flex items-center gap-1 overflow-x-auto">
-                  {[...nav, ...apps, ...developer, ...administration].map(({ label, icon }) => (
+                  {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...developer, ...administration].map(({ label, icon }) => (
                     <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${section === label ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{t(label)}</button>
                   ))}
                 </div>
@@ -259,12 +538,25 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
             <button className="relative rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notifications"><Bell className="size-4" /><span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" /></button>
             <div className="mx-2 hidden h-5 w-px bg-border sm:block" />
             <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
-              </div>
-              {/* <button onClick={handleLogout} className="rounded-lg p-2 text-red-500 hover:bg-red-500/10" aria-label="Log out">
-                <LogOut className="size-4" />
-              </button> */}
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-full hover:ring-2 hover:ring-ring outline-none cursor-pointer">
+                  <Avatar className="size-8">
+                    <AvatarImage src={user?.avatar || ''} />
+                    <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                      {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
+                    </AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5 text-sm font-semibold">{user?.firstname ? `${user.firstname} ${user.lastname || ''}` : 'Admin'}</div>
+                  <DropdownMenuItem onClick={() => handleNavigate('Account Settings')}>
+                    <UserCheck className="mr-2 size-4" /> Account Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+                    <LogOut className="mr-2 size-4" /> Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
@@ -272,31 +564,99 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
           {isFiles ? <FileManager user={user} /> : (() => {
             switch (section) {
               case 'Dashboard': return <Dashboard range={range} setRange={setRange} section={section} user={user} />
-              case 'Chat': return <ChatPage />
+              case 'Messenger': return <ChatPage />
               case 'Analytics': return <AnalyticsPage />
               case 'Orders': return <OrdersPage />
               case 'Products': return <ProductsPage />
               case 'Customers': return <CustomersPage />
-              case 'Mail': return <MailPage />
+              case 'Email': return <MailPage />
               case 'Kanban': return <KanbanPage />
               case 'Calendar': return <CalendarPage />
-              case 'Settings': return <SettingsPage />
+              case 'Settings': return <SettingsPage user={user} />
               case 'Project': return <ProjectPage />
               case 'Tasks': return <TasksPage />
+              case 'Timesheets': return <TimesheetsPage />
               case 'AI Assistant': return <AiPage />
               case 'Layouts': return <LayoutsPage layoutStyle={layoutStyle} setLayoutStyle={(val) => handlePrefChange('layout_style', val, setLayoutStyle)} />
-              case 'Setup Project': return <SetupProjectPage />
+              case 'Finance Dashboard': return <FinanceOverviewPage user={user} />
+              case 'Finance Overview': return <FinanceOverviewPage user={user} />
+              case 'Invoices': return <InvoicesPage />
+              case 'Expenses': return <ExpensesPage />
+              case 'Cash & Bank': return <CashBankPage />
+              case 'Reports': return <ReportsPage />
+              case 'HR Overview': return <HROverviewPage />
+              case 'Employees': return <EmployeesPage />
+              case 'Attendance & Leave': return <AttendancePage />
+              case 'Payroll': return <PayrollPage />
+              case 'Recruitment': return <RecruitmentPage />
+              case 'Setup Project': return <SetupProjectPage slug={slug} user={user} />
               case 'Milestones': return <MilestonePage />
               case 'Module Flows': return <ModuleFlowPage />
               case 'Roles & Permissions': return <RolesPermissionsPage />
               case 'User Management': return <UsersPage />
+              case 'Account Settings': return (
+                <div className="relative min-h-[85vh] w-full">
+                  {/* Background Bubbles */}
+                  {user?.avatar && (
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                      <img src={user.avatar} className="bg-bubble" style={{ width: '250px', height: '250px', top: '2%', left: '5%', animationDelay: '0s' }} alt="" />
+                      <img src={user.avatar} className="bg-bubble" style={{ width: '350px', height: '350px', top: '15%', right: '-2%', animationDelay: '-3s' }} alt="" />
+                      <img src={user.avatar} className="bg-bubble" style={{ width: '180px', height: '180px', top: '35%', left: '15%', animationDelay: '-7s' }} alt="" />
+                      <img src={user.avatar} className="bg-bubble" style={{ width: '280px', height: '280px', top: '55%', right: '10%', animationDelay: '-12s' }} alt="" />
+                      <img src={user.avatar} className="bg-bubble" style={{ width: '150px', height: '150px', top: '70%', left: '35%', animationDelay: '-5s' }} alt="" />
+                      <img src={user.avatar} className="bg-bubble" style={{ width: '220px', height: '220px', top: '85%', right: '25%', animationDelay: '-9s' }} alt="" />
+                      <img src={user.avatar} className="bg-bubble" style={{ width: '120px', height: '120px', top: '25%', left: '45%', animationDelay: '-1s' }} alt="" />
+                    </div>
+                  )}
+                  
+                  <div className="mx-auto max-w-4xl pt-4 relative z-10">
+                    <div className="mb-6 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{t('Workspace')}</span><span>/</span><span className="text-foreground">{t('Account Settings')}</span>
+                    </div>
+                    <AccountSettings user={user} />
+                  </div>
+                </div>
+              )
+              case 'Meetings': return <MeetingsPage />
               default: return <SectionPage section={section} />
             }
           })()}
         </div>
       </main>
     </div>
-    {command && <div className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/20 px-4 pt-[15vh]" onClick={() => setCommand(false)}><div className="w-full max-w-xl rounded-2xl border border-border bg-popover p-2 shadow-2xl" onClick={e => e.stopPropagation()}><div className="flex items-center gap-3 border-b border-border px-3 py-3"><Search className="size-4 text-muted-foreground" /><input autoFocus placeholder="Search pages, orders, customers..." className="flex-1 bg-transparent text-sm outline-none" /><kbd className="text-xs text-muted-foreground">ESC</kbd></div><div className="flex flex-col gap-1 p-2"><button onClick={() => { setSection('Dashboard'); setCommand(false) }} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm hover:bg-muted"><LayoutDashboard className="size-4" />Go to Dashboard</button><button onClick={() => { setSection('File Manager'); setCommand(false) }} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm hover:bg-muted"><Folder className="size-4" />Open File Manager</button></div></div></div>}
+    {command && <div className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/20 px-4 pt-[15vh]" onClick={() => setCommand(false)}>
+      <div className="w-full max-w-xl rounded-2xl border border-border bg-popover p-2 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-border px-3 py-3">
+          <Search className="size-4 text-muted-foreground" />
+          <input 
+            autoFocus 
+            placeholder="Search pages, apps, settings..." 
+            className="flex-1 bg-transparent text-sm outline-none" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <kbd className="text-xs text-muted-foreground">ESC</kbd>
+        </div>
+        <div className="flex flex-col gap-1 p-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
+          {searchResults.length > 0 ? (
+            searchResults.map((item) => (
+              <button 
+                key={item.label}
+                onClick={() => { handleNavigate(item.label); setCommand(false); }} 
+                className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm hover:bg-muted"
+              >
+                <item.icon className="size-4" />
+                Go to {item.label}
+              </button>
+            ))
+          ) : (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              No results found for "{searchQuery}"
+            </div>
+          )}
+        </div>
+      </div>
+    </div>}
 
     {customizerOpen && (
       <div className="fixed inset-0 z-50 flex justify-end bg-transparent" onClick={() => setCustomizerOpen(false)}>
@@ -314,6 +674,16 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
               <div className="grid grid-cols-3 gap-2">
                 {['light', 'dark', 'system'].map(t => (
                   <button key={t} onClick={() => handlePrefChange('theme_mode', t, setThemeMode)} className={`flex items-center justify-center rounded-md border py-2 text-xs font-medium capitalize transition-colors ${themeMode === t ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted hover:border-primary/50'}`}>{t}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium mb-3">Typography</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {['Inter', 'Roboto', 'Outfit', 'Playfair', 'Fira Code', 'Oswald'].map(font => (
+                  <button key={font} onClick={() => handlePrefChange('font_family', font, setActiveFont)} className={`flex items-center justify-center rounded-md border py-2 text-xs font-medium transition-colors ${activeFont === font ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted hover:border-primary/50'}`} style={{ fontFamily: `var(--font-${font.toLowerCase().replace(' ', '-')})` }}>
+                    {font}
+                  </button>
                 ))}
               </div>
             </div>
@@ -370,8 +740,11 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user 
 }
 
 function Dashboard({ range, setRange, section, user }: { range: string; setRange: (v: string) => void; section: string; user?: any }) {
-  const [greeting, setGreeting] = useState("Here's what's happening with your business today.")
+  const { t } = useLanguage()
+  const [greeting, setGreeting] = useState(t("Here's what's happening with your business today."))
   const [timeGreeting, setTimeGreeting] = useState("Good morning")
+
+
 
   useEffect(() => {
     const quotes = [
@@ -395,17 +768,17 @@ function Dashboard({ range, setRange, section, user }: { range: string; setRange
     setGreeting(quotes[dayOfYear % quotes.length])
 
     const hour = new Date().getHours()
-    if (hour < 12) setTimeGreeting("Good morning")
-    else if (hour < 18) setTimeGreeting("Good afternoon")
-    else setTimeGreeting("Good evening")
+    if (hour < 12) setTimeGreeting(t("Good morning"))
+    else if (hour < 18) setTimeGreeting(t("Good afternoon"))
+    else setTimeGreeting(t("Good evening"))
   }, [])
 
-  return <><div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"><span>Workspace</span><ChevronRight className="size-3" /><span className="text-foreground">{section}</span></div><h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{timeGreeting}, {user?.firstname || 'Admin'}</h1><p className="mt-1 text-sm text-muted-foreground">{greeting}</p></div><div className="flex items-center gap-2"><button className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted"><Download className="size-4" />Export</button><select value={range} onChange={e => setRange(e.target.value)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"><option>Last 30 days</option><option>Last 7 days</option><option>This year</option></select></div></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[['Total Revenue', '$284,920', '+18.2%', ArrowUpRight, 'vs. last month'], ['Orders', '1,429', '+12.5%', ArrowUpRight, 'vs. last month'], ['Avg. order value', '$199.24', '+4.8%', ArrowUpRight, 'vs. last month'], ['Conversion rate', '4.82%', '-0.6%', ArrowDownRight, 'vs. last month']].map(([label, value, change, Arrow, sub]) => <div key={label as string} className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label as string}</span><span className="flex size-8 items-center justify-center rounded-lg bg-muted"><Activity className="size-4 text-muted-foreground" /></span></div><p className="mt-4 text-2xl font-semibold tracking-tight">{value as string}</p><p className="mt-1 flex items-center gap-1 text-xs"><Arrow className="size-3 text-primary" /><span className="font-medium text-primary">{change as string}</span><span className="text-muted-foreground">{sub as string}</span></p></div>)}</div><div className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]"><RevenueChart /><TrafficCard /></div><div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_1fr_1fr]"><ActivityCard /><GoalsCard /><TopProducts /></div><OrdersTable /></>
+  return <><div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"><span>Workspace</span><ChevronRight className="size-3" /><span className="text-foreground">{t(section)}</span></div><h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{timeGreeting}, {user?.firstname || 'Admin'}</h1><p className="mt-1 text-sm text-muted-foreground">{greeting}</p></div><div className="flex items-center gap-2"><button className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted"><Download className="size-4" />{t('Export')}</button><select value={range} onChange={e => setRange(e.target.value)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"><option>{t('Last 30 days')}</option><option>{t('Last 7 days')}</option><option>{t('This year')}</option></select></div></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[[t('Total Revenue'), '$284,920', '+18.2%', ArrowUpRight, t('vs. last month')], [t('Orders'), '1,429', '+12.5%', ArrowUpRight, t('vs. last month')], [t('Avg. order value'), '$199.24', '+4.8%', ArrowUpRight, t('vs. last month')], [t('Conversion rate'), '4.82%', '-0.6%', ArrowDownRight, t('vs. last month')]].map(([label, value, change, Arrow, sub]) => <div key={label as string} className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label as string}</span><span className="flex size-8 items-center justify-center rounded-lg bg-muted"><Activity className="size-4 text-muted-foreground" /></span></div><p className="mt-4 text-2xl font-semibold tracking-tight">{value as string}</p><p className="mt-1 flex items-center gap-1 text-xs"><Arrow className="size-3 text-primary" /><span className="font-medium text-primary">{change as string}</span><span className="text-muted-foreground">{sub as string}</span></p></div>)}</div><div className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]"><RevenueChart /><TrafficCard /></div><div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_1fr_1fr]"><ActivityCard /><GoalsCard /><TopProducts /></div><OrdersTable /></>
 }
 
-function RevenueChart() { const bars = [32, 45, 38, 52, 48, 63, 57, 71, 68, 78, 73, 86, 80, 92, 88, 96, 84, 94, 89, 100, 91, 97, 86, 93, 90, 98, 94, 100, 96, 100]; return <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-start justify-between"><div><h2 className="font-semibold">Revenue overview</h2><p className="mt-1 text-xs text-muted-foreground">Monthly revenue performance</p></div><button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="More revenue options"><MoreHorizontal className="size-4" /></button></div><div className="mt-6 flex items-end gap-1.5 sm:gap-2" style={{ height: 220 }}>{bars.map((height, i) => <div key={i} className="group flex flex-1 flex-col justify-end"><div className="w-full rounded-t-sm bg-primary/80 transition-all group-hover:bg-primary" style={{ height: `${height}%` }} /></div>)}</div><div className="mt-3 flex justify-between text-[10px] text-muted-foreground"><span>Aug 1</span><span>Aug 8</span><span>Aug 15</span><span>Aug 22</span><span>Aug 31</span></div></section> }
-function TrafficCard() { return <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-start justify-between"><div><h2 className="font-semibold">Traffic sources</h2><p className="mt-1 text-xs text-muted-foreground">Where your visitors come from</p></div><button className="text-xs font-medium text-primary hover:underline">View report</button></div><div className="mt-7 flex items-center gap-6"><div className="relative flex size-36 shrink-0 items-center justify-center rounded-full" style={{ background: 'conic-gradient(var(--primary) 0 42%, var(--chart-2) 42% 69%, var(--chart-3) 69% 84%, var(--muted) 84% 100%)' }}><div className="flex size-24 items-center justify-center rounded-full bg-card"><div className="text-center"><p className="text-xl font-semibold">24.8k</p><p className="text-[10px] text-muted-foreground">visitors</p></div></div></div><div className="flex flex-col gap-3 text-xs">{[['Direct', '42%', 'bg-primary'], ['Organic search', '27%', 'bg-chart-2'], ['Social media', '15%', 'bg-chart-3'], ['Other', '16%', 'bg-muted']].map(([name, val, color]) => <div key={name} className="flex items-center gap-2"><span className={`size-2 rounded-full ${color}`} /><span className="text-muted-foreground">{name}</span><span className="ml-auto font-medium">{val}</span></div>)}</div></div></section> }
-function ActivityCard() { return <section className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">Recent activity</h2><button className="text-xs font-medium text-primary">View all</button></div><div className="mt-5 flex flex-col gap-5">{[['Olivia Martin', 'placed a new order', '2 min ago', 'bg-primary'], ['Liam Chen', 'completed payment', '18 min ago', 'bg-chart-2'], ['Ava Williams', 'signed up for newsletter', '1 hr ago', 'bg-chart-3'], ['Noah Smith', 'left a product review', '3 hrs ago', 'bg-muted']].map(([name, action, time, color]) => <div className="flex gap-3" key={name}><div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-primary-foreground ${color}`}>{(name as string).split(' ').map(n => n[0]).join('')}</div><div className="min-w-0 text-xs"><p><span className="font-medium">{name}</span> <span className="text-muted-foreground">{action}</span></p><p className="mt-1 text-muted-foreground">{time}</p></div></div>)}</div></section> }
-function GoalsCard() { return <section className="rounded-xl border border-border bg-card p-5"><h2 className="font-semibold">Monthly goals</h2><p className="mt-1 text-xs text-muted-foreground">Keep the momentum going</p><div className="mt-6 flex flex-col gap-5">{[['Revenue target', '$350k', '$284.9k', 81], ['New customers', '1,500', '1,124', 75], ['Orders fulfilled', '2,000', '1,429', 71]].map(([label, target, current, percent]) => <div key={label as string}><div className="mb-2 flex justify-between text-xs"><span className="font-medium">{label as string}</span><span className="text-muted-foreground">{current as string} <span className="text-border">/</span> {target as string}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} /></div></div>)}</div></section> }
-function TopProducts() { return <section className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">Top products</h2><button className="text-xs font-medium text-primary">View all</button></div><div className="mt-5 flex flex-col gap-4">{products.map(([name, sold, revenue, color], i) => <div key={name} className="flex items-center gap-3"><div className={`flex size-9 items-center justify-center rounded-lg ${color}`}><Package className="size-4 text-primary-foreground" /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{name}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{sold}</p></div><p className="text-xs font-medium">{revenue}</p></div>)}</div></section> }
-function OrdersTable() { return <section className="mt-6 rounded-xl border border-border bg-card"><div className="flex items-center justify-between p-5"><div><h2 className="font-semibold">Recent orders</h2><p className="mt-1 text-xs text-muted-foreground">Your latest transactions</p></div><button className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted">View all orders</button></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="border-y border-border bg-muted/40 text-muted-foreground"><tr>{['Order', 'Customer', 'Date', 'Amount', 'Status'].map(h => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr></thead><tbody>{orders.map(([id, customer, date, amount, status]) => <tr key={id} className="border-b border-border last:border-0 hover:bg-muted/30"><td className="px-5 py-4 font-medium">{id}</td><td className="px-5 py-4">{customer}</td><td className="px-5 py-4 text-muted-foreground">{date}</td><td className="px-5 py-4 font-medium">{amount}</td><td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-medium ${status === 'Paid' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{status}</span></td></tr>)}</tbody></table></div></section> }
+function RevenueChart() { const { t } = useLanguage(); const bars = [32, 45, 38, 52, 48, 63, 57, 71, 68, 78, 73, 86, 80, 92, 88, 96, 84, 94, 89, 100, 91, 97, 86, 93, 90, 98, 94, 100, 96, 100]; return <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-start justify-between"><div><h2 className="font-semibold">{t('Revenue overview')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Monthly revenue performance')}</p></div><button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="More revenue options"><MoreHorizontal className="size-4" /></button></div><div className="mt-6 flex items-end gap-1.5 sm:gap-2" style={{ height: 220 }}>{bars.map((height, i) => <div key={i} className="group flex flex-1 flex-col justify-end"><div className="w-full rounded-t-sm bg-primary/80 transition-all group-hover:bg-primary" style={{ height: `${height}%` }} /></div>)}</div><div className="mt-3 flex justify-between text-[10px] text-muted-foreground"><span>Aug 1</span><span>Aug 8</span><span>Aug 15</span><span>Aug 22</span><span>Aug 31</span></div></section> }
+function TrafficCard() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-start justify-between"><div><h2 className="font-semibold">{t('Traffic sources')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Where your visitors come from')}</p></div><button className="text-xs font-medium text-primary hover:underline">{t('View all')}</button></div><div className="mt-7 flex items-center gap-6"><div className="relative flex size-36 shrink-0 items-center justify-center rounded-full" style={{ background: 'conic-gradient(var(--primary) 0 42%, var(--chart-2) 42% 69%, var(--chart-3) 69% 84%, var(--muted) 84% 100%)' }}><div className="flex size-24 items-center justify-center rounded-full bg-card"><div className="text-center"><p className="text-xl font-semibold">24.8k</p><p className="text-[10px] text-muted-foreground">visitors</p></div></div></div><div className="flex flex-col gap-3 text-xs">{[[t('Direct'), '42%', 'bg-primary'], [t('Organic search'), '27%', 'bg-chart-2'], [t('Social media'), '15%', 'bg-chart-3'], [t('Other'), '16%', 'bg-muted']].map(([name, val, color]) => <div key={name} className="flex items-center gap-2"><span className={`size-2 rounded-full ${color}`} /><span className="text-muted-foreground">{name}</span><span className="ml-auto font-medium">{val}</span></div>)}</div></div></section> }
+function ActivityCard() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">{t('Recent activity')}</h2><button className="text-xs font-medium text-primary">{t('View all')}</button></div><div className="mt-5 flex flex-col gap-5">{[['Olivia Martin', 'placed a new order', '2 min ago', 'bg-primary'], ['Liam Chen', 'completed payment', '18 min ago', 'bg-chart-2'], ['Ava Williams', 'signed up for newsletter', '1 hr ago', 'bg-chart-3'], ['Noah Smith', 'left a product review', '3 hrs ago', 'bg-muted']].map(([name, action, time, color]) => <div className="flex gap-3" key={name}><div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-primary-foreground ${color}`}>{(name as string).split(' ').map(n => n[0]).join('')}</div><div className="min-w-0 text-xs"><p><span className="font-medium">{name}</span> <span className="text-muted-foreground">{action}</span></p><p className="mt-1 text-muted-foreground">{time}</p></div></div>)}</div></section> }
+function GoalsCard() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5"><h2 className="font-semibold">{t('Monthly goals')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Keep the momentum going')}</p><div className="mt-6 flex flex-col gap-5">{[[t('Revenue target'), '$350k', '$284.9k', 81], [t('New customers'), '1,500', '1,124', 75], [t('Orders fulfilled'), '2,000', '1,429', 71]].map(([label, target, current, percent]) => <div key={label as string}><div className="mb-2 flex justify-between text-xs"><span className="font-medium">{label as string}</span><span className="text-muted-foreground">{current as string} <span className="text-border">/</span> {target as string}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} /></div></div>)}</div></section> }
+function TopProducts() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">{t('Top products')}</h2><button className="text-xs font-medium text-primary">{t('View all')}</button></div><div className="mt-5 flex flex-col gap-4">{products.map(([name, sold, revenue, color], i) => <div key={name} className="flex items-center gap-3"><div className={`flex size-9 items-center justify-center rounded-lg ${color}`}><Package className="size-4 text-primary-foreground" /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{name}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{sold}</p></div><p className="text-xs font-medium">{revenue}</p></div>)}</div></section> }
+function OrdersTable() { const { t } = useLanguage(); return <section className="mt-6 rounded-xl border border-border bg-card"><div className="flex items-center justify-between p-5"><div><h2 className="font-semibold">{t('Recent orders')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Your latest transactions')}</p></div><button className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted">{t('View all')}</button></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="border-y border-border bg-muted/40 text-muted-foreground"><tr>{[t('Order'), t('Customer'), t('Date'), t('Amount'), t('Status')].map(h => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr></thead><tbody>{orders.map(([id, customer, date, amount, status]) => <tr key={id} className="border-b border-border last:border-0 hover:bg-muted/30"><td className="px-5 py-4 font-medium">{id}</td><td className="px-5 py-4">{customer}</td><td className="px-5 py-4 text-muted-foreground">{date}</td><td className="px-5 py-4 font-medium">{amount}</td><td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-medium ${status === 'Paid' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{status}</span></td></tr>)}</tbody></table></div></section> }

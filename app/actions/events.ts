@@ -1,9 +1,12 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 
 export async function getEvents() {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "calendar.view");
     const events = await prisma.events.findMany({
       orderBy: {
         start_event: 'asc'
@@ -24,6 +27,8 @@ export async function createEvent(data: {
   description?: string
 }) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "calendar.create");
     const newEvent = await prisma.events.create({
       data: {
         title: data.title,
@@ -48,6 +53,8 @@ export async function updateEvent(id: number, data: {
   description?: string
 }) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "calendar.update");
     const updatedEvent = await prisma.events.update({
       where: { id },
       data: {
@@ -67,6 +74,8 @@ export async function updateEvent(id: number, data: {
 
 export async function deleteEvent(id: number) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "calendar.delete");
     await prisma.events.delete({
       where: { id }
     })

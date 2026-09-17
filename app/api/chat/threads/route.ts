@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const uid = Number(user.id);
 
     const threads = await prisma.ai_chat_thread.findMany({
-      where: { user_id: parseInt(userId) },
+      where: { user_id: uid },
       orderBy: [
         { is_pinned: 'desc' },
         { updated_at: 'desc' }
@@ -34,15 +34,17 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { userId, title } = await req.json();
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const uid = Number(user.id);
+
+    const { title } = await req.json();
 
     const thread = await prisma.ai_chat_thread.create({
       data: {
-        user_id: parseInt(userId),
+        user_id: uid,
         title: title || 'New Chat'
       }
     });

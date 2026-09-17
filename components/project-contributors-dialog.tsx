@@ -1,14 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { useState, useEffect } from 'react'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2, UserPlus, X } from 'lucide-react'
+import { Loader2, UserPlus, X, Crown } from 'lucide-react'
 
 import { updateProjectMembers } from '@/app/actions/projects'
 
@@ -25,22 +22,30 @@ export function ProjectContributorsDialog({
 }) {
   const queryClient = useQueryClient()
   
-  // Local state for members to manage UI optimistic updates
-  const [currentMembers, setCurrentMembers] = useState<number[]>(
-    project.user_ids ? project.user_ids.split(',').map((id: string) => parseInt(id.trim())).filter((id: number) => !isNaN(id)) : []
-  )
+  const [currentMembers, setCurrentMembers] = useState<number[]>([])
   const [selectedNewUser, setSelectedNewUser] = useState<string>('')
 
-  // Wait, actually I should import updateProject server action and just mutate the user_ids string
+  // Sync members whenever dialog opens or project changes
+  useEffect(() => {
+    if (open && project) {
+      const memberIds: number[] = project.members
+        ? project.members.map((m: any) => Number(m.id))
+        : []
+      // Always include manager
+      const allIds = Array.from(new Set([Number(project.manager_id), ...memberIds]))
+      setCurrentMembers(allIds)
+      setSelectedNewUser('')
+    }
+  }, [open, project])
+
   const mutation = useMutation({
-    mutationFn: async (newUserIds: string) => {
+    mutationFn: async (newUserIds: number[]) => {
       const res = await updateProjectMembers(project.id, newUserIds)
       if (!res.success) throw new Error(res.error)
       return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
-      queryClient.invalidateQueries({ queryKey: ['project', project.id] })
       toast.success('Contributors updated successfully.')
     },
     onError: () => {
@@ -55,90 +60,109 @@ export function ProjectContributorsDialog({
       toast.error('User is already a member.')
       return
     }
-    
     const newMembers = [...currentMembers, userId]
     setCurrentMembers(newMembers)
-    mutation.mutate(newMembers.join(','))
+    mutation.mutate(newMembers)
     setSelectedNewUser('')
   }
 
   const handleRemoveMember = (userId: number) => {
-    if (userId === project.manager_id) {
+    if (userId === Number(project.manager_id)) {
       toast.error('Cannot remove the Project Manager.')
       return
     }
     const newMembers = currentMembers.filter(id => id !== userId)
     setCurrentMembers(newMembers)
-    mutation.mutate(newMembers.join(','))
+    mutation.mutate(newMembers)
   }
 
-  const availableUsers = allUsers.filter(u => !currentMembers.includes(u.id))
+  const availableUsers = allUsers.filter(u => !currentMembers.includes(Number(u.id)))
+
+  const getMemberUser = (userId: number) => allUsers.find(u => Number(u.id) === userId)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Manage Contributors</DialogTitle>
-          <DialogDescription>
-            Add or remove team members from this project.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+        {/* Header — same style as Preferences panel */}
+        <div className="mb-2">
+          <h2 className="text-xl font-semibold tracking-tight">Manage Contributors</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Add or remove team members from this project.</p>
+        </div>
 
-        <div className="flex items-center gap-2 py-4">
-          <Select value={selectedNewUser} onValueChange={setSelectedNewUser}>
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Select a user to add..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableUsers.map(u => (
-                <SelectItem key={u.id} value={u.id.toString()}>
-                  {u.firstname} {u.lastname}
-                </SelectItem>
-              ))}
-              {availableUsers.length === 0 && (
-                <SelectItem value="none" disabled>No other users available</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-          <Button onClick={handleAddMember} disabled={!selectedNewUser || mutation.isPending}>
-            {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+        {/* Add member row */}
+        <div className="flex items-center gap-2 py-3">
+          <select
+            value={selectedNewUser}
+            onChange={e => setSelectedNewUser(e.target.value)}
+            className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+          >
+            <option value="">-- Select a user to add --</option>
+            {availableUsers.map(u => (
+              <option key={u.id} value={u.id.toString()}>
+                {u.firstname} {u.lastname}
+              </option>
+            ))}
+          </select>
+          <Button
+            onClick={handleAddMember}
+            disabled={!selectedNewUser || mutation.isPending}
+            size="icon"
+          >
+            {mutation.isPending
+              ? <Loader2 className="size-4 animate-spin" />
+              : <UserPlus className="size-4" />
+            }
           </Button>
         </div>
 
-        <ScrollArea className="max-h-[300px] w-full pr-4">
-          <div className="flex flex-col gap-3">
-            {currentMembers.map(userId => {
-              const user = allUsers.find(u => u.id === userId)
-              if (!user) return null
-              const isManager = user.id === project.manager_id
+        {/* Current members grid */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            Current Contributors ({currentMembers.length})
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+              {currentMembers.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No contributors yet.
+                </p>
+              )}
+              {currentMembers.map(userId => {
+                const user = getMemberUser(userId)
+                if (!user) return null
+                const isManager = Number(user.id) === Number(project.manager_id)
 
-              return (
-                <div key={user.id} className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="size-8">
-                      <AvatarImage src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${user.firstname}`} />
-                      <AvatarFallback>{user.firstname?.[0]}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{user.firstname} {user.lastname}</p>
-                      <p className="text-xs text-muted-foreground">{isManager ? 'Project Manager' : 'Member'}</p>
+                return (
+                  <div
+                    key={userId}
+                    className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                        {user.firstname?.[0]}{user.lastname?.[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{user.firstname} {user.lastname}</p>
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                          {isManager && <Crown className="size-3 text-amber-500" />}
+                          {isManager ? 'Project Manager' : 'Member'}
+                        </p>
+                      </div>
                     </div>
+                    {!isManager && (
+                      <button
+                        onClick={() => handleRemoveMember(Number(user.id))}
+                        disabled={mutation.isPending}
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                        title="Remove member"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    )}
                   </div>
-                  {!isManager && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => handleRemoveMember(user.id)}
-                      disabled={mutation.isPending}
-                    >
-                      <X className="size-4 text-muted-foreground hover:text-destructive" />
-                    </Button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </ScrollArea>
+                )
+              })}
+            </div>
+        </div>
       </DialogContent>
     </Dialog>
   )

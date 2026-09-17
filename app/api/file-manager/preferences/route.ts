@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const uid = Number(user.id);
 
     const pref = await prisma.userPreference.findUnique({
-      where: { user_id: parseInt(userId) },
+      where: { user_id: uid },
     });
 
     return NextResponse.json({ preference: pref });
@@ -23,18 +23,20 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json();
-    const { userId, file_manager_view_mode } = body;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const uid = Number(user.id);
+
+    const body = await req.json();
+    const { file_manager_view_mode } = body;
 
     const pref = await prisma.userPreference.upsert({
-      where: { user_id: parseInt(userId) },
+      where: { user_id: uid },
       update: { file_manager_view_mode },
       create: {
-        user_id: parseInt(userId),
+        user_id: uid,
         file_manager_view_mode: file_manager_view_mode || 'grid',
       },
     });

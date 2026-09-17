@@ -161,3 +161,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes profile-float {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0.2; }
+  33% { transform: translate(40px, -60px) scale(1.1) rotate(15deg); opacity: 0.45; }
+  66% { transform: translate(-30px, 30px) scale(0.9) rotate(-10deg); opacity: 0.3; }
+  100% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 0.2; }
+}
+
+.bg-bubble {
+  position: absolute;
+  border-radius: 50%;
+  animation: profile-float 20s infinite ease-in-out;
+  object-fit: cover;
+  filter: blur(3px);
+  pointer-events: none;
+}

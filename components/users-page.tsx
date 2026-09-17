@@ -5,6 +5,7 @@ import { Search, Loader2, Plus, Edit2, Trash2, X, ChevronLeft, ChevronRight, Use
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
+import { useLanguage } from '@/components/language-provider'
 
 type User = {
   id: number
@@ -27,6 +28,7 @@ const roleColors: Record<number, { bg: string, text: string, label: string }> = 
 }
 
 export function UsersPage() {
+  const { t } = useLanguage()
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
@@ -69,6 +71,16 @@ export function UsersPage() {
   const pagination = data?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 }
   const counts = data?.counts || { total: 0, admins: 0, employees: 0 }
 
+  const { data: rolesData } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const res = await fetch('/api/roles')
+      if (!res.ok) throw new Error('Failed to fetch roles')
+      return res.json()
+    }
+  })
+  const rolesList: { id: number, name: string }[] = rolesData?.roles || []
+
   const saveMutation = useMutation({
     mutationFn: async (payload: any) => {
       const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users'
@@ -84,10 +96,10 @@ export function UsersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setIsModalOpen(false)
-      toast.success(editingUser ? "User updated successfully!" : "User created successfully!")
+      toast.success(editingUser ? t("User updated successfully!") : t("User created successfully!"))
     },
     onError: (error) => {
-      toast.error(`Failed to save user: ${error.message}`)
+      toast.error(`${t('Failed to save user')}: ${error.message}`)
     }
   })
 
@@ -100,10 +112,10 @@ export function UsersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       setIsDeleteModalOpen(false)
-      toast.success("User deleted successfully!")
+      toast.success(t("User deleted successfully!"))
     },
     onError: (error) => {
-      toast.error(`Failed to delete user: ${error.message}`)
+      toast.error(`${t('Failed to delete user')}: ${error.message}`)
     }
   })
 
@@ -142,13 +154,13 @@ export function UsersPage() {
       const uploadData = await res.json()
       if (res.ok) {
         setFormData(prev => ({ ...prev, avatar: uploadData.url }))
-        toast.success("Avatar uploaded successfully!")
+        toast.success(t("Avatar uploaded successfully!"))
       } else {
-        toast.error("Avatar upload failed!")
+        toast.error(t("Avatar upload failed!"))
       }
     } catch (error) {
       console.error(error)
-      toast.error("Error uploading avatar file")
+      toast.error(t("Error uploading avatar file"))
     } finally {
       setIsUploading(false)
     }
@@ -177,15 +189,15 @@ export function UsersPage() {
     <div className="flex h-full flex-col">
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-6 py-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">User Management</h1>
-          <p className="text-sm text-muted-foreground">Manage all registered users from the database.</p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">{t('User Management')}</h1>
+          <p className="text-sm text-muted-foreground">{t('Manage all registered users from the database.')}</p>
         </div>
         <button 
           onClick={openAddModal}
           className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <Plus className="size-4" />
-          Add User
+          {t('Add User')}
         </button>
       </header>
 
@@ -194,7 +206,7 @@ export function UsersPage() {
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">All Users</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('All Users')}</p>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{counts.total}</p>
               </div>
               <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -206,7 +218,7 @@ export function UsersPage() {
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Employee</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('Employee')}</p>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{counts.employees}</p>
               </div>
               <div className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -218,7 +230,7 @@ export function UsersPage() {
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Admin</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('Admin')}</p>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{counts.admins}</p>
               </div>
               <div className="flex size-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
@@ -235,7 +247,7 @@ export function UsersPage() {
               type="text" 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search users..." 
+              placeholder={t("Search users...")} 
               className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-4 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" 
             />
           </div>
@@ -245,11 +257,10 @@ export function UsersPage() {
             onChange={e => setRoleFilter(e.target.value)}
             className="rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
           >
-            <option value="all">All Roles</option>
-            <option value="1">Admin / Management</option>
-            <option value="2">Staff</option>
-            <option value="3">Creative Team</option>
-            <option value="4">Client / Vendor</option>
+            <option value="all">{t('All Roles')}</option>
+            {rolesList.map(role => (
+              <option key={role.id} value={role.id.toString()}>{role.name}</option>
+            ))}
           </select>
         </div>
 
@@ -258,12 +269,12 @@ export function UsersPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
-                  <th className="px-5 py-3 font-medium text-muted-foreground">No.</th>
-                  <th className="px-5 py-3 font-medium text-muted-foreground">Name</th>
-                  <th className="px-5 py-3 font-medium text-muted-foreground">Email</th>
-                  <th className="px-5 py-3 font-medium text-muted-foreground">Role Type</th>
-                  <th className="px-5 py-3 font-medium text-muted-foreground">Joined At</th>
-                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">Actions</th>
+                  <th className="px-5 py-3 font-medium text-muted-foreground">{t('No.')}</th>
+                  <th className="px-5 py-3 font-medium text-muted-foreground">{t('Name')}</th>
+                  <th className="px-5 py-3 font-medium text-muted-foreground">{t('Email')}</th>
+                  <th className="px-5 py-3 font-medium text-muted-foreground">{t('Role Type')}</th>
+                  <th className="px-5 py-3 font-medium text-muted-foreground">{t('Joined At')}</th>
+                  <th className="px-5 py-3 text-right font-medium text-muted-foreground">{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -280,19 +291,21 @@ export function UsersPage() {
                   ))
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">No users found.</td>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">{t('No users found.')}</td>
                   </tr>
                 ) : (
                   users.map((user, index) => {
-                    const role = roleColors[user.type] || roleColors[2]
+                    const dbRole = rolesList.find(r => r.id === user.type)
+                    const roleColor = roleColors[user.type] || { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Unknown' }
+                    const roleLabel = dbRole ? dbRole.name : roleColor.label
                     return (
                       <tr key={user.id} className="transition-colors hover:bg-muted/50 group">
                         <td className="px-5 py-3 text-muted-foreground">{(page - 1) * limit + index + 1}</td>
                         <td className="px-5 py-3 font-medium text-foreground">{user.firstname} {user.lastname}</td>
                         <td className="px-5 py-3 text-muted-foreground">{user.email}</td>
                         <td className="px-5 py-3">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${role.bg} ${role.text}`}>
-                            {role.label}
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${roleColor.bg} ${roleColor.text}`}>
+                            {roleLabel}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-muted-foreground">
@@ -320,7 +333,7 @@ export function UsersPage() {
           {!isLoading && users.length > 0 && (
             <div className="flex items-center justify-between border-t border-border px-5 py-4">
               <span className="text-sm text-muted-foreground">
-                Showing <strong>{(pagination.page - 1) * pagination.limit + 1}</strong> to <strong>{Math.min(pagination.page * pagination.limit, pagination.total)}</strong> of <strong>{pagination.total}</strong> results
+                {t('Showing')} <strong>{(pagination.page - 1) * pagination.limit + 1}</strong> {t('to')} <strong>{Math.min(pagination.page * pagination.limit, pagination.total)}</strong> {t('of')} <strong>{pagination.total}</strong> {t('results')}
               </span>
               <div className="flex items-center gap-1 rounded-full bg-background border border-border p-1 shadow-sm">
                 <button 
@@ -362,57 +375,87 @@ export function UsersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background/80 p-4 backdrop-blur-sm sm:p-0">
           <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-xl animate-in zoom-in-95">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold">{editingUser ? 'Edit User' : 'Add New User'}</h2>
+              <h2 className="text-lg font-semibold">{editingUser ? t('Edit User') : t('Add New User')}</h2>
               <button onClick={() => setIsModalOpen(false)} className="rounded-lg p-1 text-muted-foreground hover:bg-muted"><X className="size-5" /></button>
             </div>
             
             <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">First Name <span className="text-destructive">*</span></label>
+                  <label className="text-sm font-medium">{t('First Name')} <span className="text-destructive">*</span></label>
                   <input required value={formData.firstname} onChange={e => setFormData({...formData, firstname: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Last Name</label>
+                  <label className="text-sm font-medium">{t('Last Name')}</label>
                   <input value={formData.lastname} onChange={e => setFormData({...formData, lastname: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Email <span className="text-destructive">*</span></label>
+                  <label className="text-sm font-medium">{t('Email')} <span className="text-destructive">*</span></label>
                   <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Notification Email</label>
+                  <label className="text-sm font-medium">{t('Notification Email')}</label>
                   <input type="email" value={formData.notification_email} onChange={e => setFormData({...formData, notification_email: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">NIK</label>
+                  <label className="text-sm font-medium">{t('NIK')}</label>
                   <input value={formData.nik} onChange={e => setFormData({...formData, nik: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Avatar</label>
-                  <input type="file" accept="image/*" onChange={handleFileUpload} className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
-                  {isUploading && <p className="text-xs text-muted-foreground">Uploading...</p>}
-                  {!isUploading && formData.avatar && <p className="text-xs text-muted-foreground truncate">Selected: {formData.avatar.split('/').pop()}</p>}
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <label className="text-sm font-medium">{t('Avatar')}</label>
+                  <div className="flex items-center gap-4 mt-1">
+                    <div className="relative size-14 shrink-0 overflow-hidden rounded-full border border-border bg-muted/50 shadow-inner">
+                      {formData.avatar ? (
+                        <img src={formData.avatar} alt="Avatar Preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <UsersIcon className="size-6 opacity-50" />
+                        </div>
+                      )}
+                      {isUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                          <Loader2 className="size-5 animate-spin text-primary" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="relative">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleFileUpload} 
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                          title="Click to upload"
+                        />
+                        <button type="button" className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted hover:text-foreground">
+                          {t('Choose File')}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground truncate w-[150px]">
+                        {!isUploading && formData.avatar ? formData.avatar.split('/').pop() : t('JPG, PNG, GIF up to 5MB')}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Address</label>
+                <label className="text-sm font-medium">{t('Address')}</label>
                 <textarea rows={2} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
               </div>
               
 
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Password {editingUser && <span className="text-xs text-muted-foreground font-normal">(Leave empty to keep current)</span>}</label>
+                <label className="text-sm font-medium">{t('Password')} {editingUser && <span className="text-xs text-muted-foreground font-normal">{t('(Leave empty to keep current)')}</span>}</label>
                 <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} required={!editingUser} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingUser ? '••••••••' : 'Password...'} className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
+                  <input type={showPassword ? 'text' : 'password'} required={!editingUser} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingUser ? '••••••••' : t('Password...')} className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
@@ -420,20 +463,19 @@ export function UsersPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Role Type</label>
+                <label className="text-sm font-medium">{t('Role Type')}</label>
                 <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50">
-                  <option value="1">Admin / Management</option>
-                  <option value="2">Staff</option>
-                  <option value="3">Creative Team</option>
-                  <option value="4">Client / Vendor</option>
+                  {rolesList.map(role => (
+                    <option key={role.id} value={role.id.toString()}>{role.name}</option>
+                  ))}
                 </select>
               </div>
 
               <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">Cancel</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{t('Cancel')}</button>
                 <button type="submit" disabled={saveMutation.isPending || isUploading} className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                   {(saveMutation.isPending || isUploading) && <Loader2 className="mr-2 size-4 animate-spin" />}
-                  {editingUser ? 'Save Changes' : 'Create User'}
+                  {editingUser ? t('Save Changes') : t('Create User')}
                 </button>
               </div>
             </form>
@@ -445,14 +487,14 @@ export function UsersPage() {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl animate-in zoom-in-95">
-            <h2 className="text-lg font-semibold text-foreground">Delete User?</h2>
+            <h2 className="text-lg font-semibold text-foreground">{t('Delete User?')}</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Are you sure you want to delete <strong>{deletingUser?.firstname}</strong>? This action cannot be undone.
+              {t('Are you sure you want to delete')} <strong>{deletingUser?.firstname}</strong>? {t('This action cannot be undone.')}
             </p>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setIsDeleteModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">Cancel</button>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{t('Cancel')}</button>
               <button onClick={handleDelete} disabled={deleteMutation.isPending} className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">
-                {deleteMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Yes, delete'}
+                {deleteMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : t('Yes, delete')}
               </button>
             </div>
           </div>

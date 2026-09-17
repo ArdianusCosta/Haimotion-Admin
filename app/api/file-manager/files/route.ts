@@ -2,20 +2,21 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getUserPermission } from '@/lib/file-auth';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function GET(req: Request) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
     const folderId = searchParams.get('folderId');
     const search = searchParams.get('search');
     const filter = searchParams.get('filter'); // 'starred', 'recent', 'shared'
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    const uid = parseInt(userId);
+    const uid = Number(user.id);
     let files = [];
 
     if (filter === 'shared') {
@@ -44,7 +45,10 @@ export async function GET(req: Request) {
           shares: { some: { shared_with_user_id: uid } }
         },
         include: {
-           shares: { where: { shared_with_user_id: uid } },
+           shares: { 
+             where: { shared_with_user_id: uid },
+             include: { shared_with_user: { select: { id: true, firstname: true, lastname: true, avatar: true } } }
+           },
            owner: { select: { firstname: true, lastname: true } }
         }
       });
@@ -73,6 +77,10 @@ export async function GET(req: Request) {
         where: whereClause,
         orderBy: filter === 'recent' ? { updated_at: 'desc' } : { name: 'asc' },
         take: filter === 'recent' ? 50 : undefined,
+        include: {
+          shares: { include: { shared_with_user: { select: { id: true, firstname: true, lastname: true, avatar: true } } } },
+          owner: { select: { firstname: true, lastname: true } }
+        }
       });
 
       // If user is inside a folder, also fetch files if they have inherited access
@@ -86,7 +94,10 @@ export async function GET(req: Request) {
              // Fetch all files in this folder
              const sharedFolderFiles = await prisma.file.findMany({
                 where: { folder_id: parseInt(folderId) },
-                include: { owner: { select: { firstname: true, lastname: true } } }
+                include: { 
+                  owner: { select: { firstname: true, lastname: true } },
+                  shares: { include: { shared_with_user: { select: { id: true, firstname: true, lastname: true, avatar: true } } } }
+                }
              });
              files = sharedFolderFiles;
          }
@@ -97,15 +108,15 @@ export async function GET(req: Request) {
     const serializedFiles = await Promise.all(files.map(async file => {
       const perm = await getUserPermission(uid, file.id, 'file');
       let sharedBy = null;
-      if (file.shares && file.shares.length > 0) {
-         // In filter=shared, we included shares and owner
+      if (filter === 'shared' && file.shares && file.shares.length > 0) {
          sharedBy = file.owner ? `${file.owner.firstname} ${file.owner.lastname}` : 'Unknown';
       }
       return {
         ...file,
         size: file.size.toString(),
         permission: perm,
-        sharedBy
+        sharedBy,
+        shares: file.shares || []
       };
     }));
 

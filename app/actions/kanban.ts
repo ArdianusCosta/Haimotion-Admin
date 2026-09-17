@@ -36,7 +36,8 @@ function stripHtml(html: string | null) {
 export async function getKanbanTasks() {
   try {
     const tasks = await prisma.task_list.findMany({
-      orderBy: { date_created: 'desc' }
+      orderBy: { date_created: 'desc' },
+      include: { assignees: true }
     })
     
     const users = await prisma.user.findMany({
@@ -54,7 +55,7 @@ export async function getKanbanTasks() {
     })
     
     const formattedTasks = tasks.map(task => {
-      const assignedIds = task.user_ids ? task.user_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : []
+      const assignedIds = task.assignees.map(a => a.user_id)
       const assignees = users.filter(u => assignedIds.includes(u.id))
       
       const comments = commentsCount.find(c => c.task_id === task.id)?._count.id || 0
@@ -158,7 +159,7 @@ export async function updateTaskStatus(id: number, newStatus: number) {
   }
 }
 
-export async function createTask(data: { title: string; description: string; status: number; assignees: string }) {
+export async function createTask(data: { title: string; description: string; status: number; assignees: number[] }) {
   try {
     // Need a default project_id for this table since it's required
     const firstProject = await prisma.project_list.findFirst()
@@ -169,8 +170,10 @@ export async function createTask(data: { title: string; description: string; sta
         task: data.title,
         description: data.description,
         status: data.status,
-        user_ids: data.assignees,
-        project_id: projectId
+        project_id: projectId,
+        assignees: {
+          create: data.assignees.map(uid => ({ user_id: Number(uid) }))
+        }
       }
     })
     
@@ -180,17 +183,23 @@ export async function createTask(data: { title: string; description: string; sta
   }
 }
 
-export async function updateTask(id: number, data: { title: string; description: string; status: number; assignees: string }) {
+export async function updateTask(id: number, data: { title: string; description: string; status: number; assignees: number[] }) {
   try {
-    const task = await prisma.task_list.update({
-      where: { id },
-      data: {
-        task: data.title,
-        description: data.description,
-        status: data.status,
-        user_ids: data.assignees
-      }
-    })
+    const task = await prisma.$transaction(async (tx) => {
+      await tx.taskAssignee.deleteMany({ where: { task_id: id } });
+      
+      return tx.task_list.update({
+        where: { id },
+        data: {
+          task: data.title,
+          description: data.description,
+          status: data.status,
+          assignees: {
+            create: data.assignees.map(uid => ({ user_id: Number(uid) }))
+          }
+        }
+      });
+    });
     
     return { success: true, data: task }
   } catch (error: any) {

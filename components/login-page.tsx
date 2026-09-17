@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, ArrowRight, Command, Mail, AlertCircle } from 'lucide-react'
+import { Sparkles, ArrowRight, Command, Mail, AlertCircle, Fingerprint } from 'lucide-react'
+import { authClient } from '@/lib/auth/client'
 
 interface LoginPageProps {
   onLogin: () => void
@@ -11,6 +12,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -19,19 +21,17 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setError('')
     
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      })
+      const { data, error: authError } = await authClient.signIn.email({
+          email,
+          password,
+      });
       
-      const data = await res.json()
-      
-      if (res.ok && data.success) {
+      if (authError) {
+        setError(authError.message || 'Invalid credentials. Please try again.')
+      } else if (data) {
         localStorage.setItem('auth_user', JSON.stringify(data.user))
+        localStorage.setItem('play_welcome_voice', 'true')
         onLogin()
-      } else {
-        setError(data.error || 'Invalid credentials. Please try again.')
       }
     } catch (err) {
       setError('Network error. Please check your connection.')
@@ -51,8 +51,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
       <div className="w-full max-w-md p-6 sm:p-10 z-10 animate-in fade-in zoom-in-95 duration-500">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground mb-4 shadow-lg shadow-primary/25">
-            <Sparkles className="size-6" />
+          <div className="flex size-16 items-center justify-center rounded-2xl mb-4 shadow-lg shadow-primary/25 overflow-hidden bg-background">
+            <img src="/logohm.jpeg" alt="Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
           <p className="text-sm text-muted-foreground mt-2">Enter your credentials to access your workspace</p>
@@ -111,14 +111,36 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <button className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors shadow-sm">
-            <Command className="size-4" /> Single Sign-On
-          </button>
-          <button className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors shadow-sm">
-            <Mail className="size-4" /> Google
+        <div className="mt-6">
+          <button 
+            onClick={async () => {
+              setIsPasskeyLoading(true)
+              setError('')
+              try {
+                const { data, error: authError } = await authClient.signIn.passkey()
+                if (authError) {
+                  setError(authError.message || 'Passkey authentication failed.')
+                } else if (data) {
+                  localStorage.setItem('auth_user', JSON.stringify(data.user))
+                  onLogin()
+                }
+              } catch (err) {
+                setError('Network error or passkey cancelled.')
+              } finally {
+                setIsPasskeyLoading(false)
+              }
+            }}
+            disabled={isPasskeyLoading || isLoading}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors shadow-sm disabled:opacity-70"
+          >
+            {isPasskeyLoading ? (
+              <span className="size-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            ) : (
+              <><Fingerprint className="size-4" /> Sign in with Passkey</>
+            )}
           </button>
         </div>
+
       </div>
     </div>
   )

@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireAuth();
     const resolvedParams = await params
     const id = parseInt(resolvedParams.id)
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+    if (user.id !== id) {
+      requirePermission(user, 'users.update');
+    }
 
     const data = await request.json()
     
@@ -22,6 +28,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (data.nik !== undefined) updateData.nik = data.nik || null
     if (data.address !== undefined) updateData.address = data.address || null
     if (data.avatar !== undefined) updateData.avatar = data.avatar || ''
+    if (data.role_id !== undefined) updateData.role_id = data.role_id === null ? null : parseInt(data.role_id)
 
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -37,6 +44,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, 'users.delete');
     const resolvedParams = await params
     const id = parseInt(resolvedParams.id)
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo, useRef } from "react"
+import { useState, useMemo, useRef, useEffect } from "react"
+import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { 
   Calendar, 
@@ -19,14 +20,17 @@ import {
   Loader2,
   X,
   AlertCircle,
-  FolderDot
+  FolderDot,
+  Video
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { getTasksData, createTask, updateTask, deleteTask } from '@/app/actions/tasks'
+import { getTasksData, createTask, updateTask, deleteTask, getTaskComments, createTaskComment, getTaskForEdit } from '@/app/actions/tasks'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ScheduleMeetingDialog } from '@/components/schedule-meeting-dialog'
 
 export const TASK_STATUS_MAP: Record<number, string> = {
   1: 'To Do',
@@ -41,6 +45,7 @@ export const TASK_STATUS_MAP: Record<number, string> = {
 }
 
 export function TasksPage() {
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
 
   // TanStack Query for Data Fetching
@@ -56,12 +61,16 @@ export function TasksPage() {
   const tasks = data?.tasks || []
   const projects = data?.projects || []
   const users = data?.users || []
+  const currentUserId = data?.currentUserId || 0
 
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Filtering & Selection
   const [selectedCategory, setSelectedCategory] = useState<'inbox'|'today'|'upcoming'|'filters'>('inbox')
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(() => {
+    const pid = searchParams.get('projectId')
+    return pid ? parseInt(pid) : null
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchActive, setIsSearchActive] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -75,6 +84,7 @@ export function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<any>(null)
   const [selectedProject, setSelectedProject] = useState<any>(null)
   const [taskToDelete, setTaskToDelete] = useState<number | null>(null)
+  const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false)
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -90,6 +100,52 @@ export function TasksPage() {
   // Assignee Dropdown
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('')
+  const [isEditingTask, setIsEditingTask] = useState(false)
+
+  // Comments State
+  const [newComment, setNewComment] = useState('')
+  const [replyToId, setReplyToId] = useState<number | null>(null)
+  
+  // Mentions State
+  const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionSearch, setMentionSearch] = useState('')
+  const commentsEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch Comments for selected task
+  const { data: commentsData, refetch: refetchComments } = useQuery({
+    queryKey: ['taskComments', formData.id],
+    queryFn: async () => {
+      if (!formData.id) return { comments: [] }
+      const res = await getTaskComments(formData.id)
+      if (!res.success) throw new Error(res.error)
+      return res
+    },
+    enabled: !!formData.id && taskDialogOpen,
+    refetchInterval: 3000,
+  })
+
+  useEffect(() => {
+    if (commentsData?.comments && taskDialogOpen) {
+      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [commentsData?.comments, taskDialogOpen])
+  
+  const postCommentMut = useMutation({
+    mutationFn: async () => {
+      if (!formData.id || !newComment.trim()) return
+      const res = await createTaskComment(formData.id, newComment, replyToId || undefined)
+      if (!res.success) throw new Error(res.error)
+      return res
+    },
+    onSuccess: () => {
+      setNewComment('')
+      setReplyToId(null)
+      refetchComments()
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to post comment')
+    }
+  })
 
   // Derived state for counters and filtering
   const todayStr = new Date().toISOString().split('T')[0]
@@ -130,7 +186,7 @@ export function TasksPage() {
         title: task.title,
         description: task.rawDescription,
         status: newStatus,
-        assignees: task.assignees.map((a:any)=>a.id).join(','),
+        assignees: task.assignees.map((a:any)=>a.id),
         projectId: task.projectId,
         dueDate: task.dueDate
       })
@@ -166,7 +222,7 @@ export function TasksPage() {
         title: task.title,
         description: task.rawDescription,
         status: newStatus,
-        assignees: task.assignees.map((a:any)=>a.id).join(','),
+        assignees: task.assignees.map((a:any)=>a.id),
         projectId: task.projectId,
         dueDate: task.dueDate
       })
@@ -205,7 +261,8 @@ export function TasksPage() {
       if (res.success) {
         toast.success(formData.id ? 'Task updated' : 'Task created')
         setTaskDialogOpen(false)
-        queryClient.invalidateQueries({ queryKey: ['tasksData'] })
+        // Use refetchQueries to ensure fresh data (including assignees) is loaded before next edit
+        queryClient.refetchQueries({ queryKey: ['tasksData'] })
       } else {
         toast.error(res.error || 'Failed to save task')
       }
@@ -246,16 +303,32 @@ export function TasksPage() {
     setTaskDialogOpen(true)
   }
 
-  const openEditTaskDialog = (task: any) => {
-    setFormData({
-      id: task.dbId,
-      title: task.title,
-      description: task.description || '', // Fix: Used stripped description for editing
-      status: task.status,
-      projectId: task.projectId,
-      assignees: task.assignees.map((a:any) => a.id),
-      dueDate: task.dueDate ? task.dueDate.split('T')[0] : ''
-    })
+  const openEditTaskDialog = async (task: any) => {
+    // Fetch fresh task data from server to get correct assignees (bypass stale cache)
+    const res = await getTaskForEdit(task.dbId)
+    if (res.success && res.task) {
+      setFormData({
+        id: res.task.id,
+        title: res.task.title,
+        description: res.task.description,
+        status: res.task.status,
+        projectId: res.task.projectId,
+        assignees: res.task.assignees,
+        dueDate: res.task.dueDate
+      })
+    } else {
+      // Fallback: use cached data
+      const assigneeIds = (task.assignees || []).map((a: any) => Number(a.id))
+      setFormData({
+        id: task.dbId,
+        title: task.title,
+        description: task.rawDescription || task.description || '',
+        status: task.status,
+        projectId: task.projectId,
+        assignees: assigneeIds,
+        dueDate: task.dueDate ? task.dueDate.split('T')[0] : ''
+      })
+    }
     setTaskDialogOpen(true)
   }
 
@@ -270,7 +343,7 @@ export function TasksPage() {
       title: formData.title,
       description: formData.description,
       status: formData.status,
-      assignees: formData.assignees.join(','),
+      assignees: formData.assignees,
       projectId: formData.projectId,
       dueDate: formData.dueDate
     })
@@ -552,137 +625,337 @@ export function TasksPage() {
       </div>
 
       <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <form onSubmit={handleSaveTask}>
-            <DialogHeader>
-              <DialogTitle>{formData.id ? 'Edit Task' : 'Create Task'}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="title">Task Title</Label>
-                <Input id="title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required placeholder="E.g., Update landing page copy" />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="project">Project</Label>
-                  <select 
-                    id="project" 
-                    value={formData.projectId} 
-                    onChange={e => setFormData({...formData, projectId: parseInt(e.target.value)})}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-                    required
-                  >
-                    <option value={0} disabled>Select project...</option>
-                    {projects.map((p: any) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="grid gap-2">
-                  <Label htmlFor="status">Status</Label>
-                  <select 
-                    id="status" 
-                    value={formData.status} 
-                    onChange={e => setFormData({...formData, status: parseInt(e.target.value)})}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-                  >
-                    {Object.entries(TASK_STATUS_MAP).map(([val, label]) => (
-                      <option key={val} value={val}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input 
-                  id="dueDate" 
-                  type="date"
-                  value={formData.dueDate} 
-                  onChange={e => setFormData({...formData, dueDate: e.target.value})} 
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
-                <textarea 
-                  id="description" 
-                  value={formData.description} 
-                  onChange={e => setFormData({...formData, description: e.target.value})} 
-                  className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-primary"
-                  placeholder="Additional details..."
-                />
-              </div>
-
-              <div className="grid gap-2 relative assignee-dropdown-container">
-                <Label>Assignees</Label>
-                <div 
-                  className="flex min-h-10 w-full flex-wrap gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                >
-                  {formData.assignees.length === 0 && <span className="text-muted-foreground mt-0.5">Select members...</span>}
-                  {formData.assignees.map(id => {
-                    const u = users.find((u: any) => u.id === id)
-                    if (!u) return null
-                    return (
-                      <span key={id} className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary border border-primary/20">
-                        {u.name}
-                        <button type="button" onClick={(e) => {
-                          e.stopPropagation();
-                          setFormData({...formData, assignees: formData.assignees.filter(a => a !== id)})
-                        }} className="hover:text-destructive rounded-full p-0.5 hover:bg-destructive/10"><X className="size-3" /></button>
-                      </span>
-                    )
-                  })}
-                </div>
-                
-                {showAssigneeDropdown && (
-                  <div className="absolute top-full left-0 z-50 mt-1 max-h-48 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md flex flex-col">
-                    <div className="p-2 border-b border-border/50 sticky top-0 bg-popover z-10">
-                      <input 
-                        autoFocus
-                        placeholder="Search team members..." 
-                        value={assigneeSearchQuery}
-                        onChange={(e) => setAssigneeSearchQuery(e.target.value)}
-                        className="w-full rounded-sm bg-muted/50 py-1.5 px-3 text-xs outline-none"
-                      />
-                    </div>
-                    <div className="overflow-y-auto p-1 max-h-36">
-                      {users.filter((u: any) => u.name.toLowerCase().includes(assigneeSearchQuery.toLowerCase())).map((u: any) => {
-                        const isSelected = formData.assignees.includes(u.id)
-                        return (
-                          <div 
-                            key={u.id}
-                            className={`flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted ${isSelected ? 'bg-muted/50' : ''}`}
-                            onClick={() => {
-                              if (isSelected) {
-                                setFormData({...formData, assignees: formData.assignees.filter(id => id !== u.id)})
-                              } else {
-                                setFormData({...formData, assignees: [...formData.assignees, u.id]})
-                              }
-                            }}
-                          >
-                            <div className={`flex size-4 items-center justify-center rounded border ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background'}`}>
-                               {isSelected && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="size-2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>}
-                            </div>
-                            <span>{u.name}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
+        <DialogContent className={formData.id > 0 ? "sm:max-w-4xl w-[95vw]" : "sm:max-w-[500px]"}>
+          <div className={formData.id > 0 ? "flex flex-col md:flex-row gap-6 h-full" : ""}>
+            
+            {/* Left Column (Task Form) */}
+            <form onSubmit={handleSaveTask} className={`flex flex-col h-full ${formData.id > 0 ? 'flex-1 w-full max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar' : ''}`}>
+              <DialogHeader>
+                <DialogTitle>{formData.id ? 'Task Details' : 'Create Task'}</DialogTitle>
+                {formData.id > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Manage task details, assignees, and status.
                   </div>
                 )}
+              </DialogHeader>
+              
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="title">Task Title</Label>
+                  <Input id="title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required placeholder="E.g., Update landing page copy" />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="project">Project</Label>
+                    <select 
+                      id="project" 
+                      value={formData.projectId} 
+                      onChange={e => setFormData({...formData, projectId: parseInt(e.target.value)})}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
+                      required
+                    >
+                      <option value={0} disabled>Select project...</option>
+                      {projects.map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="status">Status</Label>
+                    <select 
+                      id="status" 
+                      value={formData.status} 
+                      onChange={e => setFormData({...formData, status: parseInt(e.target.value)})}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
+                    >
+                      {Object.entries(TASK_STATUS_MAP).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Start Date</Label>
+                    <Input disabled value={todayStr} type="date" className="opacity-50 cursor-not-allowed" title="Auto-generated" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="dueDate">Due Date</Label>
+                    <Input 
+                      id="dueDate" 
+                      type="date"
+                      value={formData.dueDate} 
+                      onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <textarea 
+                    id="description" 
+                    value={formData.description} 
+                    onChange={e => setFormData({...formData, description: e.target.value})} 
+                    className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-primary custom-scrollbar"
+                    placeholder="Provide a detailed description of the task..."
+                  />
+                </div>
+
+                <div className="grid gap-2 relative assignee-dropdown-container">
+                  <Label>Assignees</Label>
+                  <div 
+                    className="flex min-h-10 w-full flex-wrap gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                  >
+                    {formData.assignees.length === 0 && <span className="text-muted-foreground mt-0.5">Select members...</span>}
+                    {formData.assignees.map(id => {
+                      const u = users.find((u: any) => Number(u.id) === Number(id))
+                      if (!u) return null
+                      return (
+                        <span key={id} className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary border border-primary/20">
+                          {u.name}
+                          <button type="button" onClick={(e) => {
+                            e.stopPropagation();
+                            setFormData({...formData, assignees: formData.assignees.filter(a => Number(a) !== Number(id))})
+                          }} className="hover:text-destructive rounded-full p-0.5 hover:bg-destructive/10"><X className="size-3" /></button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                  
+                  {showAssigneeDropdown && (
+                    <div className="absolute top-full left-0 z-50 mt-1 max-h-48 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md flex flex-col">
+                      <div className="p-2 border-b border-border/50 sticky top-0 bg-popover z-10">
+                        <input 
+                          autoFocus
+                          placeholder="Search team members..." 
+                          value={assigneeSearchQuery}
+                          onChange={(e) => setAssigneeSearchQuery(e.target.value)}
+                          className="w-full rounded-sm bg-muted/50 py-1.5 px-3 text-xs outline-none"
+                        />
+                      </div>
+                      <div className="overflow-y-auto p-1 max-h-36 custom-scrollbar">
+                        {users.filter((u: any) => u.name.toLowerCase().includes(assigneeSearchQuery.toLowerCase())).map((u: any) => {
+                          const isSelected = formData.assignees.some(id => Number(id) === Number(u.id))
+                          return (
+                            <div 
+                              key={u.id}
+                              className={`flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-muted ${isSelected ? 'bg-muted/50' : ''}`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setFormData({...formData, assignees: formData.assignees.filter(id => Number(id) !== Number(u.id))})
+                                } else {
+                                  setFormData({...formData, assignees: [...formData.assignees, Number(u.id)]})
+                                }
+                                setShowAssigneeDropdown(false)
+                                setAssigneeSearchQuery('')
+                              }}
+                            >
+                              <div className={`flex size-4 items-center justify-center rounded border ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background'}`}>
+                                 {isSelected && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="size-2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                              </div>
+                              <span>{u.name}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setTaskDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={saveTaskMutation.isPending}>
-                {saveTaskMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Task
-              </Button>
-            </DialogFooter>
-          </form>
+              
+              <div className="mt-auto pt-4 pb-2">
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setTaskDialogOpen(false)}>Close</Button>
+                  <Button type="submit" disabled={saveTaskMutation.isPending}>
+                    {saveTaskMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Task
+                  </Button>
+                </div>
+              </div>
+            </form>
+
+            {/* Right Column (Comments UI) */}
+            {formData.id > 0 && (
+              <div className="w-full md:w-[350px] shrink-0 flex flex-col h-full max-h-[75vh] border-t md:border-t-0 md:border-l border-border pt-6 md:pt-0 md:pl-6">
+                <div className="flex items-center gap-2 mb-4 shrink-0">
+                  <Label className="text-base font-semibold">Comments</Label>
+                  <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold">
+                    {commentsData?.comments?.length || 0}
+                  </span>
+                </div>
+
+                {/* Comments List */}
+                <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar pb-4">
+                  {commentsData?.comments && commentsData.comments.length > 0 ? (
+                    (() => {
+                      const rootComments = commentsData.comments.filter((c: any) => !c.parent_id);
+                      return rootComments.map((comment: any) => {
+                        const commentUser = users.find((u: any) => Number(u.id) === Number(comment.user_id));
+                        const avatarFallback = commentUser?.name ? commentUser.name[0].toUpperCase() : 'U';
+                        const replies = commentsData.comments.filter((c: any) => c.parent_id === comment.id);
+                        
+                        const isMine = Number(comment.user_id) === currentUserId;
+
+                        return (
+                          <div key={comment.id} className="space-y-2">
+                            {/* Root Comment Bubble */}
+                            <div className={`flex gap-3 text-sm group ${isMine ? 'flex-row-reverse' : ''}`}>
+                              <Avatar className="size-8 shrink-0 mt-1">
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs">{avatarFallback}</AvatarFallback>
+                              </Avatar>
+                              <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                                <div className={`flex items-center gap-2 mb-1 ${isMine ? 'flex-row-reverse' : ''}`}>
+                                  <span className="font-semibold text-xs">{commentUser?.name || 'Unknown User'}</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {new Date(comment.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                  </span>
+                                </div>
+                                <div className={`px-3 py-2 rounded-2xl whitespace-pre-wrap leading-relaxed ${isMine ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted text-foreground rounded-tl-sm'}`}>
+                                  {comment.comment.split(/(@\w+(?:\s\w+)?)/g).map((part: string, i: number) => 
+                                    part.startsWith('@') ? <span key={i} className={`font-bold px-1 rounded-sm ${isMine ? 'bg-primary-foreground/20' : 'bg-primary/20 text-primary'}`}>{part}</span> : part
+                                  )}
+                                </div>
+                                <button 
+                                  onClick={() => setReplyToId(comment.id)} 
+                                  className={`text-[10px] font-medium text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover:opacity-100 mt-1 ${isMine ? 'mr-1' : 'ml-1'}`}
+                                >
+                                  Reply
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Replies */}
+                            {replies.length > 0 && (
+                              <div className="space-y-3 mt-2 pl-11">
+                                {replies.map((reply: any) => {
+                                  const replyUser = users.find((u: any) => Number(u.id) === Number(reply.user_id));
+                                  const rFallback = replyUser?.name ? replyUser.name[0].toUpperCase() : 'U';
+                                  const isReplyMine = Number(reply.user_id) === currentUserId;
+                                  
+                                  return (
+                                    <div key={reply.id} className={`flex gap-2.5 text-sm group ${isReplyMine ? 'flex-row-reverse pr-2' : ''}`}>
+                                      <Avatar className="size-6 shrink-0 mt-1">
+                                        <AvatarFallback className="bg-primary/10 text-primary text-[10px]">{rFallback}</AvatarFallback>
+                                      </Avatar>
+                                      <div className={`flex flex-col ${isReplyMine ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                                        <div className={`flex items-center gap-2 mb-0.5 ${isReplyMine ? 'flex-row-reverse' : ''}`}>
+                                          <span className="font-semibold text-xs">{replyUser?.name || 'Unknown User'}</span>
+                                          <span className="text-[10px] text-muted-foreground">
+                                            {new Date(reply.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                          </span>
+                                        </div>
+                                        <div className={`px-2.5 py-1.5 text-xs rounded-2xl whitespace-pre-wrap leading-relaxed ${isReplyMine ? 'bg-primary/90 text-primary-foreground rounded-tr-sm' : 'bg-muted/80 text-foreground rounded-tl-sm'}`}>
+                                          {reply.comment.split(/(@\w+(?:\s\w+)?)/g).map((part: string, i: number) => 
+                                            part.startsWith('@') ? <span key={i} className={`font-bold px-1 rounded-sm ${isReplyMine ? 'bg-primary-foreground/20' : 'bg-primary/20 text-primary'}`}>{part}</span> : part
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    })()
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
+                      <div className="size-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                        <Inbox className="size-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-medium">No comments yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Be the first to share an update.</p>
+                    </div>
+                  )}
+                  <div ref={commentsEndRef} />
+                </div>
+
+                {/* Comment Input Area */}
+                <div className="pt-4 shrink-0 mt-auto relative">
+                  {replyToId && (
+                    <div className="flex items-center justify-between bg-muted/50 px-3 py-1.5 rounded-t-lg text-xs border border-b-0 border-border">
+                      <span className="text-muted-foreground">
+                        Replying to comment...
+                      </span>
+                      <button onClick={() => setReplyToId(null)} className="hover:text-destructive"><X className="size-3" /></button>
+                    </div>
+                  )}
+                  
+                  {/* Mentions Popover */}
+                  {mentionOpen && (
+                    <div className="absolute bottom-full left-0 mb-1 max-h-40 w-full overflow-y-auto rounded-lg border border-border bg-popover shadow-lg custom-scrollbar z-50">
+                      {users.filter((u: any) => u.name.toLowerCase().includes(mentionSearch.toLowerCase())).map((u: any) => (
+                        <div 
+                          key={u.id}
+                          className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                          onClick={() => {
+                            const beforeMention = newComment.substring(0, newComment.lastIndexOf('@'));
+                            setNewComment(beforeMention + '@' + u.name + ' ');
+                            setMentionOpen(false);
+                            setMentionSearch('');
+                          }}
+                        >
+                          <Avatar className="size-5 shrink-0">
+                            <AvatarFallback className="bg-primary/10 text-primary text-[9px]">{u.name[0].toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span>{u.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col rounded-lg border border-border bg-card focus-within:ring-1 focus-within:ring-primary overflow-hidden transition-shadow">
+                    <textarea 
+                      placeholder="Add a comment... (Type @ to tag)"
+                      value={newComment}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setNewComment(val);
+                        // Mention Detection Logic
+                        const match = val.match(/@(\w*)$/);
+                        if (match) {
+                          setMentionOpen(true);
+                          setMentionSearch(match[1]);
+                        } else {
+                          setMentionOpen(false);
+                        }
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          if (newComment.trim()) postCommentMut.mutate()
+                        }
+                      }}
+                      className="min-h-[80px] w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground custom-scrollbar"
+                    />
+                    <div className="flex items-center justify-between px-2 py-2 bg-muted/30 border-t border-border">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <button type="button" onClick={() => { setMentionOpen(true); setNewComment(newComment + '@'); }} className="p-1.5 rounded hover:bg-muted hover:text-foreground transition-colors" title="Mention user">
+                          <Tag className="size-4" />
+                        </button>
+                      </div>
+                      <Button 
+                        type="button" 
+                        size="sm"
+                        className="h-7 text-xs font-semibold px-4"
+                        onClick={() => postCommentMut.mutate()}
+                        disabled={!newComment.trim() || postCommentMut.isPending}
+                      >
+                        {postCommentMut.isPending ? <Loader2 className="size-3 animate-spin mr-1.5" /> : null}
+                        Post
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+            
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -771,6 +1044,12 @@ export function TasksPage() {
                   <span className="flex items-center gap-1"><FolderDot className="size-3" /> {selectedTask.projectName}</span>
                   {selectedTask.dueDate && <span className="flex items-center gap-1"><Calendar className="size-3" /> Due {selectedTask.dueDate.split('T')[0]}</span>}
                 </div>
+                
+                <div className="mt-4 border-b border-border pb-4 flex gap-2">
+                   <Button size="sm" variant="outline" onClick={() => setIsScheduleMeetingOpen(true)}>
+                     <Video className="size-4 mr-2" /> Schedule Meeting
+                   </Button>
+                </div>
               </DialogHeader>
               
               <div className="py-4 space-y-6">
@@ -838,6 +1117,12 @@ export function TasksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ScheduleMeetingDialog 
+        open={isScheduleMeetingOpen} 
+        onOpenChange={setIsScheduleMeetingOpen} 
+        defaultValues={{ taskId: selectedTask?.dbId, projectId: selectedTask?.projectId }}
+      />
     </div>
   )
 }

@@ -2,19 +2,19 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { deleteFile as deleteMinioFile } from '@/lib/storage/minio';
 import { checkAccess } from '@/lib/file-auth';
+import { requireAuth } from '@/lib/auth/authorization';
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+    
     const { id } = await params;
     const fileId = parseInt(id);
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    const uid = parseInt(userId);
     const hasAccess = await checkAccess(uid, fileId, 'file', 'manager');
 
     const file = await prisma.file.findUnique({
@@ -42,17 +42,17 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const uid = Number(user.id);
+
     const { id } = await params;
     const fileId = parseInt(id);
     const body = await req.json();
-    const { action, name, folderId, is_starred, userId } = body;
+    const { action, name, folderId, is_starred } = body;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
-
-    const uid = parseInt(userId);
-    
     // For rename and move, require 'editor'
     // For star, require 'viewer' since it's personal preference, BUT wait, is_starred is a global column in `file` table.
     // If it's a global column, only editor can change it. Let's require editor for all PATCH for now.

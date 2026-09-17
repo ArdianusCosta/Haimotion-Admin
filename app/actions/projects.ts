@@ -1,15 +1,23 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import { requireAuth, requirePermission, canAccessProject } from '@/lib/auth/authorization'
 
 export async function getProjects() {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "projects.view");
     const projects = await prisma.project_list.findMany({
       where: { is_archived: false },
-      orderBy: { date_created: 'desc' }
+      orderBy: { date_created: 'desc' },
+      include: {
+        members: {
+          include: { user: true }
+        }
+      }
     })
     
-    // Fetch all users to map manager and members
+    // Fetch all users to map manager (members are already included)
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -34,11 +42,7 @@ export async function getProjects() {
     const formattedProjects = projects.map(project => {
       const manager = usersMap.get(project.manager_id) || null
       
-      const memberIds = project.user_ids 
-        ? project.user_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
-        : []
-      
-      const members = memberIds.map(id => usersMap.get(id)).filter(Boolean)
+      const members = project.members.map(m => m.user)
       
       const projectTasks = allTasks.filter(t => t.project_id === project.id)
       const totalTasks = projectTasks.length
@@ -69,7 +73,14 @@ export async function getProjects() {
       }
     })
     
-    return { success: true, data: formattedProjects, users: users }
+    const serialized = formattedProjects.map(p => ({
+      ...p,
+      start_date: p.start_date?.toISOString?.() ?? p.start_date,
+      end_date: p.end_date?.toISOString?.() ?? p.end_date,
+      date_created: p.date_created?.toISOString?.() ?? p.date_created,
+    }))
+
+    return { success: true, data: serialized, users: users }
   } catch (error) {
     console.error('Error fetching projects:', error)
     return { success: false, error: 'Failed to fetch projects' }
@@ -78,8 +89,16 @@ export async function getProjects() {
 
 export async function getProjectById(id: number) {
   try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'viewer');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
     const project = await prisma.project_list.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        members: {
+          include: { user: true }
+        }
+      }
     })
     
     if (!project) return { success: false, error: 'Project not found' }
@@ -102,10 +121,7 @@ export async function getProjectById(id: number) {
     const usersMap = new Map(users.map(u => [u.id, u]))
     const manager = usersMap.get(project.manager_id) || null
     
-    const memberIds = project.user_ids 
-      ? project.user_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
-      : []
-    const members = memberIds.map(id => usersMap.get(id)).filter(Boolean)
+    const members = project.members.map(m => m.user)
     
     const totalTasks = tasks.length
     const completedTasks = tasks.filter(t => t.status === 5).length
@@ -133,7 +149,21 @@ export async function getProjectById(id: number) {
       }
     }
     
-    return { success: true, data: formattedProject }
+    const serializedProject = {
+      ...formattedProject,
+      start_date: formattedProject.start_date?.toISOString?.() ?? formattedProject.start_date,
+      end_date: formattedProject.end_date?.toISOString?.() ?? formattedProject.end_date,
+      date_created: formattedProject.date_created?.toISOString?.() ?? formattedProject.date_created,
+      tasks: formattedProject.tasks.map((t: any) => ({
+        ...t,
+        start_date: t.start_date?.toISOString?.() ?? t.start_date,
+        end_date: t.end_date?.toISOString?.() ?? t.end_date,
+        date_created: t.date_created?.toISOString?.() ?? t.date_created,
+        date_updated: t.date_updated?.toISOString?.() ?? t.date_updated,
+      }))
+    }
+
+    return { success: true, data: serializedProject }
   } catch (error) {
     console.error('Error fetching project:', error)
     return { success: false, error: 'Failed to fetch project' }
@@ -147,10 +177,12 @@ export async function createProject(data: {
   start_date: string
   end_date: string
   manager_id: number
-  user_ids: string
+  user_ids: number[]
   client_name?: string
 }) {
   try {
+    const user = await requireAuth();
+    requirePermission(user, "projects.create");
     const project = await prisma.project_list.create({
       data: {
         name: data.name,
@@ -159,8 +191,12 @@ export async function createProject(data: {
         start_date: new Date(data.start_date),
         end_date: new Date(data.end_date),
         manager_id: data.manager_id,
-        user_ids: data.user_ids,
-        client_name: data.client_name
+        client_name: data.client_name,
+        members: {
+          create: data.user_ids.map(uid => ({
+            user_id: Number(uid)
+          }))
+        }
       }
     })
     return { success: true, data: project }
@@ -177,23 +213,34 @@ export async function updateProject(id: number, data: {
   start_date: string
   end_date: string
   manager_id: number
-  user_ids: string
+  user_ids: number[]
   client_name?: string
 }) {
   try {
-    const project = await prisma.project_list.update({
-      where: { id },
-      data: {
-        name: data.name,
-        description: data.description,
-        status: data.status,
-        start_date: new Date(data.start_date),
-        end_date: new Date(data.end_date),
-        manager_id: data.manager_id,
-        user_ids: data.user_ids,
-        client_name: data.client_name
-      }
-    })
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'editor');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+
+    // Update project details and reset members
+    const project = await prisma.$transaction(async (tx) => {
+      await tx.projectMember.deleteMany({ where: { project_id: id } });
+      
+      return tx.project_list.update({
+        where: { id },
+        data: {
+          name: data.name,
+          description: data.description,
+          status: data.status,
+          start_date: new Date(data.start_date),
+          end_date: new Date(data.end_date),
+          manager_id: data.manager_id,
+          client_name: data.client_name,
+          members: {
+            create: data.user_ids.map(uid => ({ user_id: Number(uid) }))
+          }
+        }
+      });
+    });
     return { success: true, data: project }
   } catch (error) {
     console.error('Error updating project:', error)
@@ -203,6 +250,9 @@ export async function updateProject(id: number, data: {
 
 export async function deleteProject(id: number) {
   try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'editor');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
     await prisma.project_list.delete({
       where: { id }
     })
@@ -216,6 +266,9 @@ export async function deleteProject(id: number) {
 
 export async function updateProjectStatus(id: number, status: number) {
   try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'editor');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
     const project = await prisma.project_list.update({
       where: { id },
       data: { status }
@@ -229,6 +282,9 @@ export async function updateProjectStatus(id: number, status: number) {
 
 export async function toggleFavoriteProject(id: number) {
   try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'viewer');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
     const project = await prisma.project_list.findUnique({ where: { id } })
     if (!project) return { success: false, error: 'Not found' }
     
@@ -244,6 +300,9 @@ export async function toggleFavoriteProject(id: number) {
 
 export async function archiveProject(id: number) {
   try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'manager');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
     await prisma.project_list.update({
       where: { id },
       data: { is_archived: true }
@@ -256,20 +315,54 @@ export async function archiveProject(id: number) {
 
 export async function duplicateProject(id: number) {
   try {
-    const project = await prisma.project_list.findUnique({ where: { id } })
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'viewer');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+    const project = await prisma.project_list.findUnique({ 
+      where: { id },
+      include: { members: true }
+    })
     if (!project) return { success: false, error: 'Not found' }
+
+    // Fetch all tasks from the original project
+    const tasks = await prisma.task_list.findMany({ where: { project_id: id } })
     
-    const duplicate = await prisma.project_list.create({
-      data: {
-        name: project.name + ' (Copy)',
-        description: project.description,
-        status: project.status,
-        start_date: project.start_date,
-        end_date: project.end_date,
-        manager_id: project.manager_id,
-        user_ids: project.user_ids,
-        client_name: project.client_name
+    // Create duplicate project + members in a transaction
+    const duplicate = await prisma.$transaction(async (tx) => {
+      const newProject = await tx.project_list.create({
+        data: {
+          name: project.name + ' (Copy)',
+          description: project.description,
+          status: project.status,
+          start_date: project.start_date,
+          end_date: project.end_date,
+          manager_id: project.manager_id,
+          client_name: project.client_name,
+          members: {
+            create: project.members.map(m => ({ user_id: m.user_id }))
+          }
+        }
+      })
+
+      // Duplicate all tasks for the new project
+      if (tasks.length > 0) {
+        await tx.task_list.createMany({
+          data: tasks.map(t => ({
+            project_id: newProject.id,
+            user_id: t.user_id,
+            task: t.task,
+            description: t.description,
+            status: t.status,
+            start_date: t.start_date,
+            end_date: t.end_date,
+            content_pillar: t.content_pillar,
+            platform: t.platform,
+            reference_links: t.reference_links,
+          }))
+        })
       }
+
+      return newProject
     })
     return { success: true, data: duplicate }
   } catch (error) {
@@ -279,6 +372,9 @@ export async function duplicateProject(id: number) {
 
 export async function exportProjectData(id: number) {
   try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'viewer');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
     const project = await prisma.project_list.findUnique({ where: { id } })
     if (!project) return { success: false, error: 'Not found' }
     
@@ -291,12 +387,25 @@ export async function exportProjectData(id: number) {
   }
 }
 
-export async function updateProjectMembers(id: number, user_ids: string) {
+export async function updateProjectMembers(id: number, user_ids: number[]) {
   try {
-    const project = await prisma.project_list.update({
-      where: { id },
-      data: { user_ids }
-    })
+    const user = await requireAuth();
+    // Allow project manager OR anyone with projects.update permission
+    const hasAccess = await canAccessProject(user, id, 'editor');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+    
+    const project = await prisma.$transaction(async (tx) => {
+      await tx.projectMember.deleteMany({ where: { project_id: id } });
+      
+      return tx.project_list.update({
+        where: { id },
+        data: {
+          members: {
+            create: user_ids.map(uid => ({ user_id: Number(uid) }))
+          }
+        }
+      });
+    });
     return { success: true, data: project }
   } catch (error) {
     return { success: false, error: 'Failed to update members' }
