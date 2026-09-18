@@ -61,6 +61,9 @@ const prismaClientSingleton = () => {
               if (typeof acc.accountId === 'number') {
                 acc.accountId = String(acc.accountId);
               }
+              if (typeof acc.userId === 'number') {
+                acc.userId = String(acc.userId);
+              }
               if (acc.providerId === 'credential') {
                 acc.issuer = 'local:credential';
               }

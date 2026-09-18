@@ -4,8 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "prisma generate && next build",
-    "start": "next start"
+    "build": "npm run prisma:generate && next build",
+    "start": "next start",
+    "prisma:generate": "node scripts/prepare-prisma.js generate",
+    "db:push": "node scripts/prepare-prisma.js db push",
+    "db:studio": "node scripts/prepare-prisma.js studio",
+    "db:migrate-data": "node scripts/generate-migration-clients.js && npx tsx scripts/run-migration.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

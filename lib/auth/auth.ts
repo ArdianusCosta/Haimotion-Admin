@@ -64,7 +64,7 @@ const prismaWithHooks = prisma.$extends({
 export const auth = betterAuth({
   trustedOrigins: ["http://192.168.0.29:3000", "http://192.168.7.21:3000"],
   database: prismaAdapter(prismaWithHooks as any, {
-    provider: "mysql",
+    provider: (process.env.ACTIVE_DB || 'postgres').toLowerCase() === 'mysql' ? 'mysql' : 'postgres',
   }),
   onAPIError: {
     throw: false,
