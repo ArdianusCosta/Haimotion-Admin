@@ -13,13 +13,25 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
       const subRoute = resolvedParams.slug[1]
       // Special mappings for finance nested routes
       const financeRouteMap: Record<string, string> = {
-        'overview': 'Finance Overview',
-        'invoices': 'Invoices',
-        'expenses': 'Expenses',
-        'cash-bank': 'Cash & Bank',
-        'reports': 'Reports'
+        'overview': 'Beranda',
+        'chart-of-accounts': 'Akun Perkiraan',
+        'sales': 'Penjualan',
+        'sales/penawaran': 'Penawaran Penjualan',
+        'sales/uang-muka': 'Uang Muka Penjualan',
+        'sales/faktur': 'Faktur Penjualan',
+        'sales/penerimaan': 'Penerimaan Penjualan',
+        'sales/pelanggan': 'Pelanggan',
+        'purchases': 'Pembelian',
+        'purchases/pesanan': 'Pesanan Pembelian',
+        'purchases/faktur': 'Faktur Pembelian',
+        'purchases/uang-muka': 'Uang Muka Pembelian',
+        'purchases/pembayaran': 'Pembayaran Pembelian',
+        'purchases/pemasok': 'Pemasok',
+        'products-services': 'Barang & Jasa',
+        'employees': 'Karyawan',
+        'general-ledger': 'Buku Besar'
       }
-      initialSection = financeRouteMap[subRoute] || 'Finance Overview'
+      initialSection = financeRouteMap[subRoute] || 'Beranda'
     } else if (resolvedParams.slug[0] === 'hr' && resolvedParams.slug.length > 1) {
       const subRoute = resolvedParams.slug[1]
       // Special mappings for hr nested routes
@@ -45,7 +57,7 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         initialSection = 'AI Assistant'
       }
       if (rawSlug === 'finance') {
-        initialSection = 'Finance Overview'
+        initialSection = 'Beranda'
       }
       if (rawSlug === 'hr') {
         initialSection = 'HR Overview'

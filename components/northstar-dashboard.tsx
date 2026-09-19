@@ -27,8 +27,29 @@ import { MeetingsPage } from '@/components/meetings-page'
 import { TransactionsPage } from '@/components/finance/transactions-page'
 import { InvoicesPage } from '@/components/finance/invoices-page'
 import { FinanceOverviewPage } from '@/components/finance/finance-overview-page'
+import { AkunPerkiraanPage } from '@/components/finance/akun-perkiraan-page'
+
+import { PenawaranPenjualanPage } from '@/components/finance/penjualan/penawaran-penjualan-page'
+import { UangMukaPenjualanPage } from '@/components/finance/penjualan/uang-muka-penjualan-page'
+import { FakturPenjualanPage } from '@/components/finance/penjualan/faktur-penjualan-page'
+import { PenerimaanPenjualanPage } from '@/components/finance/penjualan/penerimaan-penjualan-page'
+import { PelangganPage } from '@/components/finance/penjualan/pelanggan-page'
+
+import { PesananPembelianPage } from '@/components/finance/pembelian/pesanan-pembelian-page'
+import { FakturPembelianPage } from '@/components/finance/pembelian/faktur-pembelian-page'
+import { UangMukaPembelianPage } from '@/components/finance/pembelian/uang-muka-pembelian-page'
+import { PembayaranPembelianPage } from '@/components/finance/pembelian/pembayaran-pembelian-page'
+import { PemasokPage } from '@/components/finance/pembelian/pemasok-page'
+
+
 import { ExpensesPage } from '@/components/finance/expenses-page'
 import { CashBankPage } from '@/components/finance/cash-bank-page'
+
+import { BarangJasaPage } from '@/components/finance/barang-jasa-page'
+
+import { BukuBesarPage } from '@/components/finance/buku-besar-page'
+
+
 import { ReportsPage } from '@/components/finance/reports-page'
 import { HROverviewPage } from '@/components/hr/hr-overview-page'
 import { EmployeesPage } from '@/components/hr/employees-page'
@@ -83,11 +104,26 @@ const developer = [
   { label: 'Module Flows', icon: GitPullRequest }
 ]
 const financeMenu = [
-  { label: 'Finance Overview', icon: LayoutDashboard },
-  { label: 'Invoices', icon: Receipt },
-  { label: 'Expenses', icon: TrendingDown },
-  { label: 'Cash & Bank', icon: Wallet },
-  { label: 'Reports', icon: FileSpreadsheet },
+  { label: 'Beranda', icon: LayoutDashboard },
+  { label: 'Kas & Bank', icon: Wallet },
+  { label: 'Akun Perkiraan', icon: Wallet },
+  { label: 'Penjualan', icon: TrendingUp, subItems: [
+    { label: 'Penawaran Penjualan' },
+    { label: 'Uang Muka Penjualan' },
+    { label: 'Faktur Penjualan' },
+    { label: 'Penerimaan Penjualan' },
+    { label: 'Pelanggan' }
+  ] },
+  { label: 'Pembelian', icon: TrendingDown, subItems: [
+    { label: 'Pesanan Pembelian' },
+    { label: 'Faktur Pembelian' },
+    { label: 'Uang Muka Pembelian' },
+    { label: 'Pembayaran Pembelian' },
+    { label: 'Pemasok' }
+  ] },
+  { label: 'Barang & Jasa', icon: Package },
+  { label: 'Karyawan', icon: Users },
+  { label: 'Buku Besar', icon: FileSpreadsheet },
 ]
 const hrMenu = [
   { label: 'HR Overview', icon: LayoutDashboard },
@@ -121,6 +157,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
   const [collapsed, setCollapsed] = useState(false)
   const [section, setSection] = useState(initialSection)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ 'Penjualan': true })
   const [isAccountOpen, setIsAccountOpen] = useState(false)
   const [openFinanceGroups, setOpenFinanceGroups] = useState<Record<string, boolean>>({'Overview': true})
 
@@ -142,54 +179,6 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
     }
   }, [user?.id])
 
-  // Voice Greeting on Login
-  useEffect(() => {
-    const shouldPlayVoice = localStorage.getItem('play_welcome_voice')
-    if (shouldPlayVoice === 'true' && user?.firstname) {
-      localStorage.removeItem('play_welcome_voice')
-      
-      const hour = new Date().getHours()
-      let timeGreeting = "pagi"
-      if (hour >= 11 && hour < 15) timeGreeting = "siang"
-      else if (hour >= 15 && hour < 18) timeGreeting = "sore"
-      else if (hour >= 18 || hour < 3) timeGreeting = "malam"
-      
-      const message = `Hai, selamat ${timeGreeting} ${user.firstname}. Selamat bekerja!`
-      
-      if ('speechSynthesis' in window) {
-        const speakGreeting = () => {
-          const utterance = new SpeechSynthesisUtterance(message)
-          utterance.lang = 'id-ID'
-          
-          const voices = window.speechSynthesis.getVoices()
-          const idVoices = voices.filter(v => v.lang.includes('id'))
-          
-          if (idVoices.length > 0) {
-            // Try to find a high-quality/natural voice
-            const bestVoice = idVoices.find(v => 
-              v.name.toLowerCase().includes('online') || 
-              v.name.toLowerCase().includes('natural') ||
-              v.name.toLowerCase().includes('premium') ||
-              v.name.toLowerCase().includes('gadis')
-            )
-            utterance.voice = bestVoice || idVoices[0]
-          }
-          
-          utterance.rate = 1.05
-          utterance.pitch = 1.15
-          window.speechSynthesis.speak(utterance)
-        }
-
-        setTimeout(() => {
-          if (window.speechSynthesis.getVoices().length > 0) {
-            speakGreeting()
-          } else {
-            window.speechSynthesis.addEventListener('voiceschanged', speakGreeting, { once: true })
-          }
-        }, 200)
-      }
-    }
-  }, [user?.firstname])
 
   const sidebarRef = useRef<HTMLDivElement>(null)
   
@@ -211,11 +200,24 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
     
     // Custom routing for finance module
     const financeRouteMap: Record<string, string> = {
-      'Finance Overview': 'finance/overview',
-      'Invoices': 'finance/invoices',
-      'Expenses': 'finance/expenses',
-      'Cash & Bank': 'finance/cash-bank',
-      'Reports': 'finance/reports'
+      'Beranda': 'finance/overview',
+      'Kas & Bank': 'finance/cash-bank',
+      'Akun Perkiraan': 'finance/chart-of-accounts',
+      'Penjualan': 'finance/sales',
+      'Penawaran Penjualan': 'finance/sales/penawaran',
+      'Uang Muka Penjualan': 'finance/sales/uang-muka',
+      'Faktur Penjualan': 'finance/sales/faktur',
+      'Penerimaan Penjualan': 'finance/sales/penerimaan',
+      'Pelanggan': 'finance/sales/pelanggan',
+      'Pembelian': 'finance/purchases',
+      'Pesanan Pembelian': 'finance/purchases/pesanan',
+      'Faktur Pembelian': 'finance/purchases/faktur',
+      'Uang Muka Pembelian': 'finance/purchases/uang-muka',
+      'Pembayaran Pembelian': 'finance/purchases/pembayaran',
+      'Pemasok': 'finance/purchases/pemasok',
+      'Barang & Jasa': 'finance/products-services',
+      'Karyawan': 'finance/employees',
+      'Buku Besar': 'finance/general-ledger'
     }
     
     // Custom routing for HR module
@@ -477,7 +479,38 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               })}
             </div>
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Finance')}</p>
-              {financeMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
+              {financeMenu.map(({ label, icon, subItems }) => {
+                const isOpen = openGroups[label] || false;
+                const isSubActive = subItems?.some(s => s.label === section);
+                const isGroupActive = section === label || isSubActive;
+                return (
+                  <div key={label} className="flex flex-col gap-1">
+                    <button 
+                      onClick={() => subItems ? setOpenGroups({...openGroups, [label]: !isOpen}) : handleNavigate(label)} 
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isGroupActive ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}
+                    >
+                      <Icon icon={icon} className="size-4 shrink-0" />
+                      {!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}
+                      {subItems && !effectiveCollapsed && (
+                        <svg className={`size-4 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      )}
+                    </button>
+                    {subItems && isOpen && !effectiveCollapsed && (
+                      <div className="flex flex-col gap-1 pl-9 pr-3">
+                        {subItems.map((sub) => (
+                          <button
+                            key={sub.label}
+                            onClick={() => handleNavigate(sub.label)}
+                            className={`flex items-center rounded-lg px-2 py-2 text-sm transition-colors ${section === sub.label ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                          >
+                            <span className="flex-1 text-left truncate">{t(sub.label)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Human Resources')}</p>
               {hrMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
@@ -534,7 +567,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
           </div>
           <div className="flex items-center gap-1">
             <button onClick={() => setCustomizerOpen(true)} className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Preferences"><Settings className="size-4" /></button>
-            <button onClick={() => setThemeMode(resolvedDark ? 'light' : 'dark')} className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Toggle theme"><Sun className="size-4" /></button>
+            <button onClick={() => handlePrefChange('theme_mode', resolvedDark ? 'light' : 'dark', setThemeMode)} className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Toggle theme"><Sun className="size-4" /></button>
             <button className="relative rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notifications"><Bell className="size-4" /><span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" /></button>
             <div className="mx-2 hidden h-5 w-px bg-border sm:block" />
             <div className="flex items-center gap-2">
@@ -580,6 +613,29 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               case 'Layouts': return <LayoutsPage layoutStyle={layoutStyle} setLayoutStyle={(val) => handlePrefChange('layout_style', val, setLayoutStyle)} />
               case 'Finance Dashboard': return <FinanceOverviewPage user={user} />
               case 'Finance Overview': return <FinanceOverviewPage user={user} />
+              case 'Beranda': return <FinanceOverviewPage user={user} />
+              case 'Kas & Bank': return <CashBankPage />
+              case 'Akun Perkiraan': return <AkunPerkiraanPage />
+
+              case 'Penjualan': return <PenawaranPenjualanPage />
+              case 'Penawaran Penjualan': return <PenawaranPenjualanPage />
+              case 'Uang Muka Penjualan': return <UangMukaPenjualanPage />
+              case 'Faktur Penjualan': return <FakturPenjualanPage />
+              case 'Penerimaan Penjualan': return <PenerimaanPenjualanPage />
+              case 'Pelanggan': return <PelangganPage />
+
+              case 'Pembelian': return <PesananPembelianPage />
+              case 'Pesanan Pembelian': return <PesananPembelianPage />
+              case 'Faktur Pembelian': return <FakturPembelianPage />
+              case 'Uang Muka Pembelian': return <UangMukaPembelianPage />
+              case 'Pembayaran Pembelian': return <PembayaranPembelianPage />
+              case 'Pemasok': return <PemasokPage />
+
+              case 'Barang & Jasa': return <BarangJasaPage />
+              case 'Buku Besar': return <BukuBesarPage />
+
+
+
               case 'Invoices': return <InvoicesPage />
               case 'Expenses': return <ExpensesPage />
               case 'Cash & Bank': return <CashBankPage />

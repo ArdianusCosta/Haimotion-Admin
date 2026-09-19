@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useLanguage } from '@/components/language-provider'
 
-export function CashBankPage() {
-  const { t, formatDate } = useLanguage()
+export function CashBankPage() {  const { t, formatDate } = useLanguage()
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -110,8 +109,7 @@ export function CashBankPage() {
               />
             </div>
             <Button variant="outline" size="sm" className="gap-2 h-9">
-              <Filter className="size-4" /> Filter
-            </Button>
+              <Filter className="size-4" />{t('Filter')}</Button>
           </div>
         </div>
 
@@ -175,7 +173,8 @@ export function CashBankPage() {
       <TransactionModal 
         open={isModalOpen} 
         onOpenChange={setIsModalOpen} 
-        onSave={handleSave} 
+        onSave={handleSave}
+        accounts={bankAccounts || []}
       />
     </div>
   )

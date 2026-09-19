@@ -47,7 +47,7 @@ function fromCSV(csv: string) {
 export async function getFinanceSummary() {
   await requireAuth()
   
-  const [invoices, expenses, accounts] = await Promise.all([
+  const [invoices, expenses, accounts, unpaidInvoicesCount, paidInvoicesCount, totalTransactionsCount] = await Promise.all([
     prisma.financeInvoice.aggregate({
       _sum: { amount: true },
       where: { status: 'Paid' }
@@ -58,7 +58,14 @@ export async function getFinanceSummary() {
     }),
     prisma.financeAccount.aggregate({
       _sum: { balance: true }
-    })
+    }),
+    prisma.financeInvoice.count({
+      where: { status: { in: ['Draft', 'Sent', 'Overdue', 'Unpaid'] } }
+    }),
+    prisma.financeInvoice.count({
+      where: { status: 'Paid' }
+    }),
+    prisma.financeTransaction.count()
   ])
   
   const totalRevenue = invoices._sum.amount || 0
@@ -67,7 +74,32 @@ export async function getFinanceSummary() {
   
   const outstandingInvoicesResult = await prisma.financeInvoice.aggregate({
     _sum: { amount: true },
-    where: { status: { in: ['Draft', 'Sent', 'Overdue'] } }
+    where: { status: { in: ['Draft', 'Sent', 'Overdue', 'Unpaid'] } }
+  })
+
+  // Group transactions by month for the current year
+  const currentYear = new Date().getFullYear()
+  const transactions = await prisma.financeTransaction.findMany({
+    where: {
+      date: {
+        gte: new Date(`${currentYear}-01-01`),
+        lte: new Date(`${currentYear}-12-31`)
+      }
+    }
+  })
+
+  const monthlyData = Array.from({ length: 12 }, (_, i) => {
+    const month = new Date(currentYear, i).toLocaleString('en-US', { month: 'short' })
+    return { name: month, income: 0, expenses: 0 }
+  })
+
+  transactions.forEach(tx => {
+    const monthIndex = new Date(tx.date).getMonth()
+    if (tx.type === 'Income') {
+      monthlyData[monthIndex].income += tx.amount
+    } else if (tx.type === 'Expense') {
+      monthlyData[monthIndex].expenses += tx.amount
+    }
   })
   
   return {
@@ -75,7 +107,11 @@ export async function getFinanceSummary() {
     totalExpenses,
     netProfit,
     outstandingInvoices: outstandingInvoicesResult._sum.amount || 0,
-    cashAndBank: accounts._sum.balance || 0
+    outstandingInvoicesCount: unpaidInvoicesCount,
+    paidInvoicesCount,
+    totalTransactionsCount,
+    cashAndBank: accounts._sum.balance || 0,
+    monthlyData
   }
 }
 
@@ -384,4 +420,168 @@ export async function createTransaction(data: any) {
       created_by: parseInt(auth.id, 10)
     }
   })
+}
+
+// -----------------------------------------------------------------------------
+// CONTACTS (CUSTOMERS / SUPPLIERS)
+// -----------------------------------------------------------------------------
+export async function getContacts(filters?: { type?: string, search?: string }) {
+  await requireAuth()
+  const where: any = {}
+  if (filters?.type && filters.type !== 'All') {
+    where.type = filters.type
+  }
+  if (filters?.search) {
+    where.OR = [
+      { name: { contains: filters.search } },
+      { email: { contains: filters.search } }
+    ]
+  }
+  return prisma.financeContact.findMany({ where, orderBy: { name: 'asc' } })
+}
+
+export async function createContact(data: any) {
+  await requireAuth()
+  return prisma.financeContact.create({
+    data: {
+      type: data.type || 'CUSTOMER',
+      name: data.name,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null
+    }
+  })
+}
+
+export async function updateContact(id: number, data: any) {
+  await requireAuth()
+  return prisma.financeContact.update({
+    where: { id },
+    data: {
+      type: data.type,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      address: data.address
+    }
+  })
+}
+
+export async function deleteContact(id: number) {
+  await requireAuth()
+  return prisma.financeContact.delete({ where: { id } })
+}
+
+// -----------------------------------------------------------------------------
+// PRODUCTS & SERVICES
+// -----------------------------------------------------------------------------
+export async function getProductsServices(filters?: { type?: string, search?: string }) {
+  await requireAuth()
+  const where: any = {}
+  if (filters?.type && filters.type !== 'All') {
+    where.type = filters.type
+  }
+  if (filters?.search) {
+    where.OR = [
+      { name: { contains: filters.search } },
+      { code: { contains: filters.search } }
+    ]
+  }
+  return prisma.financeProductService.findMany({ where, orderBy: { name: 'asc' } })
+}
+
+export async function createProductService(data: any) {
+  await requireAuth()
+  try {
+    return await prisma.financeProductService.create({
+      data: {
+        code: data.code,
+        name: data.name,
+        type: data.type || 'Barang',
+        unit: data.unit || 'Pcs',
+        brand: data.brand || null,
+        price: parseFloat(data.price) || 0
+      }
+    })
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      throw new Error(`Item with code ${data.code} already exists.`)
+    }
+    throw err
+  }
+}
+
+export async function updateProductService(id: number, data: any) {
+  await requireAuth()
+  try {
+    return await prisma.financeProductService.update({
+      where: { id },
+      data: {
+        code: data.code,
+        name: data.name,
+        type: data.type,
+        unit: data.unit,
+        brand: data.brand,
+        price: parseFloat(data.price) || 0
+      }
+    })
+  } catch (err: any) {
+    if (err.code === 'P2002') {
+      throw new Error(`Item with code ${data.code} already exists.`)
+    }
+    throw err
+  }
+}
+
+export async function deleteProductService(id: number) {
+  await requireAuth()
+  return prisma.financeProductService.delete({ where: { id } })
+}
+
+// -----------------------------------------------------------------------------
+// ACCOUNTS (CHART OF ACCOUNTS)
+// -----------------------------------------------------------------------------
+export async function getChartOfAccounts(filters?: { search?: string }) {
+  await requireAuth()
+  const where: any = {}
+  if (filters?.search) {
+    where.OR = [
+      { name: { contains: filters.search } },
+      { code: { contains: filters.search } }
+    ]
+  }
+  return prisma.financeAccount.findMany({ where, orderBy: { code: 'asc' } })
+}
+
+export async function createAccount(data: any) {
+  await requireAuth()
+  return prisma.financeAccount.create({
+    data: {
+      code: data.code || null,
+      name: data.name,
+      type: data.type || 'Asset',
+      sub_type: data.subType || null,
+      balance: parseFloat(data.balance) || 0,
+      currency: data.currency || 'IDR'
+    }
+  })
+}
+
+export async function updateAccount(id: number, data: any) {
+  await requireAuth()
+  return prisma.financeAccount.update({
+    where: { id },
+    data: {
+      code: data.code,
+      name: data.name,
+      type: data.type,
+      sub_type: data.subType,
+      balance: parseFloat(data.balance) || 0
+    }
+  })
+}
+
+export async function deleteAccount(id: number) {
+  await requireAuth()
+  return prisma.financeAccount.delete({ where: { id } })
 }

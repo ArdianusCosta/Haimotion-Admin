@@ -4,6 +4,7 @@ import { TrendingUp, Search, Download, Filter, Plus, PieChart as PieChartIcon } 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 export function IncomePage() {
+  const { t } = useLanguage()
   const [searchTerm, setSearchTerm] = useState('')
 
   const incomes = financeData.recentTransactions.filter(tx => tx.type === 'Income')

@@ -3,6 +3,7 @@ import { financeData, formatRupiah } from '@/lib/finance-data'
 import { Download, Printer, Filter, Calendar as CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react'
 
 export function ProfitAndLossPage() {
+  const { t } = useLanguage()
   const [dateRange, setDateRange] = useState('This Year')
   
   // States for expandable rows

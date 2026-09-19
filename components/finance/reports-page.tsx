@@ -5,6 +5,7 @@ import { useFinanceOverview } from './queries'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function ReportsPage() {
+  const { t } = useLanguage()
   const { isLoading } = useFinanceOverview()
 
   const reports = [

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, Plus, Calendar, Clock, Video, Users, Play, X, ExternalLink } from 'lucide-react'
 import { ScheduleMeetingDialog } from '@/components/schedule-meeting-dialog'
-import { JitsiMeeting } from '@/components/jitsi-meeting'
+import { LiveKitMeeting } from '@/components/livekit-meeting'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useUpdateMeetingStatus } from '@/lib/hooks/use-meetings'
 
@@ -64,7 +64,7 @@ export function MeetingsPage() {
             <Button variant="destructive" onClick={handleLeaveMeeting}><X className="mr-2 size-4"/> Leave Meeting</Button>
           </div>
           <div className="flex-1">
-            <JitsiMeeting roomName={activeMeeting.jitsi_room_name} />
+            <LiveKitMeeting roomName={activeMeeting.jitsi_room_name} onLeave={handleLeaveMeeting} />
           </div>
         </div>
       )}

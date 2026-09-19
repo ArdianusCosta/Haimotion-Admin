@@ -51,6 +51,7 @@ interface InvoiceModalProps {
   initialData?: any | null
 }
 export function InvoiceModal({ open, onOpenChange, onSave, initialData }: InvoiceModalProps) {
+  const { t } = useLanguage()
   const [customerName, setCustomerName] = useState(initialData?.customer_name || '')
   const [amount, setAmount] = useState(initialData?.amount?.toString() || '')
 
@@ -172,25 +173,26 @@ interface TransactionModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (data: any) => void
+  accounts: any[]
 }
-export function TransactionModal({ open, onOpenChange, onSave }: TransactionModalProps) {
+export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: TransactionModalProps) {
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [type, setType] = useState('Expense')
-  const [account, setAccount] = useState('BCA')
+  const [accountId, setAccountId] = useState('')
 
   React.useEffect(() => {
     if (open) {
       setDescription('')
       setAmount('')
       setType('Expense')
-      setAccount('BCA')
+      setAccountId(accounts.length > 0 ? accounts[0].id.toString() : '')
     }
-  }, [open])
+  }, [open, accounts])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ description, amount: Number(amount), type: type as any, account })
+    onSave({ description, amount: Number(amount), type: type as any, accountId: Number(accountId) })
     onOpenChange(false)
   }
 
@@ -219,13 +221,12 @@ export function TransactionModal({ open, onOpenChange, onSave }: TransactionModa
               </div>
               <div className="grid gap-2">
                 <Label>Account</Label>
-                <Select value={account} onValueChange={setAccount}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="BCA">BCA</SelectItem>
-                    <SelectItem value="Mandiri">Mandiri</SelectItem>
-                    <SelectItem value="BNI">BNI</SelectItem>
-                    <SelectItem value="Cash">Cash</SelectItem>
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -5,7 +5,7 @@ import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, V
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getConversations, getMessages, sendMessage, createCallSession, searchUsers, getOrCreateThread, triggerTyping, markThreadAsRead } from '@/app/actions/chat'
 import { pusherClient } from '@/lib/pusher-client'
-import { JitsiCallUI } from './jitsi-meet'
+import { LiveKitCallUI } from './livekit-call'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -315,9 +315,9 @@ export function ChatPage() {
 
   return (
     <div className="flex flex-col gap-7 relative h-full">
-      {/* Jitsi UI Overlay */}
+      {/* LiveKit Call UI Overlay */}
       {activeCall && (
-        <JitsiCallUI 
+        <LiveKitCallUI 
           roomName={activeCall.roomName} 
           displayName={`${currentUser.firstname} ${currentUser.lastname}`} 
           email={currentUser.email}

@@ -11,8 +11,7 @@ import { toast } from 'sonner'
 import { useRef } from 'react'
 import { useLanguage } from '@/components/language-provider'
 
-export function ExpensesPage() {
-  const { t, formatDate } = useLanguage()
+export function ExpensesPage() {  const { t, formatDate } = useLanguage()
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
   const [isModalOpen, setIsModalOpen] = useState(false)

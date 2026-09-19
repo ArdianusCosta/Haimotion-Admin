@@ -689,6 +689,8 @@ model ExecutionNodeResult {
 }
 
 model FinanceAccount {
+  code           String?              @db.VarChar(50)
+  sub_type       String?              @db.VarChar(100)
   id             Int                  @id @default(autoincrement())
   name           String               @db.VarChar(200)
   type           String               @db.VarChar(50)
@@ -906,4 +908,31 @@ model MeetingParticipant {
   @@unique([meeting_id, user_id])
   @@index([user_id])
   @@map("meeting_participants")
+}
+
+model FinanceProductService {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(100)
+  name        String   @db.VarChar(255)
+  type        String   @db.VarChar(50)
+  unit        String   @db.VarChar(50)
+  brand       String?  @db.VarChar(100)
+  price       Float    @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@map("finance_products_services")
+}
+
+model FinanceContact {
+  id          Int      @id @default(autoincrement())
+  type        String   @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  email       String?  @db.VarChar(255)
+  phone       String?  @db.VarChar(50)
+  address     String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@map("finance_contacts")
 }

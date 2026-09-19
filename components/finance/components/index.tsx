@@ -1,7 +1,9 @@
 import React from 'react'
+import { useLanguage } from '@/components/language-provider'
 
 // --- Finance Page Header ---
 export function FinancePageHeader({ title, description, actions }: { title: string, description?: string, actions?: React.ReactNode }) {
+  const { t } = useLanguage()
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4 mb-6">
       <div>
