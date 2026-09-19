@@ -156,6 +156,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   const router = useRouter()
 
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [section, setSection] = useState(initialSection)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ 'Penjualan': true })
   const [isAccountOpen, setIsAccountOpen] = useState(false)
@@ -237,6 +238,9 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       const slug = newSection.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')
       router.push('/' + (slug === 'dashboard' ? '' : slug), { scroll: false })
     }
+    
+    // Close mobile menu on navigate
+    setMobileMenuOpen(false)
   }
 
   const handleLogout = async () => {
@@ -382,7 +386,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   const isSidebarMini = sidebarStyle === 'icon' || collapsed
   const effectiveCollapsed = isSidebarMini
 
-  const asideClasses = `hidden transition-all duration-300 md:flex md:flex-col bg-sidebar ${sidebarStyle === 'offcanvas' ? '!hidden' : ''} ${sidebarStyle === 'floating' ? 'm-4 rounded-xl border border-sidebar-border shadow-sm h-[calc(100vh-2rem)]' : 'border-r border-sidebar-border h-screen'} ${effectiveCollapsed ? 'w-20' : 'w-64'}`
+  const asideClasses = `${mobileMenuOpen ? 'flex absolute z-50' : 'hidden'} transition-all duration-300 md:flex md:relative md:flex-col bg-sidebar ${sidebarStyle === 'offcanvas' ? '!hidden' : ''} ${sidebarStyle === 'floating' ? 'm-4 rounded-xl border border-sidebar-border shadow-sm h-[calc(100vh-2rem)]' : 'border-r border-sidebar-border h-screen'} ${effectiveCollapsed && !mobileMenuOpen ? 'w-20' : 'w-64'}`
   const headerClasses = `flex shrink-0 items-center justify-between border-border bg-card/70 px-4 backdrop-blur md:px-8 z-10 ${headerStyle === 'sticky' ? 'h-16 border-b sticky top-0' : ''} ${headerStyle === 'scroll' ? 'h-16 border-b' : ''} ${headerStyle === 'inset' ? 'h-14 mx-4 mt-4 rounded-xl border sticky top-4' : ''}`
 
   const colorPresets: Record<string, string> = useMemo(() => ({
@@ -406,7 +410,14 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       fontFamily: `var(--font-${activeFont.toLowerCase().replace(' ', '-')})`
     } as React.CSSProperties}
   >
-    <div className="flex h-screen overflow-hidden text-foreground">
+    <div className="flex h-screen overflow-hidden text-foreground relative">
+      {/* Mobile Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
+          onClick={() => setMobileMenuOpen(false)} 
+        />
+      )}
       {!isTopnav && (
         <aside className={asideClasses}>
           <div className={`flex items-center gap-3 border-b border-sidebar-border px-5 ${sidebarStyle === 'floating' ? 'h-14' : 'h-16'}`}>
@@ -550,7 +561,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       <main className="min-w-0 flex-1 h-screen overflow-y-auto relative">
         <header className={headerClasses}>
           <div className="flex items-center gap-3">
-            {!isTopnav && <button className="rounded-lg p-2 hover:bg-muted md:hidden" aria-label="Open menu"><Menu className="size-5" /></button>}
+            {!isTopnav && <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-lg p-2 hover:bg-muted md:hidden" aria-label="Open menu"><Menu className="size-5" /></button>}
             {!isTopnav && <button onClick={() => setCollapsed(!collapsed)} className="hidden rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:block" aria-label="Toggle sidebar"><PanelLeft className="size-4" /></button>}
             {isTopnav && (
               <div className="flex items-center gap-6">
