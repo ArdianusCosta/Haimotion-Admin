@@ -384,9 +384,9 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
   const isTopnav = layoutStyle === 'topnav'
   const isSidebarMini = sidebarStyle === 'icon' || collapsed
-  const effectiveCollapsed = isSidebarMini
+  const effectiveCollapsed = isSidebarMini && !mobileMenuOpen
 
-  const asideClasses = `${mobileMenuOpen ? 'flex absolute z-50' : 'hidden'} transition-all duration-300 md:flex md:relative md:flex-col bg-sidebar ${sidebarStyle === 'offcanvas' ? '!hidden' : ''} ${sidebarStyle === 'floating' ? 'm-4 rounded-xl border border-sidebar-border shadow-sm h-[calc(100vh-2rem)]' : 'border-r border-sidebar-border h-screen'} ${effectiveCollapsed && !mobileMenuOpen ? 'w-20' : 'w-64'}`
+  const asideClasses = `${mobileMenuOpen ? 'flex flex-col absolute z-50' : 'hidden'} transition-all duration-300 md:flex md:relative md:flex-col bg-sidebar ${sidebarStyle === 'offcanvas' ? '!hidden' : ''} ${sidebarStyle === 'floating' ? 'm-4 rounded-xl border border-sidebar-border shadow-sm h-[calc(100vh-2rem)]' : 'border-r border-sidebar-border h-screen'} ${effectiveCollapsed && !mobileMenuOpen ? 'w-20' : 'w-64'}`
   const headerClasses = `flex shrink-0 items-center justify-between border-border bg-card/70 px-4 backdrop-blur md:px-8 z-10 ${headerStyle === 'sticky' ? 'h-16 border-b sticky top-0' : ''} ${headerStyle === 'scroll' ? 'h-16 border-b' : ''} ${headerStyle === 'inset' ? 'h-14 mx-4 mt-4 rounded-xl border sticky top-4' : ''}`
 
   const colorPresets: Record<string, string> = useMemo(() => ({
