@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply, Download, X, Check, CheckCheck } from 'lucide-react'
+import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply, Download, X, Check, CheckCheck, ChevronLeft } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getConversations, getMessages, sendMessage, createCallSession, searchUsers, getOrCreateThread, triggerTyping, markThreadAsRead } from '@/app/actions/chat'
 import { pusherClient } from '@/lib/pusher-client'
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { toast } from 'sonner'
 
-export function ChatPage() {
+export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, type: 'voice' | 'video') => void }) {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [activeThreadId, setActiveThreadId] = useState<number | null>(null)
   const [message, setMessage] = useState('')
@@ -26,9 +26,7 @@ export function ChatPage() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastTypingTime = useRef<number>(0)
   
-  // Call State
-  const [activeCall, setActiveCall] = useState<{ roomName: string, type: 'voice'|'video', startedAt: number } | null>(null)
-  const [incomingCall, setIncomingCall] = useState<{ id: number, room_name: string, type: 'voice'|'video', callerName: string } | null>(null)
+  // Call State (Lifted to Dashboard)
 
   // Search State
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -50,6 +48,15 @@ export function ChatPage() {
 
   // Image Modal State
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
+
+  // Mobile List State
+  const [isMobileListVisible, setIsMobileListVisible] = useState(false)
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setIsMobileListVisible(true)
+    }
+  }, [])
 
   useEffect(() => {
     const savedUser = localStorage.getItem('auth_user')
@@ -129,17 +136,7 @@ export function ChatPage() {
       }
     })
 
-    channel.bind('call:incoming', (callData: any) => {
-      if (callData.caller_id !== currentUser.id) {
-        const caller = conversations.find(c => c.otherUserId === callData.caller_id)
-        setIncomingCall({
-          id: callData.id,
-          room_name: callData.room_name,
-          type: callData.type,
-          callerName: caller ? caller.name : 'Unknown User'
-        })
-      }
-    })
+    // Call notification is now handled globally in northstar-dashboard.tsx
 
     channel.bind('typing', (data: any) => {
       if (data.senderId !== currentUser.id) {
@@ -281,26 +278,8 @@ export function ChatPage() {
 
   const startCall = async (type: 'voice' | 'video') => {
     if (!activeThreadId || !currentUser) return
-    const call = await createCallSession(activeThreadId, currentUser.id, type)
-    setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
-  }
-
-  const acceptCall = () => {
-    if (incomingCall) {
-      setActiveCall({ roomName: incomingCall.room_name, type: incomingCall.type, startedAt: Date.now() })
-      setIncomingCall(null)
-    }
-  }
-
-  const rejectCall = () => {
-    setIncomingCall(null)
-  }
-
-  const handleEndCall = async () => {
-    if (activeCall) {
-      const durationSeconds = Math.floor((Date.now() - activeCall.startedAt) / 1000)
-      import('@/app/actions/chat').then(m => m.endCallSession(activeCall.roomName, durationSeconds))
-      setActiveCall(null)
+    if (onStartCall) {
+      onStartCall(activeThreadId, type)
     }
   }
 
@@ -315,30 +294,6 @@ export function ChatPage() {
 
   return (
     <div className="flex flex-col gap-7 relative h-full">
-      {/* LiveKit Call UI Overlay */}
-      {activeCall && (
-        <LiveKitCallUI 
-          roomName={activeCall.roomName} 
-          displayName={`${currentUser.firstname} ${currentUser.lastname}`} 
-          email={currentUser.email}
-          isAudioOnly={activeCall.type === 'voice'}
-          onClose={handleEndCall} 
-        />
-      )}
-
-      {/* Incoming Call Overlay */}
-      {incomingCall && !activeCall && (
-        <div className="absolute top-10 right-10 z-[60] bg-card border border-border shadow-xl rounded-xl p-5 flex flex-col gap-4 animate-in slide-in-from-top-4">
-          <div>
-            <h3 className="font-semibold text-lg">{incomingCall.callerName}</h3>
-            <p className="text-sm text-muted-foreground">Incoming {incomingCall.type} call...</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={rejectCall} className="flex-1 bg-destructive/10 text-destructive hover:bg-destructive/20 font-medium py-2 rounded-lg">Decline</button>
-            <button onClick={acceptCall} className="flex-1 bg-green-500/10 text-green-600 hover:bg-green-500/20 font-medium py-2 rounded-lg">Accept</button>
-          </div>
-        </div>
-      )}
 
       {/* Image Modal Overlay */}
       {selectedImage && (
@@ -365,9 +320,9 @@ export function ChatPage() {
         <p className="mt-1 text-sm text-muted-foreground">Keep conversations, decisions, and handoffs in one focused workspace.</p>
       </div>
       
-      <div className="grid h-[640px] min-h-0 overflow-hidden rounded-2xl border border-border bg-card lg:grid-cols-[280px_minmax(0,1fr)_230px]">
+      <div className="flex flex-col lg:grid h-[640px] min-h-0 overflow-hidden rounded-2xl border border-border bg-card lg:grid-cols-[280px_minmax(0,1fr)_230px] relative">
         {/* SIDEBAR */}
-        <aside className="flex flex-col border-b border-border lg:border-b-0 lg:border-r min-h-0 relative">
+        <aside className={`flex flex-col border-b border-border lg:border-b-0 lg:border-r min-h-0 bg-card transition-all ${isMobileListVisible ? 'absolute inset-0 z-30' : 'hidden lg:flex'} lg:static lg:z-auto`}>
           <div className="flex items-center justify-between border-b border-border p-4 shrink-0">
             <div>
               <p className="font-semibold">Messages</p>
@@ -400,7 +355,7 @@ export function ChatPage() {
                   searchResults.map(user => (
                     <button 
                       key={user.id} 
-                      onClick={() => handleStartChatWithUser(user.id)}
+                      onClick={() => { handleStartChatWithUser(user.id); setIsMobileListVisible(false); }}
                       className="w-full flex items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-muted"
                     >
                       <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-primary-foreground ${getAvatarColor(user.id)}`}>
@@ -422,7 +377,7 @@ export function ChatPage() {
                 return (
                   <button 
                     key={item.id} 
-                    onClick={() => setActiveThreadId(item.id)} 
+                    onClick={() => { setActiveThreadId(item.id); setIsMobileListVisible(false); }} 
                     className={`flex items-start gap-3 rounded-xl p-3 text-left transition-colors ${activeThreadId === item.id ? 'bg-accent' : 'hover:bg-muted'}`}
                   >
                     <div className="relative">
@@ -478,6 +433,9 @@ export function ChatPage() {
                 </div>
               ) : activeConversation ? (
                 <>
+                  <button onClick={() => setIsMobileListVisible(true)} className="lg:hidden p-2 -ml-2 text-muted-foreground hover:bg-muted rounded-lg">
+                    <ChevronLeft className="size-5" />
+                  </button>
                   <div className="relative">
                     <span className={`flex size-9 items-center justify-center rounded-full text-[11px] font-semibold text-primary-foreground ${getAvatarColor(activeConversation.otherUserId)}`}>
                       {activeConversation.initials}

@@ -60,8 +60,9 @@ import { RecruitmentPage } from '@/components/hr/recruitment-page'
 import FileManager from '@/components/file-manager/file-manager'
 import { useLanguage } from '@/components/language-provider'
 import { authClient } from '@/lib/auth/client'
-import { getUnreadChatCount } from '@/app/actions/chat'
 import { pusherClient } from '@/lib/pusher-client'
+import { LiveKitCallUI } from './livekit-call'
+import { createCallSession } from '@/app/actions/chat'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -162,6 +163,35 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   const [isAccountOpen, setIsAccountOpen] = useState(false)
   const [openFinanceGroups, setOpenFinanceGroups] = useState<Record<string, boolean>>({'Overview': true})
 
+  // Global Call State
+  const [activeCall, setActiveCall] = useState<{ roomName: string, type: 'voice'|'video', startedAt: number } | null>(null)
+  const [incomingCall, setIncomingCall] = useState<{ id: number, room_name: string, type: 'voice'|'video', callerName: string } | null>(null)
+
+  const handleStartCall = async (threadId: number, type: 'voice' | 'video') => {
+    if (!user) return
+    const call = await createCallSession(threadId, user.id, type)
+    setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
+  }
+
+  const acceptCall = () => {
+    if (incomingCall) {
+      setActiveCall({ roomName: incomingCall.room_name, type: incomingCall.type, startedAt: Date.now() })
+      setIncomingCall(null)
+    }
+  }
+
+  const rejectCall = () => {
+    setIncomingCall(null)
+  }
+
+  const handleEndCall = async () => {
+    if (activeCall) {
+      const durationSeconds = Math.floor((Date.now() - activeCall.startedAt) / 1000)
+      import('@/app/actions/chat').then(m => m.endCallSession(activeCall.roomName, durationSeconds))
+      setActiveCall(null)
+    }
+  }
+
   const toggleFinanceGroup = (group: string) => {
     setOpenFinanceGroups(prev => ({ ...prev, [group]: !prev[group] }))
   }
@@ -171,12 +201,38 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
     setSection(initialSection)
   }, [initialSection])
 
-  // Maintain Global Pusher Presence
+  // Maintain Global Pusher Presence and Personal Channel
   useEffect(() => {
     if (!user?.id) return
     pusherClient.subscribe('presence-chat')
+    
+    const personalChannelName = `private-user-${user.id}`
+    const personalChannel = pusherClient.subscribe(personalChannelName)
+    
+    personalChannel.bind('call:incoming', (callData: any) => {
+      setIncomingCall({
+        id: callData.id,
+        room_name: callData.room_name,
+        type: callData.type,
+        callerName: callData.callerName || 'Unknown User'
+      })
+    })
+
+    personalChannel.bind('call:ended', (data: any) => {
+      setActiveCall(prev => {
+        if (prev?.roomName === data.roomName) return null
+        return prev
+      })
+      setIncomingCall(prev => {
+        if (prev?.room_name === data.roomName) return null
+        return prev
+      })
+    })
+
     return () => {
       pusherClient.unsubscribe('presence-chat')
+      personalChannel.unbind_all()
+      pusherClient.unsubscribe(personalChannelName)
     }
   }, [user?.id])
 
@@ -411,6 +467,30 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
     } as React.CSSProperties}
   >
     <div className="flex h-screen overflow-hidden text-foreground relative">
+      {/* Global Call Overlays */}
+      {activeCall && (
+        <LiveKitCallUI 
+          roomName={activeCall.roomName} 
+          displayName={`${user.firstname} ${user.lastname}`} 
+          email={user.email}
+          isAudioOnly={activeCall.type === 'voice'}
+          onClose={handleEndCall} 
+        />
+      )}
+
+      {incomingCall && !activeCall && (
+        <div className="absolute top-10 right-10 z-[100] bg-card border border-border shadow-xl rounded-xl p-5 flex flex-col gap-4 animate-in slide-in-from-top-4">
+          <div>
+            <h3 className="font-semibold text-lg">{incomingCall.callerName}</h3>
+            <p className="text-sm text-muted-foreground">Incoming {incomingCall.type} call...</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={rejectCall} className="flex-1 bg-destructive/10 text-destructive hover:bg-destructive/20 font-medium py-2 rounded-lg">Decline</button>
+            <button onClick={acceptCall} className="flex-1 bg-green-500/10 text-green-600 hover:bg-green-500/20 font-medium py-2 rounded-lg">Accept</button>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Backdrop */}
       {mobileMenuOpen && (
         <div 
@@ -608,7 +688,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
           {isFiles ? <FileManager user={user} /> : (() => {
             switch (section) {
               case 'Dashboard': return <Dashboard range={range} setRange={setRange} section={section} user={user} />
-              case 'Messenger': return <ChatPage />
+              case 'Messenger': return <ChatPage onStartCall={handleStartCall} />
               case 'Analytics': return <AnalyticsPage />
               case 'Orders': return <OrdersPage />
               case 'Products': return <ProductsPage />

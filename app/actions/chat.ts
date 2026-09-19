@@ -184,11 +184,16 @@ export async function createCallSession(threadId: number, callerId: number, type
     }
   })
 
-  // Notify the other user in the thread
-  await pusherServer.trigger(`private-thread-${threadId}`, 'call:incoming', {
-    ...call,
-    caller_id: callerId
-  })
+  const thread = await prisma.chatThread.findUnique({ where: { id: threadId } })
+  if (thread) {
+    const otherUserId = thread.user1_id === callerId ? thread.user2_id : thread.user1_id
+    // Notify the other user globally
+    await pusherServer.trigger(`private-user-${otherUserId}`, 'call:incoming', {
+      ...call,
+      caller_id: callerId,
+      callerName: `${user.firstname} ${user.lastname}`
+    })
+  }
 
   return call
 }
@@ -207,7 +212,7 @@ export async function endCallSession(roomName: string, durationSeconds: number) 
     }
   })
 
-  // Optionally send a pusher event so the other client knows it ended, or just to update history
+  // Update history in chat
   await pusherServer.trigger(`private-thread-${call.thread_id}`, 'message:created', {
     id: `call-${call.id}`,
     is_call: true,
@@ -215,6 +220,13 @@ export async function endCallSession(roomName: string, durationSeconds: number) 
     duration: durationSeconds,
     created_at: new Date()
   })
+
+  // Global event to force end the call UI for everyone
+  const thread = await prisma.chatThread.findUnique({ where: { id: call.thread_id } })
+  if (thread) {
+    await pusherServer.trigger(`private-user-${thread.user1_id}`, 'call:ended', { roomName })
+    await pusherServer.trigger(`private-user-${thread.user2_id}`, 'call:ended', { roomName })
+  }
 
   return updatedCall
 }
