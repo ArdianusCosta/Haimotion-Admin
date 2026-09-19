@@ -169,7 +169,8 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
   const handleStartCall = async (threadId: number, type: 'voice' | 'video') => {
     if (!user) return
-    const call = await createCallSession(threadId, user.id, type)
+    const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+    const call = await createCallSession(threadId, userId, type)
     setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
   }
 
