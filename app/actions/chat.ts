@@ -170,38 +170,46 @@ export async function sendMessage(threadId: number, senderId: number, content: s
 }
 
 export async function createCallSession(threadId: number, callerId: number, type: 'voice' | 'video') {
-  const user = await requireAuth();
-  const roomName = `room-${threadId}-${Date.now()}`
-  
-  const call = await prisma.call.create({
-    data: {
-      thread_id: threadId,
-      caller_id: callerId,
-      room_name: roomName,
-      type: type,
-      status: 'initiated',
-      started_at: new Date(),
-    }
-  })
-
-  const thread = await prisma.chatThread.findUnique({ where: { id: threadId } })
-  if (thread) {
-    const otherUserId = thread.user1_id === callerId ? thread.user2_id : thread.user1_id
-    // Notify the other user globally
-    await pusherServer.trigger(`private-user-${otherUserId}`, 'call:incoming', {
-      ...call,
-      caller_id: callerId,
-      callerName: `${user.firstname} ${user.lastname}`
+  try {
+    const user = await requireAuth();
+    const roomName = `room-${threadId}-${Date.now()}`
+    
+    const call = await prisma.call.create({
+      data: {
+        thread_id: threadId,
+        caller_id: callerId,
+        room_name: roomName,
+        type: type,
+        status: 'initiated',
+        started_at: new Date(),
+      }
     })
-  }
 
-  return call
+    const thread = await prisma.chatThread.findUnique({ where: { id: threadId } })
+    if (thread) {
+      const otherUserId = thread.user1_id === callerId ? thread.user2_id : thread.user1_id
+      // Notify the other user globally
+      await pusherServer.trigger(`private-user-${otherUserId}`, 'call:incoming', {
+        ...call,
+        caller_id: callerId,
+        callerName: `${user.firstname} ${user.lastname}`
+      })
+    }
+
+    return JSON.parse(JSON.stringify(call))
+  } catch (error) {
+    console.error("Error in createCallSession:", error);
+    throw new Error("Failed to create call session: " + (error instanceof Error ? error.message : "Unknown error"));
+  }
 }
 
 export async function endCallSession(roomName: string, durationSeconds: number) {
   const user = await requireAuth();
   const call = await prisma.call.findUnique({ where: { room_name: roomName } })
   if (!call) return null
+
+  // Idempotency guard: if already ended, don't double-trigger Pusher events
+  if (call.status === 'ended') return JSON.parse(JSON.stringify(call))
 
   const updatedCall = await prisma.call.update({
     where: { room_name: roomName },
@@ -221,14 +229,14 @@ export async function endCallSession(roomName: string, durationSeconds: number) 
     created_at: new Date()
   })
 
-  // Global event to force end the call UI for everyone
+  // Global event to force end the call UI for everyone in the thread
   const thread = await prisma.chatThread.findUnique({ where: { id: call.thread_id } })
   if (thread) {
     await pusherServer.trigger(`private-user-${thread.user1_id}`, 'call:ended', { roomName })
     await pusherServer.trigger(`private-user-${thread.user2_id}`, 'call:ended', { roomName })
   }
 
-  return updatedCall
+  return JSON.parse(JSON.stringify(updatedCall))
 }
 
 export async function searchUsers(query: string, currentUserId: number) {

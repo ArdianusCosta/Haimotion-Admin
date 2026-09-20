@@ -62,7 +62,7 @@ import { useLanguage } from '@/components/language-provider'
 import { authClient } from '@/lib/auth/client'
 import { pusherClient } from '@/lib/pusher-client'
 import { LiveKitCallUI } from './livekit-call'
-import { createCallSession, getUnreadChatCount } from '@/app/actions/chat'
+import { createCallSession, endCallSession, getUnreadChatCount } from '@/app/actions/chat'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -169,9 +169,16 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
   const handleStartCall = async (threadId: number, type: 'voice' | 'video') => {
     if (!user) return
-    const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
-    const call = await createCallSession(threadId, userId, type)
-    setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
+    try {
+      const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+      const call = await createCallSession(threadId, userId, type)
+      setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
+    } catch (err: any) {
+      console.error('Failed to start call:', err)
+      // Import toast dynamically to avoid circular dep
+      const { toast } = await import('sonner')
+      toast.error('Gagal memulai panggilan. Coba lagi.', { description: err?.message })
+    }
   }
 
   const acceptCall = () => {
@@ -185,11 +192,25 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
     setIncomingCall(null)
   }
 
+  // activeCallRef lets handleEndCall access the latest activeCall inside async callbacks
+  // without stale closure issues
+  const activeCallRef = useRef<{ roomName: string, type: 'voice'|'video', startedAt: number } | null>(null)
+  useEffect(() => {
+    activeCallRef.current = activeCall
+  }, [activeCall])
+
   const handleEndCall = async () => {
-    if (activeCall) {
-      const durationSeconds = Math.floor((Date.now() - activeCall.startedAt) / 1000)
-      import('@/app/actions/chat').then(m => m.endCallSession(activeCall.roomName, durationSeconds))
-      setActiveCall(null)
+    const call = activeCallRef.current
+    // Clear UI immediately so the user sees the call end right away
+    setActiveCall(null)
+    setIncomingCall(null)
+    if (call) {
+      try {
+        const durationSeconds = Math.floor((Date.now() - call.startedAt) / 1000)
+        await endCallSession(call.roomName, durationSeconds)
+      } catch (err) {
+        console.error('Failed to end call session:', err)
+      }
     }
   }
 

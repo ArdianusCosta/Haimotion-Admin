@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   LiveKitRoom,
   VideoTrack,
@@ -28,6 +28,14 @@ export function LiveKitCallUI({ roomName, displayName, email, isAudioOnly, onClo
   const [token, setToken] = useState<string | null>(null)
   const [serverUrl, setServerUrl] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
+  // Guard against double-trigger: onClose should only fire once
+  const hasEndedRef = useRef(false)
+
+  const handleClose = () => {
+    if (hasEndedRef.current) return
+    hasEndedRef.current = true
+    onClose()
+  }
 
   useEffect(() => {
     let mounted = true
@@ -65,7 +73,7 @@ export function LiveKitCallUI({ roomName, displayName, email, isAudioOnly, onClo
             <h3 className="font-semibold text-lg">Unable to connect</h3>
             <p className="text-sm text-muted-foreground">{error}</p>
           </div>
-          <button onClick={onClose} className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg font-medium text-sm transition-colors">
+          <button onClick={handleClose} className="px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg font-medium text-sm transition-colors">
             Close
           </button>
         </div>
@@ -93,7 +101,7 @@ export function LiveKitCallUI({ roomName, displayName, email, isAudioOnly, onClo
         serverUrl={serverUrl || process.env.NEXT_PUBLIC_LIVEKIT_URL}
         data-lk-theme="default"
         style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' }}
-        onDisconnected={onClose}
+        onDisconnected={handleClose}
       >
         <CallContent isAudioOnly={!!isAudioOnly} displayName={displayName} email={email} />
         <RoomAudioRenderer />
@@ -101,6 +109,7 @@ export function LiveKitCallUI({ roomName, displayName, email, isAudioOnly, onClo
     </div>
   )
 }
+
 
 function CallContent({ isAudioOnly, displayName, email }: { isAudioOnly: boolean, displayName: string, email?: string }) {
   const tracks = useTracks(
