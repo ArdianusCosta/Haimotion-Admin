@@ -25,9 +25,13 @@ export async function GET(request: Request) {
       ]
     }
     if (role !== 'all') {
-      whereClause.type = parseInt(role)
+      whereClause.role_id = parseInt(role)
     }
     
+    // Cari role id yang merupakan admin
+    const adminRoles = await prisma.role.findMany({ where: { name: { contains: 'Admin' } }, select: { id: true } })
+    const adminRoleIds = adminRoles.map(r => r.id)
+
     const [users, totalFiltered, totalAll, admins, employees] = await Promise.all([
       prisma.user.findMany({
         where: whereClause,
@@ -35,12 +39,13 @@ export async function GET(request: Request) {
         skip: skip,
         orderBy: {
           date_created: 'desc'
-        }
+        },
+        include: { role: true }
       }),
       prisma.user.count({ where: whereClause }),
       prisma.user.count(),
-      prisma.user.count({ where: { type: 1 } }),
-      prisma.user.count({ where: { type: { not: 1 } } })
+      prisma.user.count({ where: { role_id: { in: adminRoleIds.length ? adminRoleIds : [-1] } } }),
+      prisma.user.count({ where: { role_id: { notIn: adminRoleIds.length ? adminRoleIds : [-1] } } })
     ])
     
     return NextResponse.json({
@@ -83,7 +88,7 @@ export async function POST(request: Request) {
         email: data.email,
         notification_email: data.notification_email || null,
         password: hashedPassword,
-        type: parseInt(data.type) || 2,
+        role_id: data.role_id ? parseInt(data.role_id) : null,
         avatar: avatar,
         nik: data.nik || null,
         address: data.address || null

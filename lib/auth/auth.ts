@@ -85,10 +85,20 @@ export const auth = betterAuth({
       createdAt: "date_created",
       emailVerified: "emailVerified",
       updatedAt: "updatedAt"
+    },
+    additionalFields: {
+      status: {
+        type: "string",
+        defaultValue: "active"
+      }
     }
   },
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      console.log(`Reset password link for ${user.email}: ${url}`);
+      // TODO: Implement actual email sending using Resend or Nodemailer
+    },
     password: {
       async verify({ hash, password }) {
         if (!hash) return false;

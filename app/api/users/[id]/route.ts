@@ -21,7 +21,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (data.lastname !== undefined) updateData.lastname = data.lastname
     if (data.email !== undefined) updateData.email = data.email
     if (data.notification_email !== undefined) updateData.notification_email = data.notification_email
-    if (data.type !== undefined) updateData.type = parseInt(data.type)
     if (data.password) {
       updateData.password = await bcrypt.hash(data.password, 10)
     }
@@ -29,6 +28,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (data.address !== undefined) updateData.address = data.address || null
     if (data.avatar !== undefined) updateData.avatar = data.avatar || ''
     if (data.role_id !== undefined) updateData.role_id = data.role_id === null ? null : parseInt(data.role_id)
+    if (data.status !== undefined) updateData.status = data.status
 
     const updatedUser = await prisma.user.update({
       where: { id },

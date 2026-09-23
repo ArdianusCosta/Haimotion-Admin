@@ -6,9 +6,7 @@ import { useRouter } from 'next/navigation'
 import { SectionPage } from '@/components/section-page'
 import { ChatPage } from '@/components/chat-page'
 import { AnalyticsPage } from '@/components/analytics-page'
-import { OrdersPage } from '@/components/orders-page'
-import { ProductsPage } from '@/components/products-page'
-import { CustomersPage } from '@/components/customers-page'
+
 import { MailPage } from '@/components/mail-page'
 import { KanbanPage } from '@/components/kanban-page'
 import { CalendarPage } from '@/components/calendar-page'
@@ -78,8 +76,6 @@ import {
 
 const nav = [
   { label: 'Dashboard', icon: LayoutDashboard }, { label: 'Analytics', icon: Activity },
-  { label: 'Orders', icon: ShoppingCart, badge: '12' }, { label: 'Products', icon: Package },
-  { label: 'Customers', icon: Users },
 ]
 const chatsMenu = [
   { label: 'Messenger', icon: MessageCircle, badge: '4' },
@@ -159,7 +155,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   const [collapsed, setCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [section, setSection] = useState(initialSection)
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ 'Penjualan': true })
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [isAccountOpen, setIsAccountOpen] = useState(false)
   const [openFinanceGroups, setOpenFinanceGroups] = useState<Record<string, boolean>>({'Overview': true})
 
@@ -316,7 +312,13 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       const slug = newSection.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')
       router.push('/' + (slug === 'dashboard' ? '' : slug), { scroll: false })
     }
-    
+
+    // Auto-buka grup parent jika sub-item finance dipilih
+    const parentGroup = financeMenu.find(item => item.subItems?.some(s => s.label === newSection))
+    if (parentGroup) {
+      setOpenGroups(prev => ({ ...prev, [parentGroup.label]: true }))
+    }
+
     // Close mobile menu on navigate
     setMobileMenuOpen(false)
   }
@@ -522,9 +524,11 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       )}
       {!isTopnav && (
         <aside className={asideClasses}>
-          <div className={`flex items-center gap-3 border-b border-sidebar-border px-5 ${sidebarStyle === 'floating' ? 'h-14' : 'h-16'}`}>
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl overflow-hidden"><img src="/logohm.jpeg" alt="Logo" className="w-full h-full object-cover" /></div>
-            {!effectiveCollapsed && <span className="font-semibold tracking-tight">HaiMotion</span>}
+          <div className={`flex items-center justify-center border-b border-sidebar-border px-2 ${sidebarStyle === 'floating' ? 'h-14' : 'h-16'}`}>
+            {effectiveCollapsed
+              ? <img src="/logohm-transparent.png" alt="Logo" className="h-8 w-auto object-contain" />
+              : <img src="/logohm-transparent.png" alt="HaiMotion Logo" className="h-14 w-auto object-contain" />
+            }
           </div>
           <div ref={sidebarRef} onScroll={handleSidebarScroll} className="flex flex-1 flex-col gap-7 px-3 py-6 overflow-y-auto">
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Workspace')}</p>
@@ -594,8 +598,9 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Finance')}</p>
               {financeMenu.map(({ label, icon, subItems }) => {
                 const isOpen = openGroups[label] || false;
-                const isSubActive = subItems?.some(s => s.label === section);
-                const isGroupActive = section === label || isSubActive;
+                const isSubActive = subItems?.some(s => s.label === section) ?? false;
+                // Parent hanya aktif kalau section-nya tepat label itu, atau ada sub-item yang dipilih
+                const isGroupActive = !subItems ? section === label : isSubActive;
                 return (
                   <div key={label} className="flex flex-col gap-1">
                     <button 
@@ -667,7 +672,9 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             {!isTopnav && <button onClick={() => setCollapsed(!collapsed)} className="hidden rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:block" aria-label="Toggle sidebar"><PanelLeft className="size-4" /></button>}
             {isTopnav && (
               <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2 font-semibold tracking-tight"><div className="flex size-8 shrink-0 items-center justify-center rounded-xl overflow-hidden"><img src="/logohm.jpeg" alt="Logo" className="w-full h-full object-cover" /></div><span className="hidden lg:inline">HaiMotion</span></div>
+                <div className="flex items-center">
+                  <img src="/logohm-transparent.png" alt="HaiMotion Logo" className="h-12 w-auto object-contain" />
+                </div>
                 <div className="hidden md:flex items-center gap-1 overflow-x-auto">
                   {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...developer, ...administration].map(({ label, icon }) => (
                     <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${section === label ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{t(label)}</button>
@@ -712,9 +719,6 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               case 'Dashboard': return <Dashboard range={range} setRange={setRange} section={section} user={user} />
               case 'Messenger': return <ChatPage onStartCall={handleStartCall} />
               case 'Analytics': return <AnalyticsPage />
-              case 'Orders': return <OrdersPage />
-              case 'Products': return <ProductsPage />
-              case 'Customers': return <CustomersPage />
               case 'Email': return <MailPage />
               case 'Kanban': return <KanbanPage />
               case 'Calendar': return <CalendarPage />

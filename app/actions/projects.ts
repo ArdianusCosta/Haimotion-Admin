@@ -115,7 +115,12 @@ export async function getProjectById(id: number) {
     
     const tasks = await prisma.task_list.findMany({
       where: { project_id: id },
-      orderBy: { date_created: 'desc' }
+      orderBy: { date_created: 'desc' },
+      include: {
+        assignees: {
+          select: { user_id: true }
+        }
+      }
     })
     
     const usersMap = new Map(users.map(u => [u.id, u]))
@@ -133,12 +138,28 @@ export async function getProjectById(id: number) {
     let deliveryConfidence = 'On Track'
     if (pendingTasks > 0 && progress < 30) deliveryConfidence = 'At Risk'
     if (pendingTasks > 0 && tasks.some(t => t.status === 0)) deliveryConfidence = 'Blocked'
+
+    // Pre-compute per-member KPI (assigned + done counts) server-side
+    const memberKpi = members.map(m => {
+      const assignedTasks = tasks.filter(t =>
+        t.assignees.some(a => a.user_id === m.id)
+      )
+      const doneTasks = assignedTasks.filter(t => t.status === 5)
+      return {
+        userId: m.id,
+        name: `${m.firstname} ${m.lastname || ''}`.trim(),
+        avatar: (m.firstname ?? '?').charAt(0),
+        assigned: assignedTasks.length,
+        done: doneTasks.length,
+      }
+    })
     
     const formattedProject = {
       ...project,
       manager,
       members,
       tasks,
+      memberKpi,
       stats: {
         totalTasks,
         completedTasks,

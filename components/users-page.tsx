@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Loader2, Plus, Edit2, Trash2, X, ChevronLeft, ChevronRight, Users as UsersIcon, UserCheck, UserMinus, Eye, EyeOff } from 'lucide-react'
+import { Search, Loader2, Plus, Edit2, Trash2, X, ChevronLeft, ChevronRight, Users as UsersIcon, UserCheck, UserMinus, Eye, EyeOff, Power } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
@@ -13,22 +13,38 @@ type User = {
   lastname: string
   email: string
   notification_email: string | null
-  type: number
+  role_id: number | null
+  role: { id: number, name: string } | null
   avatar: string
   date_created: string
   nik: string | null
   address: string | null
+  status: string
 }
 
-const roleColors: Record<number, { bg: string, text: string, label: string }> = {
-  1: { bg: 'bg-purple-500/10 dark:bg-purple-500/20', text: 'text-purple-600 dark:text-purple-400', label: 'Admin / Mngmt' },
-  2: { bg: 'bg-blue-500/10 dark:bg-blue-500/20', text: 'text-blue-600 dark:text-blue-400', label: 'Staff' },
-  3: { bg: 'bg-emerald-500/10 dark:bg-emerald-500/20', text: 'text-emerald-600 dark:text-emerald-400', label: 'Creative' },
-  4: { bg: 'bg-amber-500/10 dark:bg-amber-500/20', text: 'text-amber-600 dark:text-amber-400', label: 'Client / Vendor' },
+const roleColors: Record<string, { bg: string, text: string }> = {
+  'Administrator': { bg: 'bg-purple-500/15 dark:bg-purple-500/25', text: 'text-purple-700 dark:text-purple-300' },
+  'Admin':         { bg: 'bg-purple-500/15 dark:bg-purple-500/25', text: 'text-purple-700 dark:text-purple-300' },
+  'Editor':        { bg: 'bg-blue-500/15 dark:bg-blue-500/25',   text: 'text-blue-700 dark:text-blue-300' },
+  'Staff':         { bg: 'bg-emerald-500/15 dark:bg-emerald-500/25', text: 'text-emerald-700 dark:text-emerald-300' },
+  'Developer':     { bg: 'bg-sky-500/15 dark:bg-sky-500/25',     text: 'text-sky-700 dark:text-sky-300' },
+  'Viewer':        { bg: 'bg-slate-500/15 dark:bg-slate-500/25', text: 'text-slate-600 dark:text-slate-300' },
+  'Client':        { bg: 'bg-amber-500/15 dark:bg-amber-500/25', text: 'text-amber-700 dark:text-amber-300' },
+  'test':          { bg: 'bg-rose-500/15 dark:bg-rose-500/25',   text: 'text-rose-700 dark:text-rose-300' },
+}
+
+// Terjemahan nama role sesuai bahasa aktif
+const roleTranslationsID: Record<string, string> = {
+  'Staff':       'Karyawan',
+  'Developer':   'Pengembang',
+  'Editor':      'Editor',
+  'Administrator': 'Administrator',
+  'Viewer':      'Penampil',
+  'Client':      'Klien',
 }
 
 export function UsersPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
@@ -40,9 +56,11 @@ export function UsersPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deletingUser, setDeletingUser] = useState<User | null>(null)
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+  const [statusUser, setStatusUser] = useState<User | null>(null)
   
   // Form states
-  const [formData, setFormData] = useState({ firstname: '', lastname: '', email: '', notification_email: '', type: '2', password: '', avatar: '', nik: '', address: '' })
+  const [formData, setFormData] = useState({ firstname: '', lastname: '', email: '', notification_email: '', role_id: '', password: '', avatar: '', nik: '', address: '' })
   const [isUploading, setIsUploading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
@@ -119,9 +137,40 @@ export function UsersPage() {
     }
   })
 
+  const statusMutation = useMutation({
+    mutationFn: async (user: User) => {
+      const newStatus = user.status === 'resign' ? 'active' : 'resign'
+      const res = await fetch(`/api/users/${user.id}`, { 
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+      if (!res.ok) throw new Error('Failed to update status')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      setIsStatusModalOpen(false)
+      toast.success(t("User status updated successfully!"))
+    },
+    onError: (error) => {
+      toast.error(`${t('Failed to update status')}: ${error.message}`)
+    }
+  })
+
+  const openStatusModal = (user: User) => {
+    setStatusUser(user)
+    setIsStatusModalOpen(true)
+  }
+
+  const handleStatusChange = () => {
+    if (!statusUser) return
+    statusMutation.mutate(statusUser)
+  }
+
   const openAddModal = () => {
     setEditingUser(null)
-    setFormData({ firstname: '', lastname: '', email: '', notification_email: '', type: '2', password: '', avatar: '', nik: '', address: '' })
+    setFormData({ firstname: '', lastname: '', email: '', notification_email: '', role_id: '', password: '', avatar: '', nik: '', address: '' })
     setIsModalOpen(true)
   }
 
@@ -132,8 +181,8 @@ export function UsersPage() {
       lastname: user.lastname || '', 
       email: user.email, 
       notification_email: user.notification_email || '',
-      type: String(user.type), 
-      password: '', // Don't prefill password
+      role_id: user.role_id ? String(user.role_id) : '', 
+      password: '',
       avatar: user.avatar || '',
       nik: user.nik || '',
       address: user.address || ''
@@ -274,6 +323,7 @@ export function UsersPage() {
                   <th className="px-5 py-3 font-medium text-muted-foreground">{t('Email')}</th>
                   <th className="px-5 py-3 font-medium text-muted-foreground">{t('Role Type')}</th>
                   <th className="px-5 py-3 font-medium text-muted-foreground">{t('Joined At')}</th>
+                  <th className="px-5 py-3 font-medium text-muted-foreground">{t('Status')}</th>
                   <th className="px-5 py-3 text-right font-medium text-muted-foreground">{t('Actions')}</th>
                 </tr>
               </thead>
@@ -286,18 +336,21 @@ export function UsersPage() {
                       <td className="px-5 py-4"><Skeleton className="h-4 w-48" /></td>
                       <td className="px-5 py-4"><Skeleton className="h-6 w-24 rounded-full" /></td>
                       <td className="px-5 py-4"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-5 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
                       <td className="px-5 py-4"><Skeleton className="h-8 w-16 ml-auto" /></td>
                     </tr>
                   ))
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">{t('No users found.')}</td>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">{t('No users found.')}</td>
                   </tr>
                 ) : (
                   users.map((user, index) => {
-                    const dbRole = rolesList.find(r => r.id === user.type)
-                    const roleColor = roleColors[user.type] || { bg: 'bg-muted', text: 'text-muted-foreground', label: 'Unknown' }
-                    const roleLabel = dbRole ? dbRole.name : roleColor.label
+                    const roleName = user.role?.name || 'Staff'
+                    const roleColor = roleColors[roleName] || { bg: 'bg-muted', text: 'text-muted-foreground' }
+                    const displayName = language === 'id'
+                      ? (roleTranslationsID[roleName] || roleName)
+                      : roleName
                     return (
                       <tr key={user.id} className="transition-colors hover:bg-muted/50 group">
                         <td className="px-5 py-3 text-muted-foreground">{(page - 1) * limit + index + 1}</td>
@@ -305,14 +358,22 @@ export function UsersPage() {
                         <td className="px-5 py-3 text-muted-foreground">{user.email}</td>
                         <td className="px-5 py-3">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${roleColor.bg} ${roleColor.text}`}>
-                            {roleLabel}
+                            {displayName}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-muted-foreground">
                           {new Date(user.date_created).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </td>
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${user.status === 'resign' ? 'bg-destructive/15 text-destructive' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'}`}>
+                            {user.status === 'resign' ? t('Resign') : t('Active')}
+                          </span>
+                        </td>
                         <td className="px-5 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => openStatusModal(user)} title={t('Toggle Status')} className={`rounded-md p-1.5 hover:bg-muted hover:text-foreground ${user.status === 'resign' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                              <Power className="size-4" />
+                            </button>
                             <button onClick={() => openEditModal(user)} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                               <Edit2 className="size-4" />
                             </button>
@@ -463,8 +524,9 @@ export function UsersPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">{t('Role Type')}</label>
-                <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50">
+                <label className="text-sm font-medium">{t('Role')}</label>
+                <select value={formData.role_id} onChange={e => setFormData({...formData, role_id: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50">
+                  <option value="">{t('-- Pilih Role --')}</option>
                   {rolesList.map(role => (
                     <option key={role.id} value={role.id.toString()}>{role.name}</option>
                   ))}
@@ -495,6 +557,24 @@ export function UsersPage() {
               <button onClick={() => setIsDeleteModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{t('Cancel')}</button>
               <button onClick={handleDelete} disabled={deleteMutation.isPending} className="inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50">
                 {deleteMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : t('Yes, delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STATUS MODAL */}
+      {isStatusModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl animate-in zoom-in-95">
+            <h2 className="text-lg font-semibold text-foreground">{t('Change User Status?')}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('Are you sure you want to change the status for')} <strong>{statusUser?.firstname}</strong> {t('to')} <strong>{statusUser?.status === 'resign' ? t('Active') : t('Resign')}</strong>?
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setIsStatusModalOpen(false)} className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">{t('Cancel')}</button>
+              <button onClick={handleStatusChange} disabled={statusMutation.isPending} className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {statusMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : t('Yes, change')}
               </button>
             </div>
           </div>

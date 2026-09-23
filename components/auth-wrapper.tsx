@@ -16,14 +16,25 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
   }, [])
 
   if (!mounted || isPending) return null
+  console.log("AuthWrapper render:", { serverUser, sessionUser: session?.user });
+  
+  if (serverUser === null && session) {
+    console.log("AuthWrapper forcing clear because serverUser is null but session exists!");
+    // Backend says user is unauthorized (e.g. resigned), but client has a session. Force clear.
+    localStorage.removeItem('auth_user');
+    authClient.signOut().then(() => {
+      console.log("AuthWrapper signed out, reloading...");
+      window.location.reload();
+    });
+  }
 
-  if (!session && !serverUser) {
+  const activeUser = serverUser !== undefined ? serverUser : session?.user;
+
+  if (!activeUser) {
     return <LoginPage onLogin={() => {
       window.location.reload();
     }} />
   }
-
-  const activeUser = serverUser || session?.user;
 
   return (
     <LanguageProvider>

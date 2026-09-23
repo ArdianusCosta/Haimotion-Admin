@@ -6,10 +6,10 @@ import {
   ChevronRight, Star, Share2, MoreHorizontal, Users, Settings, 
   FileText, Link2, GitBranch, Clock, Info, CalendarDays, 
   CheckCircle, File, Lightbulb, ClipboardList, Plus, Search, Filter, 
-  Trash2, Edit, ChevronLeft, Loader2
+  Trash2, Edit, ChevronLeft, Loader2, Lock, Download, X
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProjects, deleteProject, toggleFavoriteProject, archiveProject, duplicateProject, exportProjectData } from '@/app/actions/projects'
+import { getProjects, getProjectById, deleteProject, toggleFavoriteProject, archiveProject, duplicateProject, exportProjectData } from '@/app/actions/projects'
 import { useRouter } from 'next/navigation'
 import { DependencyGraph } from '@/components/dependency-graph'
 import { ProjectContributorsDialog } from '@/components/project-contributors-dialog'
@@ -67,6 +67,210 @@ function stripHtmlTags(html: string) {
   return decoded.replace(/<[^>]*>?/gm, '').trim();
 }
 
+// ─── Chart helper constants ────────────────────────────────────────────────
+const CHART_COLORS = [
+  '#3b82f6','#ef4444','#f59e0b','#22c55e','#a855f7',
+  '#06b6d4','#f97316','#ec4899','#84cc16','#14b8a6',
+]
+
+// ─── Donut chart component ──────────────────────────────────────────────────
+function ProjectDonutChart({ segments, total }: { segments: { pct: number; color: string }[]; total: number }) {
+  const r = 42, cx = 60, cy = 60
+  const C = 2 * Math.PI * r
+  let cum = 0
+  const validSegs = segments.filter(s => s.pct > 0)
+  return (
+    <div className="relative mx-auto flex size-[120px] items-center justify-center">
+      <svg width="120" height="120" viewBox="0 0 120 120" className="absolute inset-0">
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" className="text-muted/30" strokeWidth={20} />
+        {validSegs.map((seg, i) => {
+          const dashArr = `${seg.pct * C} ${C}`
+          const dashOff = -(cum * C)
+          cum += seg.pct
+          return (
+            <circle key={i} cx={cx} cy={cy} r={r} fill="none"
+              stroke={seg.color} strokeWidth={20}
+              strokeDasharray={dashArr} strokeDashoffset={dashOff}
+              transform={`rotate(-90 ${cx} ${cy})`}
+            />
+          )
+        })}
+      </svg>
+      <div className="relative flex flex-col items-center justify-center text-center">
+        <span className="text-xl font-bold">{total}</span>
+        <span className="text-[10px] text-muted-foreground">tasks</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Team KPI bar chart ─────────────────────────────────────────────────────
+function ProjectTeamKpi({ kpiData }: { kpiData: { userId: number; name: string; avatar: string; assigned: number; done: number }[] }) {
+  if (!kpiData || !kpiData.length) {
+    return <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">No team members assigned</div>
+  }
+
+  const sorted = [...kpiData].sort((a,b) => b.assigned - a.assigned).slice(0, 5)
+  const maxVal = Math.max(...sorted.map(d => d.assigned), 1)
+
+  return (
+    <div className="flex flex-col gap-4">
+      {sorted.map((d, i) => (
+        <div key={i} className="flex items-center gap-4">
+          <div className="flex w-36 items-center gap-3 shrink-0">
+             <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 border border-primary/20 text-xs font-bold text-primary">
+               {d.avatar}
+             </div>
+             <span className="text-sm font-medium truncate" title={d.name}>{d.name}</span>
+          </div>
+          <div className="flex-1 grid grid-cols-1 gap-2 border-l border-border/50 pl-4">
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-blue-500 font-semibold w-[60px]">Assigned</span>
+              <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                 <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: `${(d.assigned / maxVal) * 100}%` }} />
+              </div>
+              <span className="font-bold w-6 text-right">{d.assigned}</span>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-emerald-500 font-semibold w-[60px]">Done</span>
+              <div className="h-2 flex-1 rounded-full bg-muted overflow-hidden">
+                 <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${(d.done / maxVal) * 100}%` }} />
+              </div>
+              <span className="font-bold w-6 text-right">{d.done}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Task Status Card ───────────────────────────────────────────────────────
+function TaskStatusCard({ stats }: { stats: any }) {
+  const [hidden, setHidden] = useState<string[]>([])
+  const toggle = (label: string) => setHidden(prev => prev.includes(label) ? prev.filter(x => x !== label) : [...prev, label])
+
+  const items = [
+    { label: 'Pending',     color: '#6b7280', val: stats.pendingTasks, desc: 'Not started yet' },
+    { label: 'In Progress', color: '#3b82f6', val: stats.inProgressTasks, desc: 'Currently working on' },
+    { label: 'Done',        color: '#22c55e', val: stats.completedTasks, desc: 'Successfully completed' },
+  ]
+  
+  const visibleItems = items.filter(item => !hidden.includes(item.label))
+  const visibleTotal = visibleItems.reduce((acc, curr) => acc + curr.val, 0)
+  
+  const segments = items.map(item => ({
+    pct: !hidden.includes(item.label) && visibleTotal > 0 ? item.val / visibleTotal : 0,
+    color: item.color
+  }))
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="mb-6 flex items-center justify-between">
+        <p className="font-semibold text-foreground flex items-center gap-2">
+          <span className="size-2 rounded-full bg-blue-500" />
+          Task Status
+        </p>
+        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{stats.totalTasks} total tasks</span>
+      </div>
+      
+      <div className="flex flex-col sm:flex-row items-center gap-8 px-2 sm:px-8">
+        <div className="shrink-0 relative">
+          <ProjectDonutChart total={visibleTotal} segments={segments} />
+        </div>
+        <div className="w-full flex-1 grid grid-cols-2 gap-4">
+          {items.map(item => {
+            const isHidden = hidden.includes(item.label);
+            return (
+              <div 
+                key={item.label} 
+                onClick={() => toggle(item.label)}
+                className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${isHidden ? 'border-transparent bg-muted/10 opacity-50' : 'border-border/50 bg-muted/20 hover:bg-muted/50'}`}
+              >
+                <span className="mt-1 size-2.5 shrink-0 rounded-full" style={{ background: isHidden ? '#ccc' : item.color }} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm text-foreground">{item.label}</span>
+                    <span className="font-bold text-base ml-auto">{item.val}</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{item.desc}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Task Type Card ─────────────────────────────────────────────────────────
+function TaskTypeCard({ detailTasks, isLoading }: { detailTasks: any[], isLoading: boolean }) {
+  const [hidden, setHidden] = useState<string[]>([])
+  const toggle = (label: string) => setHidden(prev => prev.includes(label) ? prev.filter(x => x !== label) : [...prev, label])
+  
+  const typeGroups: Record<string, number> = {}
+  detailTasks.forEach((t: any) => {
+    const k = t.type || 'General'
+    typeGroups[k] = (typeGroups[k] || 0) + 1
+  })
+  
+  const entries = Object.entries(typeGroups)
+  const items = entries.map(([label, count], i) => ({
+    label,
+    count,
+    color: CHART_COLORS[i % CHART_COLORS.length]
+  }))
+  
+  const visibleItems = items.filter(item => !hidden.includes(item.label))
+  const visibleTotal = visibleItems.reduce((acc, curr) => acc + curr.count, 0)
+  
+  const segments = items.map(item => ({
+    pct: !hidden.includes(item.label) && visibleTotal > 0 ? item.count / visibleTotal : 0,
+    color: item.color
+  }))
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="mb-6 flex items-center justify-between">
+        <p className="font-semibold text-foreground flex items-center gap-2">
+          <span className="size-2 rounded-full bg-purple-500" />
+          Task Type Distribution
+        </p>
+        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{detailTasks.length} tasks</span>
+      </div>
+      
+      <div className="flex flex-col sm:flex-row items-center gap-8 px-2 sm:px-8">
+        <div className="shrink-0">
+          <ProjectDonutChart total={visibleTotal} segments={segments} />
+        </div>
+        <div className="w-full flex-1 max-h-[140px] overflow-y-auto pr-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {items.length === 0 ? (
+            <p className="text-sm text-muted-foreground col-span-full py-4 text-center">
+              {isLoading ? 'Loading...' : 'No type data available.'}
+            </p>
+          ) : items.map((item) => {
+            const isHidden = hidden.includes(item.label);
+            return (
+              <div 
+                key={item.label} 
+                onClick={() => toggle(item.label)}
+                className={`flex items-center justify-between rounded-lg border p-2.5 cursor-pointer transition-colors ${isHidden ? 'border-transparent bg-muted/10 opacity-50' : 'border-border/50 bg-muted/20 hover:bg-muted/50'}`}
+              >
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: isHidden ? '#ccc' : item.color }} />
+                  <span className="truncate text-sm font-medium">{item.label}</span>
+                </div>
+                <span className="font-bold text-sm bg-background px-2 py-0.5 rounded-md border border-border/50">{item.count}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ProjectPage() {
   const STATUS_LABELS: Record<number, { label: string; color: string }> = {
     0: { label: 'On Hold', color: 'bg-amber-500/10 text-amber-600' },
@@ -83,6 +287,7 @@ export function ProjectPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false)
   const [isContributorsOpen, setIsContributorsOpen] = useState(false)
+  const [isKpiDialogOpen, setIsKpiDialogOpen] = useState(false)
   const router = useRouter()
   
   const queryClient = useQueryClient()
@@ -107,7 +312,7 @@ export function ProjectPage() {
   const duplicateMutation = useMutation({
     mutationFn: duplicateProject,
     onSuccess: (res) => {
-      if(res.success) {
+      if(res.success && res.data) {
         toast.success('Project duplicated successfully')
         queryClient.invalidateQueries({ queryKey: ['projects'] })
         setSelectedProjectId(res.data.id)
@@ -120,11 +325,11 @@ export function ProjectPage() {
       if(res.success) {
         toast.success('Project exported successfully')
         // Create a blob and download
-        const blob = new Blob([res.data], { type: 'application/json' })
+        const blob = new Blob([res.data ?? ''], { type: 'application/json' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = res.filename
+        a.download = res.filename ?? 'export.json'
         a.click()
       } else toast.error('Failed to export')
     }
@@ -154,7 +359,14 @@ export function ProjectPage() {
   
   const selectedProject = selectedProjectId ? projects.find(p => p.id === selectedProjectId) : null
 
-  const tabs = ['Overview', 'Tasks', 'Issues', 'Dependencies', 'Timeline', 'Activity', 'Comments']
+  // ─── Fetch full task details for selected project ─────────────────────────
+  const { data: projectDetailRes, isLoading: isDetailLoading } = useQuery({
+    queryKey: ['project-detail', selectedProjectId],
+    queryFn: () => getProjectById(selectedProjectId!),
+    enabled: !!selectedProjectId,
+    staleTime: 30_000,
+  })
+  const detailTasks = (projectDetailRes?.data?.tasks as any[]) ?? []
 
   // Render List View
   if (!selectedProjectId) {
@@ -300,7 +512,7 @@ export function ProjectPage() {
 
   return (
     <div className="flex h-[calc(100vh-140px)] min-h-[600px] flex-col gap-6 overflow-hidden lg:flex-row">
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 pb-8">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 pb-24">
         
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
@@ -350,129 +562,150 @@ export function ProjectPage() {
           </div>
         </div>
 
-        <div className="mb-6 space-y-4">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{selectedProject.name}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${STATUS_LABELS[selectedProject.status]?.color ?? 'bg-muted text-muted-foreground'}`}>{STATUS_LABELS[selectedProject.status]?.label ?? `Status ${selectedProject.status}`}</div>
-            <div className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold">
-              <Users className="size-3.5" /> {selectedProject.members.length} contributors
+        {/* ═══════════════════ PROJECT DETAILS CARD ═══════════════════ */}
+        <div className="mb-5 rounded-xl border border-border bg-card p-5 shadow-sm">
+          {/* Header: name + status */}
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Project Details</p>
+              <h1 className="truncate text-xl font-bold tracking-tight">{selectedProject.name}</h1>
             </div>
-            {selectedProject.manager && (
-              <div className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold">
-                <Settings className="size-3.5" /> PM: {selectedProject.manager.firstname}
-              </div>
-            )}
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-            <span className="flex items-center gap-2"><FileText className="size-4 text-muted-foreground" /> ID: {selectedProject.id}</span>
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="size-4" /> <span className="text-foreground">Created: {new Date(selectedProject.date_created).toLocaleDateString()}</span>
+            <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_LABELS[selectedProject.status]?.color ?? 'bg-muted text-muted-foreground'}`}>
+              {STATUS_LABELS[selectedProject.status]?.label ?? `Status ${selectedProject.status}`}
             </span>
           </div>
-          
-          <div 
-             className="text-sm text-muted-foreground mt-2 max-w-3xl"
-             dangerouslySetInnerHTML={{ __html: deeplyDecodeHTML(selectedProject.description) }} 
-          />
-        </div>
 
-        <div className="mb-1 rounded-[14px] border border-border bg-muted/40 p-1">
-          <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
-            <div className="flex min-h-24 flex-col justify-between rounded-[10px] border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">Project progress <Info className="size-3.5" /></div>
-              <div className="flex items-end justify-between">
-                <p className="text-2xl font-semibold tracking-tight">{selectedProject.stats.progress}<span className="text-sm text-muted-foreground">%</span></p>
-                <div className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground"><GitBranch className="size-3" /></div>
-              </div>
-            </div>
-            <div className="flex min-h-24 flex-col justify-between rounded-[10px] border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarDays className="size-4" /> Due date</div>
-              <div className="flex items-end justify-between">
-                <p className="text-2xl font-semibold tracking-tight">{new Date(selectedProject.end_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</p>
-                <Clock className="size-4 text-muted-foreground" />
-              </div>
-            </div>
-            <div className="flex min-h-24 flex-col justify-between rounded-[10px] border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle className="size-4" /> Tasks completed</div>
-              <div className="flex items-end justify-between">
-                <p className="text-2xl font-semibold tracking-tight">{selectedProject.stats.completedTasks}<span className="text-sm text-muted-foreground"> / {selectedProject.stats.totalTasks}</span></p>
-                <CheckCircle className="size-4 text-muted-foreground" />
-              </div>
-            </div>
-            <div className="flex min-h-24 flex-col justify-between rounded-[10px] border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground"><File className="size-4" /> Members</div>
-              <div className="flex items-end justify-between">
-                <p className="text-2xl font-semibold tracking-tight">{selectedProject.members.length}</p>
-                <Users className="size-4 text-muted-foreground" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Delivery confidence */}
-        <div className="mb-6 mt-4 flex flex-wrap gap-x-4 gap-y-2 rounded-[10px] border border-border bg-background px-4 py-2.5 text-sm text-muted-foreground shadow-sm">
-          <span>Delivery confidence: <span className="font-medium text-foreground">
-            {selectedProject.stats.deliveryConfidence || (selectedProject.stats.progress >= 75 ? 'On Track' : selectedProject.stats.progress >= 25 ? 'At Risk' : 'Blocked')}
-          </span></span>
-          <span className="hidden sm:inline text-border">•</span>
-          <span>{selectedProject.stats.progress}% completed</span>
-        </div>
-
-        {/* Progress Stages */}
-        <div className="mb-6 overflow-hidden rounded-[14px] border border-border bg-card shadow-sm">
-          <div className="grid grid-cols-2 border-b border-border md:grid-cols-4">
-            {[
-              ['Pending', selectedProject.stats.pendingTasks], 
-              ['In Progress', selectedProject.stats.inProgressTasks], 
-              ['Done', selectedProject.stats.completedTasks], 
-              ['Total', selectedProject.stats.totalTasks]
-            ].map(([label, val], i) => (
-              <div key={label} className={`border-b border-border p-4 md:border-b-0 ${i !== 3 ? 'md:border-r' : ''} ${i % 2 === 0 && i !== 3 ? 'border-r' : ''}`}>
-                <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="mt-2 text-xl font-semibold tracking-tight">{val}</p>
-              </div>
-            ))}
-          </div>
-          <div className="relative h-20 bg-muted/10">
-            {/* Visual gradient placeholder to represent the SVG flow */}
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/20 to-primary/60" />
-            <div className="absolute inset-0 flex items-center justify-between px-[10%]">
-              <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium shadow-sm">{selectedProject.stats.progress}% →</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="mb-6 flex items-center gap-6 overflow-x-auto border-b border-border px-1 text-sm sm:gap-8 sm:px-3">
-          {tabs.map(tab => (
-            <button 
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`shrink-0 border-b-2 py-3 transition-colors ${activeTab === tab ? 'border-foreground font-semibold text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Content */}
-        <div className="rounded-[14px] border border-border bg-card shadow-sm">
-          {activeTab === 'Dependencies' ? (
-            <div className="p-4">
-              <DependencyGraph tasks={selectedProject.tasks || []} />
-            </div>
-          ) : (
-            <div className="flex h-[320px] items-center justify-center sm:h-[360px]">
-              <span className="text-xs text-muted-foreground">Loading {activeTab.toLowerCase()} content for {selectedProject.name}...</span>
-            </div>
+          {/* Description */}
+          {selectedProject.description && (
+            <div
+              className="mb-5 line-clamp-3 text-sm text-muted-foreground"
+              dangerouslySetInnerHTML={{ __html: deeplyDecodeHTML(selectedProject.description) }}
+            />
           )}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border px-4 py-3 text-sm">
-            <span className="flex items-center gap-2"><span className="size-3 rounded-full bg-chart-1" /> On Track</span>
-            <span className="flex items-center gap-2"><span className="size-3 rounded-full bg-chart-2" /> At Risk</span>
-            <span className="flex items-center gap-2"><span className="size-3 rounded-full bg-destructive" /> Blocked</span>
-            <span className="flex items-center gap-2"><span className="size-3 rounded-full bg-muted-foreground/50" /> External</span>
-            <span className="flex items-center gap-2"><span className="h-px w-8 border-t border-dashed border-muted-foreground" /> Dependency</span>
+
+          {/* Info grid: Manager | Start | End */}
+          <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Project Manager</p>
+              {selectedProject.manager ? (
+                <div className="flex items-center gap-2">
+                  {selectedProject.manager.avatar ? (
+                    <img src={selectedProject.manager.avatar} className="size-7 rounded-full object-cover border border-border" alt="" />
+                  ) : (
+                    <div className="flex size-7 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                      {selectedProject.manager.firstname.charAt(0)}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium leading-tight">{selectedProject.manager.firstname} {selectedProject.manager.lastname}</p>
+                    <p className="text-[11px] font-medium text-primary">Project Manager</p>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">Unassigned</span>
+              )}
+            </div>
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Start Date</p>
+              <div className="flex items-center gap-1.5">
+                <div className="flex size-6 items-center justify-center rounded bg-blue-500/10">
+                  <CalendarDays className="size-3.5 text-blue-500" />
+                </div>
+                <span className="text-sm font-medium">
+                  {selectedProject.start_date
+                    ? new Date(selectedProject.start_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : '—'}
+                </span>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">End Date</p>
+              <div className="flex items-center gap-1.5">
+                <div className="flex size-6 items-center justify-center rounded bg-rose-500/10">
+                  <CalendarDays className="size-3.5 text-rose-500" />
+                </div>
+                <span className="text-sm font-medium">
+                  {selectedProject.end_date
+                    ? new Date(selectedProject.end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+                    : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+
+          {/* Overall Progress */}
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="text-sm font-semibold">Overall Progress</p>
+              <span className="text-2xl font-bold tracking-tight text-primary">
+                {selectedProject.stats.progress}<span className="text-sm font-medium text-muted-foreground">%</span>
+              </span>
+            </div>
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-primary/80 to-primary transition-all duration-700 ease-out"
+                style={{ width: `${selectedProject.stats.progress}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Total{' '}
+              <span className="font-semibold text-foreground">{selectedProject.stats.completedTasks}</span>{' '}of{' '}
+              <span className="font-semibold text-foreground">{selectedProject.stats.totalTasks}</span>{' '}tasks completed
+            </p>
+          </div>
+        </div>
+
+        {/* ═══════════════════ PROJECT STATISTICS ═══════════════════ */}
+        <div className="mb-5">
+          <h3 className="mb-3 font-semibold">Project Statistics</h3>
+          <div className="flex flex-col gap-4">
+
+            {/* Task Status Donut */}
+            <TaskStatusCard stats={selectedProject.stats} />
+
+            {/* Task Type Donut */}
+            <TaskTypeCard detailTasks={detailTasks} isLoading={isDetailLoading} />
+
+            {/* Team KPI Bar */}
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow">
+              <div className="mb-6 flex items-center justify-between">
+                <p className="font-semibold text-foreground flex items-center gap-2">
+                  <span className="size-2 rounded-full bg-emerald-500" />
+                  Team KPI
+                </p>
+                <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
+                  <span className="flex items-center gap-1.5"><span className="inline-block size-2 rounded-full bg-blue-500" /> Assigned</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block size-2 rounded-full bg-emerald-500" /> Done</span>
+                </div>
+              </div>
+              <div className="px-2 sm:px-8">
+                {isDetailLoading ? (
+                  <div className="flex flex-col gap-4">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-center gap-4 animate-pulse">
+                        <div className="flex w-32 items-center gap-3 shrink-0">
+                          <div className="size-8 rounded-full bg-muted" />
+                          <div className="h-3 w-16 rounded bg-muted" />
+                        </div>
+                        <div className="flex-1 border-l border-border/50 pl-4 flex flex-col gap-2">
+                          <div className="h-2 w-full rounded-full bg-muted" />
+                          <div className="h-2 w-3/4 rounded-full bg-muted" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <ProjectTeamKpi kpiData={projectDetailRes?.data?.memberKpi ?? []} />
+                )}
+              </div>
+              <button
+                onClick={() => setIsKpiDialogOpen(true)}
+                className="mt-6 flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-border bg-muted/20 px-3 text-xs font-semibold uppercase tracking-wider transition-colors hover:bg-accent"
+              >
+                View Full Team Report <ChevronRight className="size-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -602,6 +835,108 @@ export function ProjectPage() {
               {archiveMutation.isPending ? 'Archiving...' : 'Archive Project'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Team KPI Full List Dialog */}
+      <Dialog open={isKpiDialogOpen} onOpenChange={setIsKpiDialogOpen}>
+        <DialogContent className="sm:max-w-[750px] p-0 border-0 overflow-hidden [&>button]:hidden">
+          <div id="team-kpi-report" className="bg-background">
+            <div className="flex items-center justify-between bg-primary px-4 py-3 text-primary-foreground">
+              <div className="flex items-center gap-2 font-semibold">
+                <Lock className="size-4" />
+                <span>Team KPI — Full List</span>
+              </div>
+              <button onClick={() => setIsKpiDialogOpen(false)} className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <X className="size-5" />
+              </button>
+            </div>
+            
+            <div className="px-6 py-6">
+              <div className="text-center mb-6">
+                <h2 className="text-lg font-bold">Team KPI Report</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Project: {selectedProject.name}
+                </p>
+              </div>
+
+            <div className="max-h-[400px] overflow-y-auto pr-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left">
+                    <th className="py-3 px-2 font-semibold text-[10px] uppercase text-muted-foreground">NO</th>
+                    <th className="py-3 px-2 font-semibold text-[10px] uppercase text-muted-foreground">TEAM MEMBER</th>
+                    <th className="py-3 px-2 font-semibold text-[10px] uppercase text-muted-foreground text-center">ASSIGNED</th>
+                    <th className="py-3 px-2 font-semibold text-[10px] uppercase text-muted-foreground text-center">DONE</th>
+                    <th className="py-3 px-2 font-semibold text-[10px] uppercase text-muted-foreground w-[200px]">COMPLETION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(projectDetailRes?.data?.memberKpi ?? selectedProject.members.map((m: any) => ({ userId: m.id, name: `${m.firstname} ${m.lastname || ''}`.trim(), assigned: 0, done: 0 }))).map((kpi: any, i: number) => {
+                    const completion = kpi.assigned > 0 ? Math.round((kpi.done / kpi.assigned) * 100) : 0;
+                    
+                    return (
+                      <tr key={kpi.userId} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-4 px-2 font-medium">{i + 1}</td>
+                        <td className="py-4 px-2">
+                          <p className="font-medium text-sm">{kpi.name}</p>
+                        </td>
+                        <td className="py-4 px-2 text-center">{kpi.assigned}</td>
+                        <td className="py-4 px-2 text-center">{kpi.done}</td>
+                        <td className="py-4 px-2">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                              <div 
+                                className="h-full bg-primary transition-all duration-500" 
+                                style={{ width: `${completion}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] font-medium text-muted-foreground">{completion}% Complete</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            </div>
+          </div>
+          
+          <div className="px-6 pb-6 pt-0 bg-background">
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button variant="outline" onClick={() => setIsKpiDialogOpen(false)}>
+                CLOSE
+              </Button>
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={async () => {
+                try {
+                  const toastId = toast.loading('Generating PDF...')
+                  const { jsPDF } = await import('jspdf')
+                  const { toPng } = await import('html-to-image')
+                  
+                  const element = document.getElementById('team-kpi-report')
+                  if (!element) throw new Error('Element not found')
+
+                  const imgData = await toPng(element, { pixelRatio: 2 })
+                  
+                  const pdf = new jsPDF('p', 'mm', 'a4')
+                  const pdfWidth = pdf.internal.pageSize.getWidth()
+                  const pdfHeight = (element.offsetHeight * pdfWidth) / element.offsetWidth
+                  
+                  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
+                  pdf.save(`Team_KPI_${selectedProject.name.replace(/\s+/g, '_')}.pdf`)
+                  
+                  toast.success('PDF generated successfully!', { id: toastId })
+                } catch (error) {
+                  console.error(error)
+                  toast.error('Failed to generate PDF')
+                }
+              }}>
+                SAVE AS PDF
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

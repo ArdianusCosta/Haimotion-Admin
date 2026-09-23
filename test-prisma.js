@@ -1,15 +1,9 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-
-async function test() {
-  try {
-    const fields = Object.keys(prisma._baseDmmf.modelMap.FinanceAccount.fields.reduce((acc, f) => { acc[f.name] = f; return acc; }, {}));
-    console.log("FinanceAccount fields:", fields);
-  } catch (err) {
-    console.error(err);
-  } finally {
-    await prisma.$disconnect();
-  }
+async function main() {
+  const sessions = await prisma.session.findMany();
+  console.log(sessions);
+  const users = await prisma.user.findMany({ take: 2 });
+  console.log(users);
 }
-
-test();
+main().catch(console.error).finally(() => prisma.$disconnect());

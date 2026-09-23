@@ -14,12 +14,12 @@ model User {
   email                   String                   @unique @db.VarChar(200)
   notification_email      String?                  @db.VarChar(255)
   password                String                   @db.Text
-  type                    Int                      @default(2) @db.SmallInt
   avatar                  String                   @db.Text
   date_created            DateTime                 @default(now()) @db.Timestamp()
   nik                     String?                  @db.VarChar(50)
   address                 String?                  @db.Text
   emailVerified           Boolean                  @default(false)
+  status                  String                   @default("active") @db.VarChar(50)
   role_id                 Int?
   updatedAt               DateTime                 @default(now()) @updatedAt
   name                    String?                  @db.VarChar(400)
@@ -877,7 +877,11 @@ model Meeting {
   start_time      DateTime             @db.Time()
   duration        Int
   status          String               @default("SCHEDULED") @db.VarChar(50)
-  jitsi_room_name String               @unique @db.VarChar(255)
+  room_name       String?              @unique @default(uuid()) @db.VarChar(255)
+  meeting_code    String?              @unique @db.VarChar(20)
+  join_policy     String               @default("PUBLIC_LINK") @db.VarChar(50)
+  waiting_room    Boolean              @default(false)
+  passcode        String?              @db.VarChar(50)
   project_id      Int?
   module_flow_id  Int?
   task_id         Int?
@@ -889,6 +893,7 @@ model Meeting {
   project         project_list?        @relation(fields: [project_id], references: [id])
   task            task_list?           @relation(fields: [task_id], references: [id])
 
+  @@index([meeting_code])
   @@index([module_flow_id])
   @@index([organizer_id])
   @@index([project_id])
@@ -897,15 +902,20 @@ model Meeting {
 }
 
 model MeetingParticipant {
-  id         Int      @id @default(autoincrement())
-  meeting_id Int
-  user_id    Int
-  role       String   @default("PARTICIPANT") @db.VarChar(50)
-  created_at DateTime @default(now())
-  meeting    Meeting  @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id          Int       @id @default(autoincrement())
+  meeting_id  Int
+  user_id     Int?
+  guest_name  String?   @db.VarChar(255)
+  guest_email String?   @db.VarChar(255)
+  role        String    @default("PARTICIPANT") @db.VarChar(50)
+  status      String    @default("JOINED") @db.VarChar(50)
+  joined_at   DateTime?
+  left_at     DateTime?
+  created_at  DateTime  @default(now())
+  meeting     Meeting   @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@unique([meeting_id, user_id])
+  @@index([meeting_id])
   @@index([user_id])
   @@map("meeting_participants")
 }

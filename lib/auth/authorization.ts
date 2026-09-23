@@ -4,8 +4,10 @@ import prisma from "@/lib/prisma";
 
 export async function getUserSession() {
   try {
+    const hdrs = new Headers(await headers());
+    console.log("getUserSession headers:", Object.fromEntries(hdrs.entries()));
     const session = await auth.api.getSession({
-      headers: await headers(),
+      headers: hdrs,
     });
     
     if (!session || !session.user) {
@@ -23,6 +25,10 @@ export async function getUserSession() {
         }
       }
     });
+    
+    if (dbUser?.status === 'resign') {
+      return null;
+    }
     
     return dbUser;
   } catch (error) {

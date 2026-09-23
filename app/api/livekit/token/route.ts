@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       // Check if it's a Meeting
       const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
       const meeting = await prisma.meeting.findFirst({
-        where: { jitsi_room_name: roomName },
+        where: { room_name: roomName },
         include: { participants: true }
       });
 
