@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth/authorization'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/activity-log'
 
 // --- GET FLOW ---
 export async function getModuleFlow(flowId: number) {
@@ -135,6 +136,12 @@ export async function createFlowNode(flowId: number, data: any) {
     data: { status: 'DRAFT' }
   })
   
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'create',
+    description: `Created flow node: ${data.label || nodeId}`
+  })
+  
   return node
 }
 
@@ -151,6 +158,12 @@ export async function updateFlowNode(nodeId: string, flowId: number, data: any) 
     data: { status: 'DRAFT' }
   })
   
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'update',
+    description: `Updated flow node: ${nodeId}`
+  })
+  
   return node
 }
 
@@ -164,6 +177,12 @@ export async function deleteFlowNode(nodeId: string, flowId: number) {
   await prisma.moduleFlow.update({
     where: { id: flowId },
     data: { status: 'DRAFT' }
+  })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'delete',
+    description: `Deleted flow node: ${nodeId}`
   })
 }
 
@@ -251,6 +270,12 @@ export async function publishModuleFlow(flowId: number) {
     }
   })
   
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'update',
+    description: `Published module flow ID ${flowId} to version ${newVersion}`
+  })
+  
   return newVersion
 }
 
@@ -266,6 +291,12 @@ export async function runFlowExecution(flowId: number) {
       started_by: parseInt(auth.id, 10),
       completed_at: new Date()
     }
+  })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'create',
+    description: `Ran flow execution for flow ID: ${flowId}`
   })
   
   return execution

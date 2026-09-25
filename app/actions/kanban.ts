@@ -2,6 +2,8 @@
 
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { requireAuth } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 function getTagColor(tag: string | null) {
   if (!tag) return 'bg-muted text-muted-foreground'
@@ -148,9 +150,16 @@ export async function getKanbanTasks() {
 
 export async function updateTaskStatus(id: number, newStatus: number) {
   try {
+    const user = await requireAuth();
     await prisma.task_list.update({
       where: { id },
       data: { status: newStatus }
+    })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'update',
+      description: `Updated task status in Kanban to ${newStatus}`
     })
     
     return { success: true }
@@ -161,6 +170,7 @@ export async function updateTaskStatus(id: number, newStatus: number) {
 
 export async function createTask(data: { title: string; description: string; status: number; assignees: number[] }) {
   try {
+    const user = await requireAuth();
     // Need a default project_id for this table since it's required
     const firstProject = await prisma.project_list.findFirst()
     const projectId = firstProject?.id || 1 // Fallback to 1 if no projects exist
@@ -175,6 +185,12 @@ export async function createTask(data: { title: string; description: string; sta
           create: data.assignees.map(uid => ({ user_id: Number(uid) }))
         }
       }
+    })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'create',
+      description: `Created task in Kanban: ${data.title}`
     })
     
     return { success: true, data: task }
@@ -201,6 +217,13 @@ export async function updateTask(id: number, data: { title: string; description:
       });
     });
     
+    const user = await requireAuth();
+    await logActivity({
+      userId: user.id,
+      activityType: 'update',
+      description: `Updated task in Kanban: ${data.title}`
+    })
+    
     return { success: true, data: task }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -213,8 +236,15 @@ export async function deleteTask(id: number) {
     await prisma.task_comments.deleteMany({ where: { task_id: id } })
     await prisma.task_attachments.deleteMany({ where: { task_id: id } })
     
-    await prisma.task_list.delete({
+    const task = await prisma.task_list.delete({
       where: { id }
+    })
+    
+    const user = await requireAuth();
+    await logActivity({
+      userId: user.id,
+      activityType: 'delete',
+      description: `Deleted task ID in Kanban: ${id}`
     })
     
     return { success: true }

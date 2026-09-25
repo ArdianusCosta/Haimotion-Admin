@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 function toCSV(records: any[]) {
   if (records.length === 0) return ''
@@ -149,7 +150,7 @@ export async function createInvoice(data: any) {
   // Create reference if missing
   const ref = data.reference || `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`
 
-  return prisma.financeInvoice.create({
+  const invoice = await prisma.financeInvoice.create({
     data: {
       reference: ref,
       customer_name: data.customerName,
@@ -168,23 +169,47 @@ export async function createInvoice(data: any) {
       }
     }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'create',
+    description: `Created invoice: ${invoice.reference}`
+  });
+
+  return invoice;
 }
 
 export async function updateInvoice(id: number, data: any) {
-  await requireAuth()
-  return prisma.financeInvoice.update({
+  const auth = await requireAuth()
+  const invoice = await prisma.financeInvoice.update({
     where: { id },
     data: {
       status: data.status
     }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'update',
+    description: `Updated invoice status: ${invoice.reference}`
+  });
+  
+  return invoice;
 }
 
 export async function deleteInvoice(id: number) {
-  await requireAuth()
-  return prisma.financeInvoice.delete({
+  const auth = await requireAuth()
+  const invoice = await prisma.financeInvoice.delete({
     where: { id }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'delete',
+    description: `Deleted invoice: ${invoice.reference}`
+  });
+  
+  return invoice;
 }
 
 export async function exportInvoicesCsv() {
@@ -260,7 +285,7 @@ export async function getExpenses(filters?: { category?: string, search?: string
 export async function createExpense(data: any) {
   const auth = await requireAuth()
   
-  return prisma.financeExpense.create({
+  const expense = await prisma.financeExpense.create({
     data: {
       date: data.date ? new Date(data.date) : new Date(),
       description: data.description,
@@ -271,6 +296,14 @@ export async function createExpense(data: any) {
       created_by: parseInt(auth.id, 10)
     }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'create',
+    description: `Created expense: ${expense.description}`
+  });
+
+  return expense;
 }
 
 export async function updateExpense(id: number, data: any) {

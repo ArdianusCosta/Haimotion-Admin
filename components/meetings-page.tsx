@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/components/language-provider'
-import { useMeetings, useUpdateMeetingStatus } from '@/lib/hooks/use-meetings'
+import { useMeetings, useUpdateMeetingStatus } from '@/hooks/use-meetings'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -12,9 +13,10 @@ import {
   Search, Plus, Calendar, Clock, Video, Users, Play, Globe, Lock,
   ShieldCheck, Copy, ExternalLink, MoreHorizontal, ChevronRight
 } from 'lucide-react'
-import { ScheduleMeetingDialog } from '@/components/schedule-meeting-dialog'
-import { MeetingDetailSheet } from '@/components/meeting-detail-sheet'
-import { MeetingRoom } from '@/components/meeting-room'
+import { ScheduleMeetingDialog } from '@/components/meetings/dialogs/schedule-meeting-dialog'
+import { MeetingDetailSheet } from '@/components/meetings/dialogs/meeting-detail-sheet'
+import { MeetingRoom } from '@/components/meetings/meeting-room'
+import { CreateMeetingPage } from '@/components/meetings/create-meeting-page'
 import { toast } from 'sonner'
 
 function getMeetingUrl(meetingCode: string) {
@@ -189,7 +191,8 @@ function MeetingCard({
   )
 }
 
-export function MeetingsPage() {
+export function MeetingsPage({ slug }: { slug?: string[] }) {
+  const router = useRouter()
   const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState<'upcoming' | 'today' | 'past'>('upcoming')
   const [searchQuery, setSearchQuery] = useState('')
@@ -256,6 +259,14 @@ export function MeetingsPage() {
     { key: 'past', label: 'Past' },
   ] as const
 
+  const isCreating = slug && slug[1] === 'create'
+
+  if (isCreating) {
+    return (
+      <CreateMeetingPage onBack={() => router.push('/meetings')} />
+    )
+  }
+
   return (
     <>
       {/* Active Meeting Room Overlay */}
@@ -275,7 +286,7 @@ export function MeetingsPage() {
               {t('Manage your scheduled meetings and video conferences.')}
             </p>
           </div>
-          <Button onClick={() => setIsScheduleOpen(true)}>
+          <Button onClick={() => router.push('/meetings/create')}>
             <Plus className="size-4 mr-1.5" />
             {t('Schedule Meeting')}
           </Button>
@@ -314,7 +325,7 @@ export function MeetingsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredMeetings.length === 0 ? (
-                <EmptyState tab={activeTab} onSchedule={() => setIsScheduleOpen(true)} />
+                <EmptyState tab={activeTab} onSchedule={() => router.push('/meetings/create')} />
               ) : (
                 filteredMeetings.map((meeting: any) => (
                   <MeetingCard
@@ -330,8 +341,6 @@ export function MeetingsPage() {
           )}
         </div>
       </div>
-
-      <ScheduleMeetingDialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen} />
 
       {selectedMeeting && (
         <MeetingDetailSheet

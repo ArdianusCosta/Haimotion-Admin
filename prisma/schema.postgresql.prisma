@@ -23,6 +23,7 @@ model User {
   role_id                 Int?
   updatedAt               DateTime                 @default(now()) @updatedAt
   name                    String?                  @db.VarChar(400)
+  face_descriptor         String?                  @db.Text
   files                   File[]
   files_shared_by_me      FileShare[]              @relation("SharedByUserFiles")
   files_shared_with_me    FileShare[]              @relation("SharedWithUserFiles")
@@ -47,7 +48,6 @@ model User {
   organized_meetings      Meeting[]                @relation("MeetingOrganizer")
   passkeys                Passkey[]
   project_members         ProjectMember[]
-  setup_field_values      ProjectSetupFieldValue[]
   sessions                Session[]
   task_assignees          TaskAssignee[]
   user_group_read_status  user_group_read_status[]
@@ -147,6 +147,8 @@ model activity_log {
   task_id       Int?
   activity_type String    @db.VarChar(50)
   description   String    @db.Text
+  ip_address    String?   @db.VarChar(100)
+  user_agent    String?   @db.Text
   created_at    DateTime? @default(now()) @db.Timestamp()
 }
 
@@ -207,9 +209,7 @@ model project_list {
   is_archived  Boolean            @default(false)
   is_favorite  Boolean            @default(false)
   meetings     Meeting[]
-  module_flows ModuleFlow[]
   members      ProjectMember[]
-  setup_steps  ProjectSetupStep[]
 }
 
 model system_settings {
@@ -484,54 +484,8 @@ model Verification {
   @@map("verification")
 }
 
-model ProjectSetupStep {
-  id          Int                 @id @default(autoincrement())
-  project_id  Int
-  name        String              @db.VarChar(255)
-  description String?             @db.Text
-  order       Int                 @default(0)
-  created_at  DateTime            @default(now()) @db.Timestamp()
-  updated_at  DateTime            @default(now()) @updatedAt @db.Timestamp()
-  fields      ProjectSetupField[]
-  project     project_list        @relation(fields: [project_id], references: [id], onDelete: Cascade)
 
-  @@index([project_id])
-  @@map("project_setup_steps")
-}
 
-model ProjectSetupField {
-  id          Int                      @id @default(autoincrement())
-  step_id     Int
-  name        String                   @db.VarChar(255)
-  description String?                  @db.Text
-  is_required Boolean                  @default(true)
-  field_type  String                   @default("checkbox") @db.VarChar(50)
-  order       Int                      @default(0)
-  created_at  DateTime                 @default(now()) @db.Timestamp()
-  updated_at  DateTime                 @default(now()) @updatedAt @db.Timestamp()
-  values      ProjectSetupFieldValue[]
-  step        ProjectSetupStep         @relation(fields: [step_id], references: [id], onDelete: Cascade)
-
-  @@index([step_id])
-  @@map("project_setup_fields")
-}
-
-model ProjectSetupFieldValue {
-  id           Int               @id @default(autoincrement())
-  field_id     Int
-  user_id      Int?
-  value        String?           @db.Text
-  is_completed Boolean           @default(false)
-  completed_at DateTime?         @db.Timestamp()
-  created_at   DateTime          @default(now()) @db.Timestamp()
-  updated_at   DateTime          @default(now()) @updatedAt @db.Timestamp()
-  field        ProjectSetupField @relation(fields: [field_id], references: [id], onDelete: Cascade)
-  user         User?             @relation(fields: [user_id], references: [id])
-
-  @@index([field_id])
-  @@index([user_id])
-  @@map("project_setup_field_values")
-}
 
 model ProjectMember {
   id         Int          @id @default(autoincrement())
@@ -577,116 +531,11 @@ model Passkey {
   @@map("passkeys")
 }
 
-model ModuleFlow {
-  id          Int             @id @default(autoincrement())
-  project_id  Int?
-  name        String          @db.VarChar(255)
-  description String?         @db.Text
-  version     String          @default("V1.0") @db.VarChar(50)
-  status      String          @default("DRAFT") @db.VarChar(50)
-  progress    Int             @default(0)
-  created_by  Int?
-  updated_at  DateTime        @default(now()) @updatedAt
-  created_at  DateTime        @default(now())
-  checklists  ChecklistItem[]
-  edges       FlowEdge[]
-  executions  FlowExecution[]
-  nodes       FlowNode[]
-  meetings    Meeting[]
-  project     project_list?   @relation(fields: [project_id], references: [id])
 
-  @@index([project_id])
-  @@map("module_flows")
-}
 
-model FlowNode {
-  id                String                @id @default(uuid())
-  flow_id           Int
-  label             String                @db.VarChar(255)
-  description       String?               @db.Text
-  type              String                @db.VarChar(100)
-  tech              String?               @db.VarChar(100)
-  status            String?               @db.VarChar(100)
-  owner             String?               @db.VarChar(255)
-  position_x        Float
-  position_y        Float
-  width             Float?
-  height            Float?
-  created_at        DateTime              @default(now())
-  updated_at        DateTime              @default(now()) @updatedAt
-  execution_results ExecutionNodeResult[]
-  source_edges      FlowEdge[]            @relation("SourceEdges")
-  target_edges      FlowEdge[]            @relation("TargetEdges")
-  flow              ModuleFlow            @relation(fields: [flow_id], references: [id], onDelete: Cascade)
 
-  @@index([flow_id])
-  @@map("flow_nodes")
-}
 
-model FlowEdge {
-  id            String     @id @default(uuid())
-  flow_id       Int
-  source_id     String
-  target_id     String
-  source_handle String?    @db.VarChar(100)
-  target_handle String?    @db.VarChar(100)
-  label         String?    @db.VarChar(255)
-  color         String?    @db.VarChar(50)
-  created_at    DateTime   @default(now())
-  flow          ModuleFlow @relation(fields: [flow_id], references: [id], onDelete: Cascade)
-  source        FlowNode   @relation("SourceEdges", fields: [source_id], references: [id], onDelete: Cascade)
-  target        FlowNode   @relation("TargetEdges", fields: [target_id], references: [id], onDelete: Cascade)
 
-  @@index([flow_id])
-  @@index([source_id])
-  @@index([target_id])
-  @@map("flow_edges")
-}
-
-model ChecklistItem {
-  id         Int        @id @default(autoincrement())
-  flow_id    Int
-  label      String     @db.VarChar(255)
-  is_done    Boolean    @default(false)
-  order      Int        @default(0)
-  created_at DateTime   @default(now())
-  updated_at DateTime   @default(now()) @updatedAt
-  flow       ModuleFlow @relation(fields: [flow_id], references: [id], onDelete: Cascade)
-
-  @@index([flow_id])
-  @@map("flow_checklists")
-}
-
-model FlowExecution {
-  id           Int                   @id @default(autoincrement())
-  flow_id      Int
-  status       String                @default("PENDING") @db.VarChar(50)
-  started_by   Int?
-  created_at   DateTime              @default(now())
-  completed_at DateTime?
-  node_results ExecutionNodeResult[]
-  flow         ModuleFlow            @relation(fields: [flow_id], references: [id], onDelete: Cascade)
-
-  @@index([flow_id])
-  @@map("flow_executions")
-}
-
-model ExecutionNodeResult {
-  id           Int           @id @default(autoincrement())
-  execution_id Int
-  node_id      String
-  status       String        @db.VarChar(50)
-  started_at   DateTime?
-  completed_at DateTime?
-  output       String?       @db.Text
-  error        String?       @db.Text
-  execution    FlowExecution @relation(fields: [execution_id], references: [id], onDelete: Cascade)
-  node         FlowNode      @relation(fields: [node_id], references: [id], onDelete: Cascade)
-
-  @@index([execution_id])
-  @@index([node_id])
-  @@map("execution_node_results")
-}
 
 model FinanceAccount {
   code           String?              @db.VarChar(50)
@@ -883,18 +732,15 @@ model Meeting {
   waiting_room    Boolean              @default(false)
   passcode        String?              @db.VarChar(50)
   project_id      Int?
-  module_flow_id  Int?
   task_id         Int?
   created_at      DateTime             @default(now())
   updated_at      DateTime             @default(now()) @updatedAt
   participants    MeetingParticipant[]
-  module_flow     ModuleFlow?          @relation(fields: [module_flow_id], references: [id])
   organizer       User                 @relation("MeetingOrganizer", fields: [organizer_id], references: [id])
   project         project_list?        @relation(fields: [project_id], references: [id])
   task            task_list?           @relation(fields: [task_id], references: [id])
 
   @@index([meeting_code])
-  @@index([module_flow_id])
   @@index([organizer_id])
   @@index([project_id])
   @@index([task_id])

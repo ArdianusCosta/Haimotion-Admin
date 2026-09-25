@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 // Generate a short, readable meeting code like "7KX92P"
 function generateMeetingCode(): string {
@@ -135,6 +136,12 @@ export async function createMeeting(data: {
         participants: true,
       }
     });
+    
+    await logActivity({
+      userId: uid,
+      activityType: 'create',
+      description: `Created meeting: ${data.title}`
+    })
 
     revalidatePath('/');
     return { success: true, data: newMeeting };
@@ -175,6 +182,13 @@ export async function updateMeeting(id: number, data: {
     if (data.passcode !== undefined) updateData.passcode = data.passcode || null;
 
     const updated = await prisma.meeting.update({ where: { id }, data: updateData });
+    
+    await logActivity({
+      userId: uid,
+      activityType: 'update',
+      description: `Updated meeting: ${meeting.title}`
+    })
+    
     revalidatePath('/');
     return { success: true, data: updated };
   } catch (error: any) {
@@ -196,6 +210,13 @@ export async function cancelMeeting(id: number) {
       where: { id },
       data: { status: 'CANCELLED' }
     });
+    
+    await logActivity({
+      userId: uid,
+      activityType: 'update',
+      description: `Cancelled meeting: ${meeting.title}`
+    })
+    
     revalidatePath('/');
     return { success: true, data: updated };
   } catch (error: any) {
@@ -214,6 +235,13 @@ export async function deleteMeeting(id: number) {
     if (meeting.organizer_id !== uid) return { success: false, error: 'Forbidden' };
 
     await prisma.meeting.delete({ where: { id } });
+    
+    await logActivity({
+      userId: uid,
+      activityType: 'delete',
+      description: `Deleted meeting: ${meeting.title}`
+    })
+    
     revalidatePath('/');
     return { success: true };
   } catch (error: any) {

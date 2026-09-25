@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth/authorization';
+import { logActivity } from '@/lib/activity-log';
 
 export async function GET() {
   try {
@@ -21,6 +23,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const user = await requireAuth();
     const data = await req.json();
     const { name, description } = data;
     
@@ -30,6 +33,12 @@ export async function POST(req: Request) {
 
     const newRole = await prisma.role.create({
       data: { name, description }
+    });
+
+    await logActivity({
+      userId: user.id,
+      activityType: 'create',
+      description: `Created role: ${newRole.name}`
     });
 
     return NextResponse.json({ role: newRole });

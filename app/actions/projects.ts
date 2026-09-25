@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { requireAuth, requirePermission, canAccessProject } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 export async function getProjects() {
   try {
@@ -220,6 +221,13 @@ export async function createProject(data: {
         }
       }
     })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'create',
+      description: `Created project: ${project.name}`
+    })
+
     return { success: true, data: project }
   } catch (error) {
     console.error('Error creating project:', error)
@@ -262,6 +270,13 @@ export async function updateProject(id: number, data: {
         }
       });
     });
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'update',
+      description: `Updated project: ${project.name}`
+    })
+
     return { success: true, data: project }
   } catch (error) {
     console.error('Error updating project:', error)
@@ -277,6 +292,13 @@ export async function deleteProject(id: number) {
     await prisma.project_list.delete({
       where: { id }
     })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'delete',
+      description: `Deleted project ID: ${id}`
+    })
+
     // Note: We might want to cascade delete tasks here if needed, but for now we follow the user instruction to be careful.
     return { success: true }
   } catch (error) {

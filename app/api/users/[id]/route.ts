@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -22,7 +23,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (data.email !== undefined) updateData.email = data.email
     if (data.notification_email !== undefined) updateData.notification_email = data.notification_email
     if (data.password) {
-      updateData.password = await bcrypt.hash(data.password, 10)
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      updateData.password = hashedPassword;
+      
+      // Update better-auth Account password if it exists
+      await prisma.account.updateMany({
+        where: { userId: id },
+        data: { password: hashedPassword }
+      });
     }
     if (data.nik !== undefined) updateData.nik = data.nik || null
     if (data.address !== undefined) updateData.address = data.address || null
@@ -35,6 +43,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       data: updateData
     })
     
+    await logActivity({
+      userId: user.id,
+      activityType: 'update',
+      description: `Updated user: ${updatedUser.firstname} ${updatedUser.lastname}`
+    });
+
     return NextResponse.json(updatedUser)
   } catch (error) {
     console.error('Error updating user:', error)
@@ -50,10 +64,16 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const id = parseInt(resolvedParams.id)
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
-    await prisma.user.delete({
+    const deletedUser = await prisma.user.delete({
       where: { id }
     })
     
+    await logActivity({
+      userId: user.id,
+      activityType: 'delete',
+      description: `Deleted user: ${deletedUser.firstname} ${deletedUser.lastname}`
+    });
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting user:', error)

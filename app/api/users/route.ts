@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 export async function GET(request: Request) {
   try {
@@ -95,6 +96,25 @@ export async function POST(request: Request) {
       }
     })
     
+    // Create better-auth account so the user can login
+    await prisma.account.create({
+      data: {
+        id: crypto.randomUUID(),
+        accountId: newUser.id.toString(),
+        providerId: 'credential',
+        userId: newUser.id,
+        password: hashedPassword,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+    });
+
+    await logActivity({
+      userId: user.id,
+      activityType: 'create',
+      description: `Created user: ${newUser.firstname} ${newUser.lastname}`
+    });
+
     return NextResponse.json(newUser, { status: 201 })
   } catch (error) {
     console.error('Error creating user:', error)

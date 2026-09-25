@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 export async function getEvents() {
   try {
@@ -38,6 +39,13 @@ export async function createEvent(data: {
         description: data.description,
       }
     })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'create',
+      description: `Created event: ${data.title}`
+    })
+    
     return { success: true, data: newEvent }
   } catch (error: any) {
     console.error('Failed to create event:', error)
@@ -65,6 +73,13 @@ export async function updateEvent(id: number, data: {
         description: data.description,
       }
     })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'update',
+      description: `Updated event: ${data.title}`
+    })
+    
     return { success: true, data: updatedEvent }
   } catch (error: any) {
     console.error('Failed to update event:', error)
@@ -79,6 +94,13 @@ export async function deleteEvent(id: number) {
     await prisma.events.delete({
       where: { id }
     })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'delete',
+      description: `Deleted event ID: ${id}`
+    })
+    
     return { success: true }
   } catch (error: any) {
     console.error('Failed to delete event:', error)

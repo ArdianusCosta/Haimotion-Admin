@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 // -----------------------------------------------------------------------------
 // OVERVIEW & SUMMARY
@@ -90,7 +91,7 @@ export async function getAttendances() {
 }
 
 export async function importAttendances(data: any[]) {
-  await requireAuth()
+  const auth = await requireAuth()
   
   const mapped = data.map(item => ({
     employee_id: parseInt(String(item.employee_id)),
@@ -101,10 +102,18 @@ export async function importAttendances(data: any[]) {
     notes: item.notes || null,
   }))
 
-  return prisma.hrAttendance.createMany({
+  const result = await prisma.hrAttendance.createMany({
     data: mapped,
     skipDuplicates: true,
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'import',
+    description: `Imported ${result.count} attendance records`
+  })
+  
+  return result;
 }
 
 export async function getAttendanceSummaries() {
@@ -153,11 +162,19 @@ export async function getLeaves() {
 }
 
 export async function updateLeaveStatus(id: number, status: string) {
-  await requireAuth()
-  return prisma.hrLeaveRequest.update({
+  const auth = await requireAuth()
+  const leave = await prisma.hrLeaveRequest.update({
     where: { id },
     data: { status }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'update',
+    description: `Updated leave request ${id} to ${status}`
+  })
+  
+  return leave;
 }
 
 export async function createLeaveRequest(data: any) {
@@ -186,8 +203,8 @@ export async function getPayrolls() {
 }
 
 export async function createPayroll(data: any) {
-  await requireAuth()
-  return prisma.hrPayroll.create({
+  const auth = await requireAuth()
+  const payroll = await prisma.hrPayroll.create({
     data: {
       employee_id: data.employeeId,
       period: data.period,
@@ -198,6 +215,14 @@ export async function createPayroll(data: any) {
       status: data.status || 'Pending'
     }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'create',
+    description: `Created payroll for employee ${data.employeeId} period ${data.period}`
+  })
+  
+  return payroll;
 }
 
 export async function exportPayrollsCsv() {
@@ -236,16 +261,24 @@ export async function getCandidates(filters?: { search?: string }) {
 }
 
 export async function updateCandidateStatus(id: number, status: string) {
-  await requireAuth()
-  return prisma.hrCandidate.update({
+  const auth = await requireAuth()
+  const candidate = await prisma.hrCandidate.update({
     where: { id },
     data: { status }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'update',
+    description: `Updated candidate ${candidate.name} status to ${status}`
+  })
+  
+  return candidate;
 }
 
 export async function createCandidate(data: any) {
-  await requireAuth()
-  return prisma.hrCandidate.create({
+  const auth = await requireAuth()
+  const candidate = await prisma.hrCandidate.create({
     data: {
       name: data.name,
       email: data.email,
@@ -255,4 +288,12 @@ export async function createCandidate(data: any) {
       status: data.status || 'Applied'
     }
   })
+  
+  await logActivity({
+    userId: parseInt(auth.id, 10),
+    activityType: 'create',
+    description: `Created candidate ${candidate.name} for ${candidate.role_applied}`
+  })
+  
+  return candidate;
 }

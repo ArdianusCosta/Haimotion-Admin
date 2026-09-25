@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { MeetingRoom } from '@/components/meeting-room'
-import { MeetingPrejoin } from '@/components/meeting-prejoin'
+import { MeetingRoom } from '@/components/meetings/meeting-room'
+import { MeetingPrejoin } from '@/components/meetings/meeting-prejoin'
 
 export default function MeetPageClient({ meetingCode, meeting }: { meetingCode: string, meeting: any }) {
   const [joinParams, setJoinParams] = useState<any>(null)

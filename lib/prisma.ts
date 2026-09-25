@@ -1,7 +1,10 @@
 import { PrismaClient } from '@prisma/client'
 
+const activeDb = (process.env.ACTIVE_DB || 'postgres').toLowerCase();
+const datasourceUrl = activeDb === 'postgres' ? process.env.POSTGRES_URL : process.env.MYSQL_URL;
+
 const prismaClientSingleton = () => {
-  return new PrismaClient({ log: ['query'] }).$extends({
+  return new PrismaClient({ log: ['query'], datasourceUrl }).$extends({
     query: {
       user: {
         async $allOperations({ operation, args, query }) {
@@ -123,13 +126,13 @@ const prismaClientSingleton = () => {
 }
 
 declare global {
-  var prisma9: undefined | ReturnType<typeof prismaClientSingleton>
+  var prisma10: undefined | ReturnType<typeof prismaClientSingleton>
 }
 
-const prisma = globalThis.prisma9 ?? prismaClientSingleton()
+const prisma = globalThis.prisma10 ?? prismaClientSingleton()
 
 export default prisma
 
-export const __force_invalidate_cache = 6
+export const __force_invalidate_cache = 7
 
-if (process.env.NODE_ENV !== 'production') globalThis.prisma9 = prisma
+if (process.env.NODE_ENV !== 'production') globalThis.prisma10 = prisma

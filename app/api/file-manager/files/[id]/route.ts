@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { deleteFile as deleteMinioFile } from '@/lib/storage/minio';
 import { checkAccess } from '@/lib/file-auth';
 import { requireAuth } from '@/lib/auth/authorization';
+import { logActivity } from '@/lib/activity-log';
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -31,6 +32,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     // Delete from database
     await prisma.file.delete({
       where: { id: fileId },
+    });
+    
+    await logActivity({
+      userId: uid,
+      activityType: 'delete',
+      description: `Deleted file: ${file.name}`
     });
 
     return NextResponse.json({ success: true });
@@ -79,6 +86,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const updatedFile = await prisma.file.update({
       where: { id: fileId },
       data: updateData,
+    });
+    
+    await logActivity({
+      userId: uid,
+      activityType: 'update',
+      description: `Updated file: ${updatedFile.name}`
     });
 
     return NextResponse.json({ 

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth/authorization';
+import { logActivity } from '@/lib/activity-log';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -10,6 +12,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const updatedRole = await prisma.role.update({
       where: { id: parseInt(resolvedParams.id) },
       data: { name, description }
+    });
+
+    const user = await requireAuth();
+    await logActivity({
+      userId: user.id,
+      activityType: 'update',
+      description: `Updated role: ${updatedRole.name}`
     });
 
     return NextResponse.json({ role: updatedRole });
@@ -35,8 +44,15 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     // RolePermissions cascade delete is set up in schema.prisma (`onDelete: Cascade`), 
     // so deleting the role will also delete its permissions.
-    await prisma.role.delete({
+    const deletedRole = await prisma.role.delete({
       where: { id: roleId }
+    });
+
+    const user = await requireAuth();
+    await logActivity({
+      userId: user.id,
+      activityType: 'delete',
+      description: `Deleted role: ${deletedRole.name}`
     });
 
     return NextResponse.json({ success: true });

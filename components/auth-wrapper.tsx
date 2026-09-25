@@ -19,16 +19,12 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
   console.log("AuthWrapper render:", { serverUser, sessionUser: session?.user });
   
   if (serverUser === null && session) {
-    console.log("AuthWrapper forcing clear because serverUser is null but session exists!");
-    // Backend says user is unauthorized (e.g. resigned), but client has a session. Force clear.
-    localStorage.removeItem('auth_user');
-    authClient.signOut().then(() => {
-      console.log("AuthWrapper signed out, reloading...");
-      window.location.reload();
-    });
+    console.log("AuthWrapper: serverUser is null but client session exists. Trusting client session.");
+    // We do NOT sign out here because Next.js RSC caching can sometimes cause serverUser to be null
+    // while the client has a fresh valid session.
   }
 
-  const activeUser = serverUser !== undefined ? serverUser : session?.user;
+  const activeUser = serverUser ? serverUser : session?.user;
 
   if (!activeUser) {
     return <LoginPage onLogin={() => {

@@ -3,11 +3,15 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Loader2, Users as UsersIcon, Eye, EyeOff, Camera, CheckCircle2 } from 'lucide-react'
+import { Loader2, Users as UsersIcon, Eye, EyeOff, Camera, CheckCircle2, Fingerprint } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { authClient } from '@/lib/auth/client'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useLanguage } from '@/components/language-provider'
+import dynamic from 'next/dynamic'
+
+const FaceScanner = dynamic(() => import('@/components/face-scanner').then(mod => mod.FaceScanner), { ssr: false })
 
 function FieldGroup({ label, required, hint, children }: {
   label: string
@@ -60,6 +64,47 @@ export function AccountSettings({ user }: { user?: any }) {
   const [isUploading, setIsUploading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
+  
+  const [isFaceScannerOpen, setIsFaceScannerOpen] = useState(false)
+  const [isFaceProcessing, setIsFaceProcessing] = useState(false)
+
+  const handleFaceDetected = async (descriptor: Float32Array) => {
+    setIsFaceProcessing(true)
+    try {
+      const res = await fetch(`/api/users/${user.id}/face`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ faceDescriptor: Array.from(descriptor) })
+      })
+      if (res.ok) {
+        toast.success(t('Face registered successfully!'))
+        setIsFaceScannerOpen(false)
+      } else {
+        toast.error(t('Failed to register face.'))
+      }
+    } catch (e) {
+      toast.error(t('Error connecting to server.'))
+    } finally {
+      setIsFaceProcessing(false)
+    }
+  }
+
+  const handleRegisterPasskey = async () => {
+    setIsPasskeyLoading(true)
+    try {
+      const { data, error } = await authClient.passkey.addPasskey()
+      if (error) {
+        toast.error(error.message || t('Failed to register passkey'))
+      } else {
+        toast.success(t('Device registered successfully for Passkey login!'))
+      }
+    } catch (err) {
+      toast.error(t('An error occurred during passkey registration'))
+    } finally {
+      setIsPasskeyLoading(false)
+    }
+  }
 
   const roleName = user?.role?.name || (user?.type === 1 ? 'Super Admin' : 'Admin')
   const position = user?.name || ''
@@ -265,6 +310,23 @@ export function AccountSettings({ user }: { user?: any }) {
             </FieldGroup>
           </div>
 
+          {/* ─── Passkey / Face ID ─── */}
+          <Divider title={t('Biometric Login')} subtitle={t('Login securely using your device biometrics or AI Camera.')} />
+          
+          <div className="flex flex-col gap-4 items-start">
+            <p className="text-sm text-muted-foreground">{t('Register this device to allow logging in without a password.')}</p>
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="outline" onClick={handleRegisterPasskey} disabled={isPasskeyLoading}>
+                {isPasskeyLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Fingerprint className="mr-2 size-4" />}
+                {isPasskeyLoading ? t('Registering...') : t('Register Sidik Jari / Device')}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsFaceScannerOpen(true)}>
+                <Camera className="mr-2 size-4" />
+                {t('Register AI Face (Camera)')}
+              </Button>
+            </div>
+          </div>
+
           {/* ─── Foto Profil ─── */}
           <Divider title={t('Profile Picture')} subtitle={t('Upload and adjust your avatar photo.')} />
 
@@ -332,6 +394,14 @@ export function AccountSettings({ user }: { user?: any }) {
           </Button>
         </div>
       </form>
+
+      {isFaceScannerOpen && (
+        <FaceScanner
+          onCancel={() => setIsFaceScannerOpen(false)}
+          onFaceDetected={handleFaceDetected}
+          isProcessing={isFaceProcessing}
+        />
+      )}
     </div>
   )
 }

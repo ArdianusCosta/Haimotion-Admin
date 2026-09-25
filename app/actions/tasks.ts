@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAuth, requirePermission, canAccessTask } from '@/lib/auth/authorization'
+import { logActivity } from '@/lib/activity-log'
 
 // Status Map
 const TASK_STATUS_MAP: Record<number, string> = {
@@ -163,6 +164,13 @@ export async function createTask(data: { title: string, description: string, sta
         }
       }
     })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'create',
+      description: `Created task: ${data.title}`
+    })
+
     revalidatePath('/kanban')
     return { success: true, data: task }
   } catch (error: any) {
@@ -196,6 +204,12 @@ export async function updateTask(id: number, data: { title: string, description:
       });
     });
     
+    await logActivity({
+      userId: user.id,
+      activityType: 'update',
+      description: `Updated task: ${data.title}`
+    })
+    
     revalidatePath('/kanban')
     return { success: true, data: task }
   } catch (error: any) {
@@ -214,9 +228,16 @@ export async function deleteTask(id: number) {
     await prisma.task_attachments.deleteMany({ where: { task_id: id } })
     await prisma.user_productivity.deleteMany({ where: { task_id: id } })
     
-    await prisma.task_list.delete({
+    const task = await prisma.task_list.delete({
       where: { id }
     })
+    
+    await logActivity({
+      userId: user.id,
+      activityType: 'delete',
+      description: `Deleted task ID: ${id}`
+    })
+
     revalidatePath('/kanban')
     return { success: true }
   } catch (error: any) {

@@ -16,16 +16,15 @@ import { LayoutsPage } from '@/components/layouts-page'
 import { AiPage } from '@/components/ai-page'
 import { TasksPage } from '@/components/tasks-page'
 import { TimesheetsPage } from '@/components/timesheets-page'
-import { SetupProjectPage } from '@/components/setup-project-page'
-import { MilestonePage } from '@/components/milestone-page'
-import { ModuleFlowPage } from '@/components/module-flow-page'
+
 import { RolesPermissionsPage } from '@/components/roles-permissions-page'
 import { UsersPage } from '@/components/users-page'
+import { ActivityLogPage } from '@/components/activity-log-page'
 import { MeetingsPage } from '@/components/meetings-page'
 import { TransactionsPage } from '@/components/finance/transactions-page'
-import { InvoicesPage } from '@/components/finance/invoices-page'
-import { FinanceOverviewPage } from '@/components/finance/finance-overview-page'
-import { AkunPerkiraanPage } from '@/components/finance/akun-perkiraan-page'
+import { InvoicesPage } from '@/components/finance/invoices/invoices-page'
+import { FinanceOverviewPage } from '@/components/finance/finance-overview/finance-overview-page'
+import { AkunPerkiraanPage } from '@/components/finance/akun-perkiraan/akun-perkiraan-page'
 
 import { PenawaranPenjualanPage } from '@/components/finance/penjualan/penawaran-penjualan-page'
 import { UangMukaPenjualanPage } from '@/components/finance/penjualan/uang-muka-penjualan-page'
@@ -40,15 +39,15 @@ import { PembayaranPembelianPage } from '@/components/finance/pembelian/pembayar
 import { PemasokPage } from '@/components/finance/pembelian/pemasok-page'
 
 
-import { ExpensesPage } from '@/components/finance/expenses-page'
-import { CashBankPage } from '@/components/finance/cash-bank-page'
+import { ExpensesPage } from '@/components/finance/expenses/expenses-page'
+import { CashBankPage } from '@/components/finance/cash-bank/cash-bank-page'
 
-import { BarangJasaPage } from '@/components/finance/barang-jasa-page'
+import { BarangJasaPage } from '@/components/finance/barang-jasa/barang-jasa-page'
 
-import { BukuBesarPage } from '@/components/finance/buku-besar-page'
+import { BukuBesarPage } from '@/components/finance/buku-besar/buku-besar-page'
 
 
-import { ReportsPage } from '@/components/finance/reports-page'
+import { ReportsPage } from '@/components/finance/reports/reports-page'
 import { HROverviewPage } from '@/components/hr/hr-overview-page'
 import { EmployeesPage } from '@/components/hr/employees-page'
 import { AttendancePage } from '@/components/hr/attendance-page'
@@ -95,11 +94,7 @@ const workMenu = [
 const apps = [
   { label: 'Layouts', icon: LayoutTemplate }
 ]
-const developer = [
-  { label: 'Setup Project', icon: Blocks },
-  { label: 'Milestones', icon: Flag },
-  { label: 'Module Flows', icon: GitPullRequest }
-]
+
 const financeMenu = [
   { label: 'Beranda', icon: LayoutDashboard },
   { label: 'Kas & Bank', icon: Wallet },
@@ -133,6 +128,7 @@ const hrMenu = [
 const administration = [
   { label: 'Roles & Permissions', icon: ShieldCheck },
   { label: 'User Management', icon: Users },
+  { label: 'Activity Log', icon: List },
 ]
 const products = [
   ['Aurora Headphones', '1,240 sold', '$124,820', 'bg-chart-1'],
@@ -324,6 +320,15 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   }
 
   const handleLogout = async () => {
+    try {
+      await fetch('/api/activity-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activityType: 'logout', description: 'User logged out' })
+      });
+    } catch (e) {
+      console.error('Failed to log logout activity', e);
+    }
     localStorage.removeItem('auth_state')
     localStorage.removeItem('auth_user')
     await authClient.signOut()
@@ -344,7 +349,6 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       ...aiMenu,
       ...workMenu,
       ...apps,
-      ...developer,
       ...financeMenu,
       ...hrMenu,
       ...administration,
@@ -633,9 +637,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Human Resources')}</p>
               {hrMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
-            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Developer')}</p>
-              {developer.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
-            </div>
+
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Administration')}</p>
               {administration.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
@@ -676,7 +678,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
                   <img src="/logohm-transparent.png" alt="HaiMotion Logo" className="h-12 w-auto object-contain" />
                 </div>
                 <div className="hidden md:flex items-center gap-1 overflow-x-auto">
-                  {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...developer, ...administration].map(({ label, icon }) => (
+                  {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...administration].map(({ label, icon }) => (
                     <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${section === label ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{t(label)}</button>
                   ))}
                 </div>
@@ -762,11 +764,10 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               case 'Attendance & Leave': return <AttendancePage />
               case 'Payroll': return <PayrollPage />
               case 'Recruitment': return <RecruitmentPage />
-              case 'Setup Project': return <SetupProjectPage slug={slug} user={user} />
-              case 'Milestones': return <MilestonePage />
-              case 'Module Flows': return <ModuleFlowPage />
+
               case 'Roles & Permissions': return <RolesPermissionsPage />
               case 'User Management': return <UsersPage />
+              case 'Activity Log': return <ActivityLogPage />
               case 'Account Settings': return (
                 <div className="relative min-h-[85vh] w-full">
                   {/* Background Bubbles */}
@@ -790,7 +791,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
                   </div>
                 </div>
               )
-              case 'Meetings': return <MeetingsPage />
+              case 'Meetings': return <MeetingsPage slug={slug} />
               default: return <SectionPage section={section} />
             }
           })()}
