@@ -51,7 +51,11 @@ export function FaceScanner({ onFaceDetected, onCancel, isProcessing = false }: 
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: 640, height: 480, facingMode: 'user' } 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user' 
+        } 
       })
       streamRef.current = stream
       if (videoRef.current) {
