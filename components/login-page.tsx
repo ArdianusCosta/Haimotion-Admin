@@ -1,15 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Sparkles, ArrowRight, Command, Mail, AlertCircle, Fingerprint, Eye, EyeOff, KeyRound, ArrowLeft, Camera } from 'lucide-react'
 import { authClient } from '@/lib/auth/client'
 import dynamic from 'next/dynamic'
 
-const FaceScanner = dynamic(() => import('@/components/face-scanner').then(mod => mod.FaceScanner), { ssr: false })
-
-interface LoginPageProps {
-  onLogin: () => void
+class FaceErrorBoundary extends React.Component<{children: React.ReactNode}, {error: any}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 text-white text-left break-all">
+          <div>
+            <h2 className="text-xl font-bold text-red-500 mb-4">Aplikasi Crash!</h2>
+            <p className="mb-4">Tolong screenshot layar ini dan kirimkan kepadaku:</p>
+            <pre className="bg-red-500/20 p-4 rounded text-xs overflow-auto max-h-[60vh]">
+              {String(this.state.error.stack || this.state.error.message || this.state.error)}
+            </pre>
+            <button 
+              onClick={() => this.setState({ error: null })} 
+              className="mt-6 px-4 py-2 bg-white text-black rounded font-semibold"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
+
+const FaceScanner = dynamic(() => import('@/components/face-scanner').then(mod => mod.FaceScanner), { ssr: false })
 
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState('')
@@ -406,11 +434,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       </div>
       
       {isFaceScannerOpen && (
-        <FaceScanner
-          onCancel={() => setIsFaceScannerOpen(false)}
-          onFaceDetected={handleFaceDetected}
-          isProcessing={isFaceProcessing}
-        />
+        <FaceErrorBoundary>
+          <FaceScanner
+            onCancel={() => setIsFaceScannerOpen(false)}
+            onFaceDetected={handleFaceDetected}
+            isProcessing={isFaceProcessing}
+          />
+        </FaceErrorBoundary>
       )}
     </div>
   )
