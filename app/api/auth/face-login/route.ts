@@ -31,7 +31,8 @@ export async function POST(request: Request) {
       }
     });
 
-    cookies().set('better-auth.session_token', sessionToken, {
+    const cookieStore = await cookies();
+    cookieStore.set('better-auth.session_token', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

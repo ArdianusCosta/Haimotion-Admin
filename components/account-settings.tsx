@@ -81,7 +81,8 @@ export function AccountSettings({ user }: { user?: any }) {
         toast.success(t('Face registered successfully!'))
         setIsFaceScannerOpen(false)
       } else {
-        toast.error(t('Failed to register face.'))
+        const errData = await res.json().catch(() => ({}));
+        toast.error(`Failed to register face: ${res.status} ${errData.error || res.statusText}`)
       }
     } catch (e) {
       toast.error(t('Error connecting to server.'))
