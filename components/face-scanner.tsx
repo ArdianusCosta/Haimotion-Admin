@@ -26,7 +26,7 @@ export function FaceScanner({ onFaceDetected, onCancel, isProcessing = false }: 
     const loadModels = async () => {
       try {
         await Promise.all([
-          faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
+          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
           faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
           faceapi.nets.faceRecognitionNet.loadFromUri('/models')
         ])
@@ -87,7 +87,7 @@ export function FaceScanner({ onFaceDetected, onCancel, isProcessing = false }: 
       
       isDetecting = true
       try {
-        const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 })
+        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.4 })
         const detections = await faceapi.detectSingleFace(videoRef.current, options)
           .withFaceLandmarks()
           .withFaceDescriptor()

@@ -8,7 +8,7 @@ export async function PUT(
 ) {
   try {
     const session = await getUserSession();
-    if (!session || String(session.user.id) !== params.id) {
+    if (!session || String(session.id) !== params.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
