@@ -77,36 +77,48 @@ export function FaceScanner({ onFaceDetected, onCancel, isProcessing = false }: 
   const handleVideoPlay = () => {
     if (!videoRef.current || !canvasRef.current) return
     
+    let isDetecting = false
+    
     // Create interval to detect faces
     intervalRef.current = setInterval(async () => {
-      if (!videoRef.current || isProcessing) return
+      if (!videoRef.current || isProcessing || isDetecting) return
       
-      const detections = await faceapi.detectSingleFace(videoRef.current)
-        .withFaceLandmarks()
-        .withFaceDescriptor()
-        
-      if (detections) {
-        // Draw to canvas for visual feedback
-        const displaySize = { width: videoRef.current.videoWidth, height: videoRef.current.videoHeight }
-        faceapi.matchDimensions(canvasRef.current!, displaySize)
-        const resizedDetections = faceapi.resizeResults(detections, displaySize)
-        
-        const ctx = canvasRef.current!.getContext('2d')
-        ctx?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height)
-        faceapi.draw.drawDetections(canvasRef.current!, resizedDetections)
-        faceapi.draw.drawFaceLandmarks(canvasRef.current!, resizedDetections)
+      if (videoRef.current.readyState !== 4) return
+      
+      isDetecting = true
+      try {
+        const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 })
+        const detections = await faceapi.detectSingleFace(videoRef.current, options)
+          .withFaceLandmarks()
+          .withFaceDescriptor()
+          
+        if (detections) {
+          // Draw to canvas for visual feedback
+          const displaySize = { width: videoRef.current.videoWidth, height: videoRef.current.videoHeight }
+          faceapi.matchDimensions(canvasRef.current!, displaySize)
+          const resizedDetections = faceapi.resizeResults(detections, displaySize)
+          
+          const ctx = canvasRef.current!.getContext('2d')
+          ctx?.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height)
+          faceapi.draw.drawDetections(canvasRef.current!, resizedDetections)
+          faceapi.draw.drawFaceLandmarks(canvasRef.current!, resizedDetections)
 
-        // Return descriptor to parent
-        if (!isProcessing) {
-          setStatusText('Face detected! Verifying...')
-          onFaceDetected(detections.descriptor)
+          // Return descriptor to parent
+          if (!isProcessing) {
+            setStatusText('Face detected! Verifying...')
+            onFaceDetected(detections.descriptor)
+          }
+        } else {
+          const ctx = canvasRef.current?.getContext('2d')
+          if (ctx && canvasRef.current) {
+            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+          }
+          if (!isProcessing) setStatusText('No face detected. Please look at the camera.')
         }
-      } else {
-        const ctx = canvasRef.current?.getContext('2d')
-        if (ctx && canvasRef.current) {
-          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-        }
-        if (!isProcessing) setStatusText('No face detected. Please look at the camera.')
+      } catch (err) {
+        console.error('Face detection error:', err)
+      } finally {
+        isDetecting = false
       }
     }, 500)
   }
