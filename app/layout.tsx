@@ -5,12 +5,12 @@ import { QueryProvider } from '@/components/query-provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' })
-const roboto = Roboto({ weight: ['400', '500', '700'], subsets: ['latin'], variable: '--font-roboto' })
-const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' })
-const firaCode = Fira_Code({ subsets: ['latin'], variable: '--font-fira-code' })
-const oswald = Oswald({ subsets: ['latin'], variable: '--font-oswald' })
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit', display: 'swap' })
+const roboto = Roboto({ weight: '400', subsets: ['latin'], variable: '--font-roboto', display: 'swap' })
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair', display: 'swap' })
+const firaCode = Fira_Code({ subsets: ['latin'], variable: '--font-fira-code', display: 'swap' })
+const oswald = Oswald({ subsets: ['latin'], variable: '--font-oswald', display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'HaiMotion — Business workspace',
