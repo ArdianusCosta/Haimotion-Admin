@@ -57,6 +57,7 @@ import { RecruitmentPage } from '@/components/hr/recruitment-page'
 
 import FileManager from '@/components/file-manager/file-manager'
 import { useLanguage } from '@/components/language-provider'
+import { useThemeSounds } from './use-theme-sounds'
 import { authClient } from '@/lib/auth/client'
 import { pusherClient } from '@/lib/pusher-client'
 import { LiveKitCallUI } from './livekit-call'
@@ -373,13 +374,15 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   const [activeRadius, setActiveRadius] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_theme_radius') || '0.5' : '0.5')
   const [activeFont, setActiveFont] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_font_family') || 'Inter' : 'Inter')
 
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_theme_mode') as any) || 'system' : 'system')
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system' | 'hacker' | 'cewek'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_theme_mode') as any) || 'system' : 'system')
   const [contentWidth, setContentWidth] = useState<'centered' | 'full'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_content_width') as any) || 'centered' : 'centered')
   const [headerStyle, setHeaderStyle] = useState<'sticky' | 'scroll' | 'inset'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_header_style') as any) || 'sticky' : 'sticky')
   const [sidebarStyle, setSidebarStyle] = useState<'sidebar' | 'floating' | 'icon' | 'offcanvas'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_sidebar_style') as any) || 'sidebar' : 'sidebar')
   const [resolvedDark, setResolvedDark] = useState(false)
 
   const [range, setRange] = useState('Last 30 days')
+
+  useThemeSounds(themeMode)
 
   // --- PREFERENCES LOGIC ---
   useQuery({
@@ -440,14 +443,22 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handleChange = () => {
-      const isDark = themeMode === 'dark' || (themeMode === 'system' && mediaQuery.matches)
-      setResolvedDark(isDark)
-      if (isDark) {
-        document.documentElement.classList.add('dark')
-        document.documentElement.classList.remove('light')
+      document.documentElement.classList.remove('light', 'dark', 'hacker', 'cewek')
+      
+      if (themeMode === 'system') {
+        const isDark = mediaQuery.matches
+        setResolvedDark(isDark)
+        document.documentElement.classList.add(isDark ? 'dark' : 'light')
+      } else if (themeMode === 'hacker') {
+        setResolvedDark(true)
+        document.documentElement.classList.add('hacker')
+      } else if (themeMode === 'cewek') {
+        setResolvedDark(false)
+        document.documentElement.classList.add('cewek')
       } else {
-        document.documentElement.classList.add('light')
-        document.documentElement.classList.remove('dark')
+        const isDark = themeMode === 'dark'
+        setResolvedDark(isDark)
+        document.documentElement.classList.add(themeMode)
       }
     }
     handleChange()
@@ -478,7 +489,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   }, [activeColor, activeRadius, colorPresets])
 
   return <div
-    className={resolvedDark ? 'dark h-screen bg-background overflow-hidden' : 'h-screen bg-background overflow-hidden'}
+    className={`h-screen bg-background overflow-hidden ${themeMode === 'hacker' ? 'hacker' : themeMode === 'cewek' ? 'cewek' : resolvedDark ? 'dark' : ''}`}
     style={{
       '--primary': colorPresets[activeColor],
       '--radius': `${activeRadius}rem`,
@@ -680,7 +691,18 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
           </div>
           <div className="flex items-center gap-1">
             <button onClick={() => setCustomizerOpen(true)} className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Preferences"><Settings className="size-4" /></button>
-            <button onClick={() => handlePrefChange('theme_mode', resolvedDark ? 'light' : 'dark', setThemeMode)} className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Toggle theme"><Sun className="size-4" /></button>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground outline-none cursor-pointer" aria-label="Toggle theme">
+                <Sun className="size-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {['light', 'dark', 'system', 'hacker', 'cewek'].map(t => (
+                  <DropdownMenuItem key={t} onClick={() => handlePrefChange('theme_mode', t, setThemeMode)} className="capitalize cursor-pointer">
+                    {t}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button className="relative rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notifications"><Bell className="size-4" /><span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" /></button>
             <div className="mx-2 hidden h-5 w-px bg-border sm:block" />
             <div className="flex items-center gap-2">
@@ -837,7 +859,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             <div>
               <h3 className="text-sm font-medium mb-3">Theme</h3>
               <div className="grid grid-cols-3 gap-2">
-                {['light', 'dark', 'system'].map(t => (
+                {['light', 'dark', 'system', 'hacker', 'cewek'].map(t => (
                   <button key={t} onClick={() => handlePrefChange('theme_mode', t, setThemeMode)} className={`flex items-center justify-center rounded-md border py-2 text-xs font-medium capitalize transition-colors ${themeMode === t ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted hover:border-primary/50'}`}>{t}</button>
                 ))}
               </div>

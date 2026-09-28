@@ -177,3 +177,183 @@
   filter: blur(3px);
   pointer-events: none;
 }
+
+.hacker {
+  color-scheme: dark;
+  --background: oklch(0.15 0 0);
+  --foreground: oklch(0.85 0.25 150);
+  --card: oklch(0.2 0 0);
+  --card-foreground: oklch(0.85 0.25 150);
+  --popover: oklch(0.2 0 0);
+  --popover-foreground: oklch(0.85 0.25 150);
+  --primary: oklch(0.85 0.25 150);
+  --primary-foreground: oklch(0.15 0 0);
+  --secondary: oklch(0.25 0 0);
+  --secondary-foreground: oklch(0.85 0.25 150);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.7 0.1 150);
+  --accent: oklch(0.25 0 0);
+  --accent-foreground: oklch(0.85 0.25 150);
+  --destructive: oklch(0.7 0.2 25);
+  --border: oklch(0.85 0.25 150 / 30%);
+  --input: oklch(0.85 0.25 150 / 30%);
+  --ring: oklch(0.85 0.25 150);
+  --sidebar: oklch(0.15 0 0);
+  --sidebar-foreground: oklch(0.85 0.25 150);
+  --sidebar-primary: oklch(0.85 0.25 150);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-accent: oklch(0.25 0 0);
+  --sidebar-accent-foreground: oklch(0.85 0.25 150);
+  --sidebar-border: oklch(0.85 0.25 150 / 30%);
+  --sidebar-ring: oklch(0.85 0.25 150);
+}
+
+.cewek {
+  color-scheme: light;
+  --background: oklch(0.98 0.05 350);
+  --foreground: oklch(0.4 0.15 350);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.4 0.15 350);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.4 0.15 350);
+  --primary: oklch(0.65 0.2 350);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.93 0.1 350);
+  --secondary-foreground: oklch(0.4 0.15 350);
+  --muted: oklch(0.95 0.05 350);
+  --muted-foreground: oklch(0.6 0.1 350);
+  --accent: oklch(0.93 0.1 350);
+  --accent-foreground: oklch(0.4 0.15 350);
+  --destructive: oklch(0.6 0.2 25);
+  --border: oklch(0.85 0.1 350);
+  --input: oklch(0.85 0.1 350);
+  --ring: oklch(0.65 0.2 350);
+  --sidebar: oklch(0.98 0.05 350);
+  --sidebar-foreground: oklch(0.4 0.15 350);
+  --sidebar-primary: oklch(0.65 0.2 350);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.93 0.1 350);
+  --sidebar-accent-foreground: oklch(0.4 0.15 350);
+  --sidebar-border: oklch(0.85 0.1 350);
+  --sidebar-ring: oklch(0.65 0.2 350);
+}
+
+/* Decorative Elements for Themes */
+
+/* --- CEWEK THEME --- */
+.cewek .bg-card {
+  position: relative;
+}
+
+.cewek .bg-card::after {
+  content: "🐱";
+  position: absolute;
+  bottom: -5px;
+  right: 10px;
+  font-size: 4rem;
+  opacity: 0.08; /* Very subtle so it's not tacky */
+  pointer-events: none;
+  z-index: 0;
+}
+
+.cewek aside {
+  position: relative;
+  overflow: hidden;
+}
+
+.cewek aside::after {
+  content: "🐶";
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  font-size: 5rem;
+  opacity: 0.08; /* Very subtle watermark */
+  pointer-events: none;
+  z-index: 0;
+  transform: translateX(-50%);
+}
+
+.cewek header {
+  position: relative;
+}
+
+.cewek header::after {
+  content: "✨";
+  position: absolute;
+  top: 15px;
+  right: 250px;
+  font-size: 1.5rem;
+  opacity: 0.4;
+  pointer-events: none;
+  animation: pulse 3s infinite;
+}
+
+/* --- HACKER THEME --- */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.hacker::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 2px;
+  background: rgba(0, 255, 0, 0.4);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+  pointer-events: none;
+  z-index: 9999;
+  animation: scanline 6s linear infinite;
+}
+
+.hacker .bg-card {
+  position: relative;
+}
+
+.hacker .bg-card::after {
+  content: "🥷"; /* Hacker Ninja Mask */
+  position: absolute;
+  bottom: -5px;
+  right: 10px;
+  font-size: 4rem;
+  opacity: 0.04; /* Very subtle so it's not tacky */
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* --- SKELETON THEMES --- */
+.hacker .animate-pulse {
+  background-color: oklch(0.85 0.25 150 / 0.15) !important;
+  box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.1);
+  border: 1px solid rgba(0, 255, 0, 0.1);
+  animation: hacker-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+}
+
+@keyframes hacker-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: inset 0 0 10px rgba(0, 255, 0, 0.1);
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.3);
+  }
+}
+
+.cewek .animate-pulse {
+  background-image: linear-gradient(45deg, oklch(0.93 0.1 350 / 0.4), oklch(0.85 0.1 350 / 0.6)) !important;
+  animation: cewek-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+}
+
+@keyframes cewek-pulse {
+  0%, 100% {
+    opacity: 1;
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.6;
+    filter: hue-rotate(15deg);
+  }
+}
