@@ -1,6 +1,6 @@
 import React from 'react'
 import { Plus, Search, Filter, ClipboardList, CalendarDays } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
@@ -35,11 +35,9 @@ export function ProjectListView({
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-2">
-                <Filter className="size-4" /> 
-                {statusFilter === null ? 'Filter' : statusFilter === 2 ? 'Active' : statusFilter === 5 ? 'Done' : statusFilter === 0 ? 'On Hold' : 'Pending'}
-              </Button>
+            <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', size: 'sm', className: 'h-9 gap-2' })}>
+              <Filter className="size-4" /> 
+              {statusFilter === null ? 'Filter' : statusFilter === 2 ? 'Active' : statusFilter === 5 ? 'Done' : statusFilter === 0 ? 'On Hold' : 'Pending'}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuCheckboxItem checked={statusFilter === null} onCheckedChange={() => setStatusFilter(null)}>All Status</DropdownMenuCheckboxItem>

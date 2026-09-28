@@ -1,40 +1,243 @@
 'use client'
 
-import { ArrowDownRight, ArrowUpRight, Download, MoreHorizontal, TrendingUp, Users, MousePointer2, ShoppingCart, CalendarDays } from 'lucide-react'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { useState, useEffect } from 'react'
+import { getAdvancedAnalytics } from '@/app/actions/analytics'
+import { ArrowDownRight, ArrowUpRight, Download, Users, Briefcase, Clock, ShieldAlert, BarChart3, AlertCircle } from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip, Cell } from 'recharts'
 import { useLanguage } from '@/components/language-provider'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-const trend = [
-  { day: 'Aug 02', visitors: 2100, conversions: 86 }, { day: 'Aug 05', visitors: 2900, conversions: 112 },
-  { day: 'Aug 08', visitors: 2500, conversions: 104 }, { day: 'Aug 11', visitors: 3600, conversions: 148 },
-  { day: 'Aug 14', visitors: 4100, conversions: 178 }, { day: 'Aug 17', visitors: 3800, conversions: 165 },
-  { day: 'Aug 20', visitors: 4900, conversions: 214 }, { day: 'Aug 23', visitors: 4600, conversions: 196 },
-  { day: 'Aug 26', visitors: 5600, conversions: 248 }, { day: 'Aug 29', visitors: 6200, conversions: 284 },
-]
 export function AnalyticsPage() {
   const { t } = useLanguage()
-  
-  const channels = [{ name: t('Direct'), value: 42, color: 'bg-primary' }, { name: t('Organic search'), value: 27, color: 'bg-chart-2' }, { name: t('Social media'), value: 18, color: 'bg-chart-3' }, { name: t('Referral'), value: 13, color: 'bg-chart-4' }]
-  const kpis = [
-    [t('Unique visitors'), '24,860', '+16.4%', Users, 'up'], [t('Page views'), '68,420', '+22.8%', MousePointer2, 'up'],
-    [t('Conversion rate'), '4.82%', '+0.8%', TrendingUp, 'up'], [t('Revenue'), '$284,920', '-2.4%', ShoppingCart, 'down'],
-  ] as const
+  const [range, setRange] = useState('Last 30 days')
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<any>(null)
 
-  return <div className="flex flex-col gap-7">
-    <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-      <div><div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"><span>Workspace</span><span>/</span><span className="text-foreground">{t('Analytics overview')}</span></div><h1 className="text-3xl font-semibold tracking-tight">{t('Analytics overview')}</h1><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{t('A clear view of the signals shaping your business this month.')}</p></div>
-      <div className="flex items-center gap-2"><button className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted"><Download className="size-4" />{t('Export report')}</button><select className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"><option>{t('Last 30 days')}</option><option>{t('Last 7 days')}</option><option>{t('This year')}</option></select></div>
-    </header>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{kpis.map(([label, value, change, Icon, direction]) => <div key={label as string} className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label as string}</span><span className="flex size-9 items-center justify-center rounded-lg bg-muted"><Icon className="size-4 text-primary" /></span></div><p className="mt-5 text-2xl font-semibold tracking-tight">{value as string}</p><p className="mt-2 flex items-center gap-1 text-xs"><span className="flex items-center gap-1 font-medium text-primary"><ArrowUpRight className="size-3" />{change as string}</span><span className="text-muted-foreground">{t('vs last month')}</span></p></div>)}</div>
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,.75fr)]">
-      <section className="min-w-0 rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start"><div><h2 className="font-semibold">{t('Acquisition performance')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Visitors and conversions over the selected period')}</p></div><div className="flex items-center gap-4 text-xs"><span className="flex items-center gap-2"><span className="size-2 rounded-full bg-chart-1" />{t('Visitors')}</span><span className="flex items-center gap-2"><span className="size-2 rounded-full bg-chart-2" />{t('Conversions')}</span><button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="More chart options"><MoreHorizontal className="size-4" /></button></div></div><ChartContainer config={{ visitors: { label: t('Visitors'), color: 'var(--chart-1)' }, conversions: { label: t('Conversions'), color: 'var(--chart-2)' } } satisfies ChartConfig} className="mt-6 h-[290px] w-full"><AreaChart accessibilityLayer data={trend} margin={{ left: -20, right: 8, top: 10 }}><CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--border)" /><XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={10} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} interval="preserveStartEnd" /><YAxis tickLine={false} axisLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} tickFormatter={(v) => `${v / 1000}k`} /><ChartTooltip content={<ChartTooltipContent />} /><Area type="monotone" dataKey="visitors" stroke="var(--color-visitors)" fill="var(--color-visitors)" fillOpacity={0.12} strokeWidth={2} /><Area type="monotone" dataKey="conversions" stroke="var(--color-conversions)" fill="var(--color-conversions)" fillOpacity={0.06} strokeWidth={2} /></AreaChart></ChartContainer></section>
-      <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-start justify-between"><div><h2 className="font-semibold">{t('Traffic sources')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Share of total visitors')}</p></div><button className="text-xs font-medium text-primary hover:underline">{t('View all')}</button></div><div className="mt-8 flex justify-center"><div className="relative flex size-44 items-center justify-center rounded-full" style={{ background: 'conic-gradient(var(--primary) 0 42%, var(--chart-2) 42% 69%, var(--chart-3) 69% 87%, var(--chart-4) 87% 100%)' }}><div className="flex size-28 flex-col items-center justify-center rounded-full bg-card"><span className="text-2xl font-semibold">24.8k</span><span className="text-xs text-muted-foreground">{t('total visitors')}</span></div></div></div><div className="mt-8 flex flex-col gap-4">{channels.map((channel) => <div key={channel.name} className="flex items-center gap-3 text-xs"><span className={`size-2.5 rounded-full ${channel.color}`} /><span className="flex-1 text-muted-foreground">{channel.name}</span><span className="font-medium">{channel.value}%</span></div>)}</div></section>
+  useEffect(() => {
+    setLoading(true)
+    getAdvancedAnalytics(range).then(res => {
+      setData(res)
+      setLoading(false)
+    }).catch(err => {
+      console.error(err)
+      setLoading(false)
+    })
+  }, [range])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[500px]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="size-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Menganalisis data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!data) return <div>Failed to load analytics.</div>
+
+  const totalOverloaded = data.teamWorkload.filter((u: any) => u.status === 'Overload').length
+  const totalClients = data.clientHealth.length
+  const averageHealth = data.clientHealth.length > 0 
+    ? Math.round(data.clientHealth.reduce((acc: number, c: any) => acc + c.healthScore, 0) / data.clientHealth.length) 
+    : 0
+
+  return (
+    <div className="flex flex-col gap-7 pb-10">
+      
+      {/* HEADER SECTION */}
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Workspace</span><span>/</span><span className="text-foreground">Advanced Analytics</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">Kapasitas & Klien</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+            Monitor beban kerja tim dan evaluasi performa klien untuk pengambilan keputusan taktis.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Select value={range} onValueChange={setRange}>
+            <SelectTrigger className="w-[180px] h-10 bg-background">
+              <SelectValue placeholder="Pilih Periode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Last 7 days">7 Hari Terakhir</SelectItem>
+              <SelectItem value="Last 30 days">30 Hari Terakhir</SelectItem>
+              <SelectItem value="This year">Tahun Ini</SelectItem>
+              <SelectItem value="All time">Semua Waktu</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </header>
+
+      {/* QUICK KPI */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Tim Overload</span>
+            <span className="flex size-9 items-center justify-center rounded-lg bg-rose-500/10"><Users className="size-4 text-rose-500" /></span>
+          </div>
+          <p className="mt-5 text-2xl font-bold tracking-tight">{totalOverloaded} Orang</p>
+          <p className="mt-2 text-xs text-muted-foreground">Membutuhkan pendelegasian ulang</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total Klien Aktif</span>
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10"><Briefcase className="size-4 text-primary" /></span>
+          </div>
+          <p className="mt-5 text-2xl font-bold tracking-tight">{totalClients} Klien</p>
+          <p className="mt-2 text-xs text-muted-foreground">Di periode ini</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Skor Kesehatan Klien (Rata-rata)</span>
+            <span className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10"><BarChart3 className="size-4 text-emerald-500" /></span>
+          </div>
+          <p className="mt-5 text-2xl font-bold tracking-tight">{averageHealth}/100</p>
+          <p className="mt-2 text-xs text-muted-foreground">Berdasarkan delay & revisi</p>
+        </div>
+      </div>
+
+      {/* TEAM UTILIZATION & WORKLOAD */}
+      <section className="rounded-xl border border-border bg-card p-5 md:p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="font-semibold text-lg">Beban Kerja & Kapasitas Tim</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Perbandingan Jam Kerja Tercatat (Log) vs Kapasitas Normal</p>
+          </div>
+        </div>
+
+        <div className="h-[300px] w-full mt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart accessibilityLayer data={data.teamWorkload} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--border)" />
+              <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} tickFormatter={(v) => `${v}h`} />
+              <RechartsTooltip 
+                cursor={{fill: 'var(--muted)', opacity: 0.4}}
+                contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px', fontSize: '12px' }}
+              />
+              <Bar dataKey="hoursLogged" radius={[4, 4, 0, 0]} name="Jam Kerja (Logged)">
+                {data.teamWorkload.map((entry: any, index: number) => (
+                  <Cell key={`cell-${index}`} fill={entry.status === 'Overload' ? 'var(--destructive)' : entry.status === 'Underutilized' ? 'var(--chart-4)' : 'var(--primary)'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="pb-3 font-medium">Anggota Tim</th>
+                <th className="pb-3 font-medium text-center">Task Aktif</th>
+                <th className="pb-3 font-medium text-center">Jam Kerja (Log)</th>
+                <th className="pb-3 font-medium text-center">Status Beban</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {data.teamWorkload.map((user: any) => (
+                <tr key={user.id} className="hover:bg-muted/30">
+                  <td className="py-3 flex items-center gap-3">
+                    <Avatar className="size-8">
+                      <AvatarImage src={user.avatar} />
+                      <AvatarFallback className="bg-primary/20 text-primary font-medium text-xs">{user.name.substring(0,2)}</AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{user.name}</span>
+                  </td>
+                  <td className="py-3 text-center">{user.activeTasks}</td>
+                  <td className="py-3 text-center">{user.hoursLogged} <span className="text-xs text-muted-foreground">/ {user.capacity}h</span></td>
+                  <td className="py-3 text-center">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium border
+                      ${user.status === 'Overload' ? 'bg-destructive/10 text-destructive border-destructive/20' : 
+                        user.status === 'Underutilized' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
+                        'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'}`}>
+                      {user.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* CLIENT HEALTH LEADERBOARD */}
+      <section className="rounded-xl border border-border bg-card p-5 md:p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="font-semibold text-lg">Leaderboard Kesehatan Klien</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Evaluasi klien berdasarkan tingkat delay dan revisi</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="pb-3 font-medium">Klien</th>
+                <th className="pb-3 font-medium text-center">Total Project</th>
+                <th className="pb-3 font-medium text-center">Tingkat Revisi</th>
+                <th className="pb-3 font-medium text-center">Tingkat Keterlambatan</th>
+                <th className="pb-3 font-medium text-center">Health Score</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {data.clientHealth.map((client: any, idx: number) => (
+                <tr key={idx} className="hover:bg-muted/30">
+                  <td className="py-4 font-medium">{client.name}</td>
+                  <td className="py-4 text-center">{client.totalProjects}</td>
+                  
+                  {/* Revision Rate */}
+                  <td className="py-4">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`font-semibold ${client.revisionRate > 20 ? 'text-rose-500' : 'text-foreground'}`}>
+                        {client.revisionRate}%
+                      </span>
+                      <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${client.revisionRate > 20 ? 'bg-rose-500' : 'bg-primary'}`} style={{ width: `${client.revisionRate}%` }} />
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Delay Rate */}
+                  <td className="py-4">
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`font-semibold ${client.delayRate > 20 ? 'text-rose-500' : 'text-foreground'}`}>
+                        {client.delayRate}%
+                      </span>
+                      <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${client.delayRate > 20 ? 'bg-rose-500' : 'bg-primary'}`} style={{ width: `${client.delayRate}%` }} />
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Health Score */}
+                  <td className="py-4 text-center">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold border
+                      ${client.healthScore >= 80 ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 
+                        client.healthScore >= 50 ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 
+                        'bg-destructive/10 text-destructive border-destructive/20'}`}>
+                      {client.healthScore}/100
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              
+              {data.clientHealth.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground">Belum ada data klien untuk periode ini.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
     </div>
-    <div className="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
-      <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-center justify-between"><div><h2 className="font-semibold">{t('Conversion funnel')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('How visitors move through your store')}</p></div><button className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted">{t('Details')}</button></div><div className="mt-7 flex flex-col gap-5">{[[t('Visited site'),'24,860','100%',100],[t('Viewed product'),'12,430','50%',74],[t('Added to cart'),'4,920','19.8%',48],[t('Completed checkout'),'1,198','4.8%',27]].map(([label, value, percent, width]) => <div key={label as string}><div className="mb-2 flex items-center justify-between text-xs"><span className="font-medium">{label as string}</span><span className="text-muted-foreground">{value as string} · {percent as string}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} /></div></div>)}</div></section>
-      <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-center justify-between"><div><h2 className="font-semibold">{t('Top pages')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Most visited this month')}</p></div><button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="More page options"><MoreHorizontal className="size-4" /></button></div><div className="mt-5 flex flex-col gap-4">{[['/home','18,420','+12.4%'],['/products/aurora','12,840','+8.2%'],['/pricing','9,620','+4.8%'],['/about','5,180','-1.2%']].map(([page, views, change]) => <div key={page} className="flex items-center gap-3"><div className="flex size-8 items-center justify-center rounded-lg bg-muted"><CalendarDays className="size-4 text-primary" /></div><span className="flex-1 truncate font-mono text-xs">{page}</span><span className="text-xs font-medium">{views}</span><span className={`w-12 text-right text-[11px] ${change.startsWith('-') ? 'text-muted-foreground' : 'text-primary'}`}>{change}</span></div>)}</div></section>
-    </div>
-    <section className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><div><h2 className="font-semibold">{t('Revenue by channel')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Attributed revenue for the last 30 days')}</p></div><button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="More revenue options"><MoreHorizontal className="size-4" /></button></div><ChartContainer config={{ revenue: { label: t('Revenue'), color: 'var(--chart-1)' } }} className="mt-5 h-[190px] w-full"><BarChart accessibilityLayer data={channels.map((c) => ({ channel: c.name, revenue: [119800, 76800, 51300, 37020][channels.indexOf(c)] }))} margin={{ left: -20, right: 8, top: 10 }}><CartesianGrid vertical={false} strokeDasharray="4 4" stroke="var(--border)" /><XAxis dataKey="channel" tickLine={false} axisLine={false} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} /><YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `$${v / 1000}k`} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} /><ChartTooltip content={<ChartTooltipContent />} /><Bar dataKey="revenue" fill="var(--color-revenue)" radius={[5, 5, 0, 0]} /></BarChart></ChartContainer></section>
-  </div>
+  )
 }

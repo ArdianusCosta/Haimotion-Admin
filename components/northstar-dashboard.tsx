@@ -638,7 +638,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             <div className="flex flex-col gap-1">
               <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent">
                 <Avatar className="size-8">
-                  <AvatarImage src={user?.avatar || ''} />
+                  <AvatarImage src={user?.avatar || undefined} />
                   <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
                     {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
                   </AvatarFallback>
@@ -687,7 +687,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-full hover:ring-2 hover:ring-ring outline-none cursor-pointer">
                   <Avatar className="size-8">
-                    <AvatarImage src={user?.avatar || ''} />
+                    <AvatarImage src={user?.avatar || undefined} />
                     <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
                       {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
                     </AvatarFallback>
