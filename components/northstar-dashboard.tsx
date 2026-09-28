@@ -22,6 +22,7 @@ import { UsersPage } from '@/components/users-page'
 import { ActivityLogPage } from '@/components/activity-log-page'
 import { MeetingsPage } from '@/components/meetings-page'
 import { TransactionsPage } from '@/components/finance/transactions-page'
+import { MainDashboard } from '@/components/dashboard/main-dashboard'
 import { InvoicesPage } from '@/components/finance/invoices/invoices-page'
 import { FinanceOverviewPage } from '@/components/finance/finance-overview/finance-overview-page'
 import { AkunPerkiraanPage } from '@/components/finance/akun-perkiraan/akun-perkiraan-page'
@@ -130,17 +131,7 @@ const administration = [
   { label: 'User Management', icon: Users },
   { label: 'Activity Log', icon: List },
 ]
-const products = [
-  ['Aurora Headphones', '1,240 sold', '$124,820', 'bg-chart-1'],
-  ['Nimbus Keyboard', '864 sold', '$86,400', 'bg-chart-2'],
-  ['Orbit Desk Lamp', '622 sold', '$41,780', 'bg-chart-3'],
-]
-const orders = [
-  ['#N-28391', 'Olivia Martin', 'Aug 31, 2026', '$248.00', 'Paid'],
-  ['#N-28390', 'Liam Chen', 'Aug 31, 2026', '$1,240.00', 'Paid'],
-  ['#N-28389', 'Ava Williams', 'Aug 30, 2026', '$86.00', 'Pending'],
-  ['#N-28388', 'Noah Smith', 'Aug 30, 2026', '$420.00', 'Paid'],
-]
+
 
 function Icon({ icon: I, className = '' }: { icon: React.ElementType; className?: string }) { return <I className={className} aria-hidden="true" /> }
 
@@ -718,7 +709,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
         <div className={`mx-auto p-4 md:p-8 ${contentWidth === 'centered' ? 'max-w-[1500px]' : 'w-full max-w-none'}`}>
           {isFiles ? <FileManager user={user} /> : (() => {
             switch (section) {
-              case 'Dashboard': return <Dashboard range={range} setRange={setRange} section={section} user={user} />
+              case 'Dashboard': return <MainDashboard user={user} />
               case 'Messenger': return <ChatPage onStartCall={handleStartCall} />
               case 'Analytics': return <AnalyticsPage />
               case 'Email': return <MailPage />
@@ -913,46 +904,3 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   </div>
 }
 
-function Dashboard({ range, setRange, section, user }: { range: string; setRange: (v: string) => void; section: string; user?: any }) {
-  const { t } = useLanguage()
-  const [greeting, setGreeting] = useState(t("Here's what's happening with your business today."))
-  const [timeGreeting, setTimeGreeting] = useState("Good morning")
-
-
-
-  useEffect(() => {
-    const quotes = [
-      "Here's what's happening with your business today.",
-      "Great things never come from comfort zones.",
-      "Dream it. Wish it. Do it.",
-      "Success doesn't just find you. You have to go out and get it.",
-      "The harder you work for something, the greater you'll feel when you achieve it.",
-      "Dream bigger. Do bigger.",
-      "Don't stop when you're tired. Stop when you're done.",
-      "Wake up with determination. Go to bed with satisfaction.",
-      "Do something today that your future self will thank you for.",
-      "Little things make big days.",
-      "It's going to be hard, but hard does not mean impossible.",
-      "Don't wait for opportunity. Create it.",
-      "Sometimes we're tested not to show our weaknesses, but to discover our strengths.",
-      "The key to success is to focus on goals, not obstacles.",
-      "Dream it. Believe it. Build it.",
-    ]
-    const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24)
-    setGreeting(quotes[dayOfYear % quotes.length])
-
-    const hour = new Date().getHours()
-    if (hour < 12) setTimeGreeting(t("Good morning"))
-    else if (hour < 18) setTimeGreeting(t("Good afternoon"))
-    else setTimeGreeting(t("Good evening"))
-  }, [])
-
-  return <><div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"><span>Workspace</span><ChevronRight className="size-3" /><span className="text-foreground">{t(section)}</span></div><h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{timeGreeting}, {user?.firstname || 'Admin'}</h1><p className="mt-1 text-sm text-muted-foreground">{greeting}</p></div><div className="flex items-center gap-2"><button className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted"><Download className="size-4" />{t('Export')}</button><select value={range} onChange={e => setRange(e.target.value)} className="rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none"><option>{t('Last 30 days')}</option><option>{t('Last 7 days')}</option><option>{t('This year')}</option></select></div></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[[t('Total Revenue'), '$284,920', '+18.2%', ArrowUpRight, t('vs. last month')], [t('Orders'), '1,429', '+12.5%', ArrowUpRight, t('vs. last month')], [t('Avg. order value'), '$199.24', '+4.8%', ArrowUpRight, t('vs. last month')], [t('Conversion rate'), '4.82%', '-0.6%', ArrowDownRight, t('vs. last month')]].map(([label, value, change, Arrow, sub]) => <div key={label as string} className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">{label as string}</span><span className="flex size-8 items-center justify-center rounded-lg bg-muted"><Activity className="size-4 text-muted-foreground" /></span></div><p className="mt-4 text-2xl font-semibold tracking-tight">{value as string}</p><p className="mt-1 flex items-center gap-1 text-xs"><Arrow className="size-3 text-primary" /><span className="font-medium text-primary">{change as string}</span><span className="text-muted-foreground">{sub as string}</span></p></div>)}</div><div className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]"><RevenueChart /><TrafficCard /></div><div className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_1fr_1fr]"><ActivityCard /><GoalsCard /><TopProducts /></div><OrdersTable /></>
-}
-
-function RevenueChart() { const { t } = useLanguage(); const bars = [32, 45, 38, 52, 48, 63, 57, 71, 68, 78, 73, 86, 80, 92, 88, 96, 84, 94, 89, 100, 91, 97, 86, 93, 90, 98, 94, 100, 96, 100]; return <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-start justify-between"><div><h2 className="font-semibold">{t('Revenue overview')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Monthly revenue performance')}</p></div><button className="rounded-lg p-2 text-muted-foreground hover:bg-muted" aria-label="More revenue options"><MoreHorizontal className="size-4" /></button></div><div className="mt-6 flex items-end gap-1.5 sm:gap-2" style={{ height: 220 }}>{bars.map((height, i) => <div key={i} className="group flex flex-1 flex-col justify-end"><div className="w-full rounded-t-sm bg-primary/80 transition-all group-hover:bg-primary" style={{ height: `${height}%` }} /></div>)}</div><div className="mt-3 flex justify-between text-[10px] text-muted-foreground"><span>Aug 1</span><span>Aug 8</span><span>Aug 15</span><span>Aug 22</span><span>Aug 31</span></div></section> }
-function TrafficCard() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5 md:p-6"><div className="flex items-start justify-between"><div><h2 className="font-semibold">{t('Traffic sources')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Where your visitors come from')}</p></div><button className="text-xs font-medium text-primary hover:underline">{t('View all')}</button></div><div className="mt-7 flex items-center gap-6"><div className="relative flex size-36 shrink-0 items-center justify-center rounded-full" style={{ background: 'conic-gradient(var(--primary) 0 42%, var(--chart-2) 42% 69%, var(--chart-3) 69% 84%, var(--muted) 84% 100%)' }}><div className="flex size-24 items-center justify-center rounded-full bg-card"><div className="text-center"><p className="text-xl font-semibold">24.8k</p><p className="text-[10px] text-muted-foreground">visitors</p></div></div></div><div className="flex flex-col gap-3 text-xs">{[[t('Direct'), '42%', 'bg-primary'], [t('Organic search'), '27%', 'bg-chart-2'], [t('Social media'), '15%', 'bg-chart-3'], [t('Other'), '16%', 'bg-muted']].map(([name, val, color]) => <div key={name} className="flex items-center gap-2"><span className={`size-2 rounded-full ${color}`} /><span className="text-muted-foreground">{name}</span><span className="ml-auto font-medium">{val}</span></div>)}</div></div></section> }
-function ActivityCard() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">{t('Recent activity')}</h2><button className="text-xs font-medium text-primary">{t('View all')}</button></div><div className="mt-5 flex flex-col gap-5">{[['Olivia Martin', 'placed a new order', '2 min ago', 'bg-primary'], ['Liam Chen', 'completed payment', '18 min ago', 'bg-chart-2'], ['Ava Williams', 'signed up for newsletter', '1 hr ago', 'bg-chart-3'], ['Noah Smith', 'left a product review', '3 hrs ago', 'bg-muted']].map(([name, action, time, color]) => <div className="flex gap-3" key={name}><div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-primary-foreground ${color}`}>{(name as string).split(' ').map(n => n[0]).join('')}</div><div className="min-w-0 text-xs"><p><span className="font-medium">{name}</span> <span className="text-muted-foreground">{action}</span></p><p className="mt-1 text-muted-foreground">{time}</p></div></div>)}</div></section> }
-function GoalsCard() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5"><h2 className="font-semibold">{t('Monthly goals')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Keep the momentum going')}</p><div className="mt-6 flex flex-col gap-5">{[[t('Revenue target'), '$350k', '$284.9k', 81], [t('New customers'), '1,500', '1,124', 75], [t('Orders fulfilled'), '2,000', '1,429', 71]].map(([label, target, current, percent]) => <div key={label as string}><div className="mb-2 flex justify-between text-xs"><span className="font-medium">{label as string}</span><span className="text-muted-foreground">{current as string} <span className="text-border">/</span> {target as string}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} /></div></div>)}</div></section> }
-function TopProducts() { const { t } = useLanguage(); return <section className="rounded-xl border border-border bg-card p-5"><div className="flex items-center justify-between"><h2 className="font-semibold">{t('Top products')}</h2><button className="text-xs font-medium text-primary">{t('View all')}</button></div><div className="mt-5 flex flex-col gap-4">{products.map(([name, sold, revenue, color], i) => <div key={name} className="flex items-center gap-3"><div className={`flex size-9 items-center justify-center rounded-lg ${color}`}><Package className="size-4 text-primary-foreground" /></div><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{name}</p><p className="mt-0.5 text-[11px] text-muted-foreground">{sold}</p></div><p className="text-xs font-medium">{revenue}</p></div>)}</div></section> }
-function OrdersTable() { const { t } = useLanguage(); return <section className="mt-6 rounded-xl border border-border bg-card"><div className="flex items-center justify-between p-5"><div><h2 className="font-semibold">{t('Recent orders')}</h2><p className="mt-1 text-xs text-muted-foreground">{t('Your latest transactions')}</p></div><button className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted">{t('View all')}</button></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="border-y border-border bg-muted/40 text-muted-foreground"><tr>{[t('Order'), t('Customer'), t('Date'), t('Amount'), t('Status')].map(h => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}</tr></thead><tbody>{orders.map(([id, customer, date, amount, status]) => <tr key={id} className="border-b border-border last:border-0 hover:bg-muted/30"><td className="px-5 py-4 font-medium">{id}</td><td className="px-5 py-4">{customer}</td><td className="px-5 py-4 text-muted-foreground">{date}</td><td className="px-5 py-4 font-medium">{amount}</td><td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-medium ${status === 'Paid' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{status}</span></td></tr>)}</tbody></table></div></section> }

@@ -1,0 +1,30 @@
+--- app/actions/dashboard.ts
++++ app/actions/dashboard.ts
+@@ -147,15 +147,24 @@
+   trendTasks.forEach(t => {
+     const key = formatDate(new Date(t.date_created));
+-    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0 };
++    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0, workHours: 0 };
+     trendMap[key].tasksCreated++;
+     if (t.status === 5) trendMap[key].tasksCompleted++;
+   });
+ 
+   trendProjects.forEach(p => {
+     const key = formatDate(new Date(p.date_created));
+-    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0 };
++    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0, workHours: 0 };
+     trendMap[key].projectsCreated++;
+     if (p.status === 5) trendMap[key].projectsCompleted++;
+   });
++
++  const trendWorkHours = await prisma.user_productivity.findMany({
++    where: { date: { gte: startDate } },
++    select: { date: true, time_rendered: true }
++  });
++  trendWorkHours.forEach(w => {
++    const key = formatDate(new Date(w.date));
++    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0, workHours: 0 };
++    trendMap[key].workHours += Number(w.time_rendered || 0);
++  });
+ 
+   const trendData = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
