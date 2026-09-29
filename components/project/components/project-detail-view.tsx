@@ -29,6 +29,7 @@ import { deeplyDecodeHTML } from '../utils/html-helpers'
 import { STATUS_LABELS } from './project-list-view'
 import { ProjectFormDialog } from '@/components/project-form-dialog'
 import { ProjectContributorsDialog } from '@/components/project-contributors-dialog'
+import { ProjectDomainChecker } from './project-domain-checker'
 
 export function ProjectDetailView({
   selectedProject, setSelectedProjectId,
@@ -80,10 +81,8 @@ export function ProjectDetailView({
               <Trash2 className="size-4" />
             </button>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground">
-                  <MoreHorizontal className="size-4" />
-                </button>
+              <DropdownMenuTrigger className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground">
+                <MoreHorizontal className="size-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => duplicateMutation.mutate(selectedProject.id)}>Duplicate project</DropdownMenuItem>
@@ -231,6 +230,11 @@ export function ProjectDetailView({
               </button>
             </div>
           </div>
+        </div>
+
+        {/* ═══════════════════ DOMAIN CHECKER ═══════════════════ */}
+        <div className="mb-5">
+          <ProjectDomainChecker defaultDomain={/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(selectedProject.name || '') ? selectedProject.name : ''} />
         </div>
       </div>
 

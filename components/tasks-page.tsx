@@ -101,18 +101,7 @@ function TasksContent() {
             <h1 className="text-xl font-bold tracking-tight text-foreground">Tasks</h1>
             <span className="hidden sm:inline-flex text-sm text-muted-foreground">Manage your work and projects</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center rounded-full border border-border/60 bg-muted/30 px-3 py-1.5 shadow-sm">
-              <Search className="size-3.5 text-muted-foreground mr-2" />
-              <span className="text-xs text-muted-foreground">Search</span>
-            </div>
-            <button className="flex size-8 items-center justify-center rounded-full border border-border/50 bg-card text-muted-foreground hover:bg-muted hover:text-foreground shadow-sm transition-all">
-              <Bell className="size-4" />
-            </button>
-            <button className="flex size-8 items-center justify-center rounded-full border border-border/50 bg-card text-muted-foreground hover:bg-muted hover:text-foreground shadow-sm transition-all">
-              <UserIcon className="size-4" />
-            </button>
-          </div>
+
         </div>
 
         <div className="flex-1 p-6 md:p-8 w-full space-y-8">
