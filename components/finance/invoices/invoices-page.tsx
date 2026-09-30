@@ -136,15 +136,15 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
             </thead>
             <tbody>
               {isLoading ? (
-                Array(5).fill(0).map((_, i) => (
-                  <tr key={i} className="border-b border-border">
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-in fade-in duration-500 border-b border-border">
                     <td className="px-5 py-4"><Skeleton className="h-4 w-20" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-32" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-20" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-20" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
-                    <td className="px-5 py-4"><Skeleton className="h-4 w-16" /></td>
-                    <td className="px-5 py-4"><Skeleton className="h-4 w-8 ml-auto" /></td>
+                    <td className="px-5 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                    <td className="px-5 py-4"><Skeleton className="h-8 w-8 ml-auto" /></td>
                   </tr>
                 ))
               ) : invoices?.length === 0 ? (

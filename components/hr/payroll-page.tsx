@@ -6,6 +6,7 @@ import { PayrollModal } from './components/modals';
 import { Search, Download, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useLanguage } from '@/components/language-provider';
 
@@ -88,9 +89,6 @@ export function PayrollPage() {
         </div>
 
         <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-          {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground">{t('Loading')}</div>
-          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
@@ -105,7 +103,19 @@ export function PayrollPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredPayrolls?.map((payroll: any) => (
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i} className="animate-in fade-in duration-500">
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-28 ml-auto" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-32 ml-auto" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
+                      </tr>
+                    ))
+                  ) : filteredPayrolls?.map((payroll: any) => (
                     <tr key={payroll.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 font-medium text-foreground">{payroll.employee?.name}</td>
                       <td className="px-6 py-4">{payroll.period}</td>
@@ -130,7 +140,6 @@ export function PayrollPage() {
                 </tbody>
               </table>
             </div>
-          )}
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { formatCurrency } from '../utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useRef } from 'react'
 import { useLanguage } from '@/components/language-provider'
@@ -100,20 +101,21 @@ export function ExpensesPage() {  const { t, formatDate } = useLanguage()
                 className="h-9 w-full sm:w-[250px] rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary transition-colors"
               />
             </div>
-            <select 
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary transition-colors"
-            >
-              <option value="All">All Categories</option>
-              <option value="Operations">Operations</option>
-              <option value="Salaries">Salaries</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Utilities">Utilities</option>
-              <option value="Office Supplies">Office Supplies</option>
-              <option value="Transportation">Transportation</option>
-              <option value="Other">Other</option>
-            </select>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-[180px] h-9 bg-background">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All Categories</SelectItem>
+                <SelectItem value="Operations">Operations</SelectItem>
+                <SelectItem value="Salaries">Salaries</SelectItem>
+                <SelectItem value="Marketing">Marketing</SelectItem>
+                <SelectItem value="Utilities">Utilities</SelectItem>
+                <SelectItem value="Office Supplies">Office Supplies</SelectItem>
+                <SelectItem value="Transportation">Transportation</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -132,15 +134,15 @@ export function ExpensesPage() {  const { t, formatDate } = useLanguage()
             </thead>
             <tbody>
               {isLoading ? (
-                Array(5).fill(0).map((_, i) => (
-                  <tr key={i} className="border-b border-border">
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-in fade-in duration-500 border-b border-border">
                     <td className="px-5 py-4"><Skeleton className="h-4 w-20" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-40" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-24" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-20" /></td>
                     <td className="px-5 py-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
-                    <td className="px-5 py-4"><Skeleton className="h-4 w-16" /></td>
-                    <td className="px-5 py-4"><Skeleton className="h-4 w-8 ml-auto" /></td>
+                    <td className="px-5 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                    <td className="px-5 py-4"><Skeleton className="h-8 w-8 ml-auto" /></td>
                   </tr>
                 ))
               ) : expenses?.length === 0 ? (

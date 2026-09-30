@@ -41,14 +41,24 @@ export function KanbanBoard() {
       {loading ? (
         // Skeleton Loading
         Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex w-[320px] shrink-0 flex-col rounded-xl bg-muted/30 p-3 border border-border/50 animate-pulse">
+          <div key={i} className="flex w-[320px] shrink-0 flex-col rounded-xl bg-muted/30 p-3 border border-border/50 animate-in fade-in duration-500">
             <div className="mb-4 flex items-center gap-2">
-              <div className="size-2.5 rounded-full bg-muted" />
-              <div className="h-5 w-24 rounded bg-muted" />
+              <div className="size-2.5 rounded-full bg-muted animate-pulse" />
+              <div className="h-5 w-24 rounded bg-muted animate-pulse" />
             </div>
             <div className="flex flex-col gap-3">
               {Array.from({ length: 3 }).map((_, j) => (
-                <div key={j} className="rounded-xl border border-border bg-card p-4 h-32" />
+                <div key={j} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                  <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-muted animate-pulse" />
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex -space-x-1">
+                      <div className="size-5 rounded-full bg-muted animate-pulse border border-card" />
+                      <div className="size-5 rounded-full bg-muted animate-pulse border border-card" />
+                    </div>
+                    <div className="h-4 w-16 rounded-full bg-muted animate-pulse" />
+                  </div>
+                </div>
               ))}
             </div>
           </div>

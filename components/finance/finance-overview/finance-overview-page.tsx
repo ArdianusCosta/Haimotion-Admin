@@ -3,6 +3,7 @@ import { useLanguage } from '@/components/language-provider'
 import { Wallet, Receipt, CreditCard, ChevronRight, Bell } from 'lucide-react'
 import { formatCurrency } from '../utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -73,10 +74,15 @@ export function FinanceOverviewPage({ user }: { user?: any }) {
                     <span className="text-muted-foreground">{t('Expenses')}</span>
                   </div>
                 </div>
-                <select className="text-xs border border-border rounded-md px-2 py-1 bg-background text-foreground outline-none">
-                  <option>{t('This month')}</option>
-                  <option>{t('This year')}</option>
-                </select>
+                <Select defaultValue="this-month">
+                  <SelectTrigger className="w-[120px] h-8 text-xs bg-background">
+                    <SelectValue placeholder={t('This month')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="this-month">{t('This month')}</SelectItem>
+                    <SelectItem value="this-year">{t('This year')}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardHeader>
             <CardContent className="p-6 pt-6">
@@ -163,9 +169,14 @@ export function FinanceOverviewPage({ user }: { user?: any }) {
           <Card className="shadow-sm border-border bg-card rounded-2xl flex-1 flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between p-6 pb-0">
               <CardTitle className="text-lg font-bold text-foreground">{t('Invoices')}</CardTitle>
-              <select className="text-xs border border-border rounded-md px-2 py-1 bg-background text-foreground outline-none">
-                <option>{t('This month')}</option>
-              </select>
+              <Select defaultValue="this-month">
+                <SelectTrigger className="w-[120px] h-8 text-xs bg-background">
+                  <SelectValue placeholder={t('This month')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="this-month">{t('This month')}</SelectItem>
+                </SelectContent>
+              </Select>
             </CardHeader>
             <CardContent className="p-6 flex-1 flex flex-col justify-between">
               

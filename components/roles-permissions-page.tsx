@@ -153,6 +153,7 @@ export function RolesPermissionsPage() {
       <div className="flex flex-col md:flex-row gap-6">
         <RolesSidebar 
           roles={roles}
+          isLoading={rolesLoading}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           activeRole={activeRole}
@@ -160,6 +161,7 @@ export function RolesPermissionsPage() {
         />
 
         <PermissionsPanel 
+          isLoading={permsLoading}
           activeRole={activeRole}
           categories={categories}
           isChecked={isChecked}

@@ -4,6 +4,7 @@ import { HRPageHeader } from './components';
 import { Search, Star, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguage } from '@/components/language-provider';
 
 export function RecruitmentPage() {
@@ -50,9 +51,6 @@ export function RecruitmentPage() {
         </div>
 
         <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-          {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground">{t('Loading')}</div>
-          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">
@@ -66,7 +64,21 @@ export function RecruitmentPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredCandidates?.map((candidate: any) => (
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i} className="animate-in fade-in duration-500">
+                        <td className="px-6 py-4">
+                          <Skeleton className="h-4 w-32 mb-2" />
+                          <Skeleton className="h-3 w-48" />
+                        </td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-28" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-8 w-8 ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : filteredCandidates?.map((candidate: any) => (
                     <tr key={candidate.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-medium text-foreground">{candidate.name}</div>
@@ -109,7 +121,6 @@ export function RecruitmentPage() {
                 </tbody>
               </table>
             </div>
-          )}
         </div>
       </div>
     </div>

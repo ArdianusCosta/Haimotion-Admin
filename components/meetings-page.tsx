@@ -39,7 +39,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function MeetingCardSkeleton() {
   return (
-    <div className="border bg-card rounded-xl p-5 space-y-3">
+    <div className="border bg-card rounded-xl p-5 space-y-3 animate-in fade-in duration-500">
       <div className="flex justify-between">
         <Skeleton className="h-5 w-20 rounded-full" />
         <Skeleton className="h-5 w-24 rounded-full" />

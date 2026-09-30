@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply, Download, X, Check, CheckCheck, ChevronLeft } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Skeleton } from '@/components/ui/skeleton'
 import { getConversations, getMessages, sendMessage, createCallSession, searchUsers, getOrCreateThread, triggerTyping, markThreadAsRead } from '@/app/actions/chat'
 import { pusherClient } from '@/lib/pusher-client'
 import { LiveKitCallUI } from './livekit-call'
@@ -67,7 +68,7 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
     }
   }, [])
 
-  const { data: conversations = [], refetch: refetchConversations } = useQuery({
+  const { data: conversations = [], isLoading: isLoadingConversations, refetch: refetchConversations } = useQuery({
     queryKey: ['conversations', currentUser?.id],
     queryFn: () => getConversations(currentUser!.id),
     enabled: !!currentUser?.id,
@@ -79,7 +80,7 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
     }
   }, [conversations, activeThreadId, searchQuery])
 
-  const { data: messages = [] } = useQuery({
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['messages', activeThreadId],
     queryFn: () => getMessages(activeThreadId!),
     enabled: !!activeThreadId,
@@ -371,6 +372,21 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                   <p className="p-3 text-xs text-muted-foreground text-center">No users found</p>
                 )}
               </div>
+            ) : isLoadingConversations ? (
+              <div className="space-y-1 p-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-xl p-3 animate-in fade-in duration-500">
+                    <Skeleton className="size-10 rounded-full shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-3 w-10" />
+                      </div>
+                      <Skeleton className="h-3 w-40" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
               conversations.map((item) => {
                 const isOnline = onlineUsers.has(item.otherUserId)
@@ -490,7 +506,19 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
           </header>
           
           <div className="flex flex-1 flex-col gap-5 overflow-auto p-5">
-            {(chatSearchQuery ? messages.filter((m: any) => m.message_content?.toLowerCase().includes(chatSearchQuery.toLowerCase())) : messages).map((item: any, index: number) => {
+            {isLoadingMessages ? (
+              <div className="flex flex-col gap-5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className={`flex items-end gap-2 animate-in fade-in duration-500 ${i % 2 === 0 ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <Skeleton className="size-8 rounded-full shrink-0" />
+                    <div className={`space-y-1 ${i % 2 === 0 ? 'items-start' : 'items-end'} flex flex-col`}>
+                      <Skeleton className={`h-10 rounded-2xl ${i % 2 === 0 ? 'w-48' : 'w-64'}`} />
+                      <Skeleton className="h-3 w-12" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (chatSearchQuery ? messages.filter((m: any) => m.message_content?.toLowerCase().includes(chatSearchQuery.toLowerCase())) : messages).map((item: any, index: number) => {
               const isOwn = item.sender_id === currentUser.id
               const time = new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
               const initials = item.sender ? `${item.sender.firstname[0]}${item.sender.lastname[0]}` : '?'

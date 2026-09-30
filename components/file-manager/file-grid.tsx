@@ -34,10 +34,33 @@ export function FileGrid({
   updateFolderMut, updateFileMut
 }: FileGridProps) {
   if (isLoading) {
+    if (view === 'grid') {
+      return (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-3 animate-in fade-in duration-500">
+              <div className="flex items-start justify-between">
+                <Skeleton className="size-10 rounded-lg" />
+                <Skeleton className="size-6 rounded-md" />
+              </div>
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
+      )
+    }
     return (
-      <div className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3' : 'flex flex-col gap-2'}>
-        {[1,2,3,4,5,6].map(i => (
-          <Skeleton key={i} className={view === 'grid' ? 'h-32 rounded-xl' : 'h-16 rounded-xl'} />
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 rounded-xl border border-border bg-card p-3 animate-in fade-in duration-500">
+            <Skeleton className="size-9 rounded-lg shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </div>
         ))}
       </div>
     )

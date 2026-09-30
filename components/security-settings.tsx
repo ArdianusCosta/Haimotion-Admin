@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { authClient } from '@/lib/auth/client'
 import { Fingerprint, Trash2, Plus, AlertCircle } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function SecuritySettings() {
   const { t } = useLanguage()
@@ -68,7 +69,17 @@ export function SecuritySettings() {
 
           <div className="space-y-4">
             {isLoading ? (
-              <p className="text-sm text-muted-foreground">{t('Loading passkeys...')}</p>
+              <ul className="space-y-2">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <li key={i} className="flex items-center justify-between rounded-lg border border-border bg-background p-3 animate-in fade-in duration-500">
+                    <div className="flex flex-col space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-48" />
+                    </div>
+                    <Skeleton className="size-8 rounded-md" />
+                  </li>
+                ))}
+              </ul>
             ) : !passkeys || passkeys.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">{t('No passkeys registered yet.')}</p>
             ) : (

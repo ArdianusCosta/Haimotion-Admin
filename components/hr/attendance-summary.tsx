@@ -5,6 +5,7 @@ import { useAttendanceSummaries, useImportAttendanceSummaries, useEmployees } fr
 import { Search, Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useLanguage } from '@/components/language-provider';
 import * as XLSX from 'xlsx';
@@ -168,9 +169,6 @@ export function AttendanceSummary() {
       </div>
 
       <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center text-muted-foreground">{t('Loading')}...</div>
-        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-muted-foreground bg-muted/50 border-b">
@@ -195,7 +193,24 @@ export function AttendanceSummary() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered?.map((att: any) => (
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-in fade-in duration-500">
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-32" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-20" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-12 mx-auto" /></td>
+                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                      <td className="px-4 py-4"><Skeleton className="h-4 w-8 mx-auto" /></td>
+                    </tr>
+                  ))
+                ) : filtered?.map((att: any) => (
                   <tr key={att.id} className="hover:bg-muted/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground border-r">{att.employee?.name}</td>
                     <td className="px-4 py-3 border-r">{att.department || '-'}</td>
@@ -221,7 +236,6 @@ export function AttendanceSummary() {
               </tbody>
             </table>
           </div>
-        )}
       </div>
     </div>
   );

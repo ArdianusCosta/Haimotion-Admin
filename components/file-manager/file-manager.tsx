@@ -224,6 +224,7 @@ export default function FileManager({ user }: FileManagerProps) {
       {!query && !filter && (
         <FileManagerStats 
           statsData={statsData}
+          isLoading={foldersLoading}
           setFilter={setFilter}
           setQuery={setQuery}
           setCurrentFolderId={setCurrentFolderId}

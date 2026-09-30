@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { Edit2, Trash2, Users, Plus, CheckCircle2 } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type PermissionsPanelProps = {
   activeRole: any
@@ -14,12 +15,13 @@ type PermissionsPanelProps = {
   setAddCategoryModal: React.Dispatch<React.SetStateAction<any>>
   setPermModal: React.Dispatch<React.SetStateAction<any>>
   setDeleteModal: React.Dispatch<React.SetStateAction<any>>
+  isLoading?: boolean
 }
 
 export function PermissionsPanel({
   activeRole, categories, isChecked, togglePermission,
   setRoleModal, setDeleteRoleConfirm, setAssignUsersModal,
-  setAddCategoryModal, setPermModal, setDeleteModal
+  setAddCategoryModal, setPermModal, setDeleteModal, isLoading
 }: PermissionsPanelProps) {
   if (!activeRole) return null
 
@@ -56,7 +58,35 @@ export function PermissionsPanel({
 
       <div className="flex-1 overflow-y-auto p-5">
         <div className="space-y-8">
-          {categories.map((category, idx) => (
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i}>
+                <div className="flex items-center justify-between mb-4">
+                  <Skeleton className="h-4 w-32" />
+                </div>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-left text-sm">
+                    <tbody className="divide-y divide-border">
+                      {Array.from({ length: 3 }).map((_, j) => (
+                        <tr key={j} className="animate-in fade-in duration-500">
+                          <td className="p-4 w-12 text-center align-middle">
+                            <Skeleton className="size-5 rounded" />
+                          </td>
+                          <td className="p-4 align-middle space-y-2">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-3 w-64" />
+                          </td>
+                          <td className="p-4 text-right align-middle">
+                            <Skeleton className="h-8 w-16 ml-auto" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          ) : categories.map((category, idx) => (
             <div key={idx}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{category.name}</h3>

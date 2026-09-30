@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ProjectFormDialog } from '@/components/project-form-dialog'
 import { stripHtmlTags } from '../utils/html-helpers'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export const STATUS_LABELS: Record<number, { label: string; color: string }> = {
   0: { label: 'On Hold', color: 'bg-amber-500/10 text-amber-600' },
@@ -65,8 +66,33 @@ export function ProjectListView({
 
       <div className="flex-1 overflow-y-auto pb-8 pr-2">
         {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <span className="text-muted-foreground animate-pulse">Loading projects...</span>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-5 shadow-sm animate-in fade-in duration-500">
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex-1 pr-4">
+                    <Skeleton className="h-5 w-3/4 mb-2" />
+                    <Skeleton className="h-3 w-full mb-1" />
+                    <Skeleton className="h-3 w-5/6" />
+                  </div>
+                  <Skeleton className="h-4 w-16 rounded-full" />
+                </div>
+                <div className="mb-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-8" />
+                  </div>
+                  <Skeleton className="h-1.5 w-full rounded-full" />
+                </div>
+                <div className="flex items-center justify-between border-t border-border pt-4">
+                  <div className="flex -space-x-2">
+                    <Skeleton className="size-6 rounded-full border-2 border-background" />
+                    <Skeleton className="size-6 rounded-full border-2 border-background" />
+                  </div>
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="flex h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border text-center">

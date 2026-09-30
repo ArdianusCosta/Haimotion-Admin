@@ -3,7 +3,7 @@ import { FileText, TrendingUp, Scale, Clock, Activity, Download, ChevronRight, F
 import { FinancePageHeader } from '../components'
 import { useFinanceOverview } from '../queries'
 import { Skeleton } from '@/components/ui/skeleton'
-
+import { useLanguage } from '@/components/language-provider'
 export function ReportsPage() {
   const { t } = useLanguage()
   const { isLoading } = useFinanceOverview()

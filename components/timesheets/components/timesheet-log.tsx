@@ -6,12 +6,14 @@ import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { History, Search, Filter, CheckCircle2, AlertCircle, PlayCircle, Download, MoreHorizontal, Edit2, Trash2 } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type TimesheetLogProps = {
   entries: any[]
+  isLoading?: boolean
 }
 
-export function TimesheetLog({ entries }: TimesheetLogProps) {
+export function TimesheetLog({ entries, isLoading }: TimesheetLogProps) {
   return (
     <Card className="flex-1">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -39,7 +41,19 @@ export function TimesheetLog({ entries }: TimesheetLogProps) {
               </tr>
             </thead>
             <tbody>
-              {entries.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border/50 animate-in fade-in duration-500">
+                    <td className="px-4 py-4"><Skeleton className="h-4 w-40" /></td>
+                    <td className="px-4 py-4"><Skeleton className="h-4 w-28" /></td>
+                    <td className="px-4 py-4"><Skeleton className="h-4 w-20" /></td>
+                    <td className="px-4 py-4"><Skeleton className="h-4 w-28" /></td>
+                    <td className="px-4 py-4"><Skeleton className="h-4 w-16" /></td>
+                    <td className="px-4 py-4"><Skeleton className="h-6 w-14 rounded-full" /></td>
+                    <td className="px-4 py-4"><Skeleton className="h-8 w-8 ml-auto" /></td>
+                  </tr>
+                ))
+              ) : entries.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                     No timesheet entries yet. Start the timer to create one!

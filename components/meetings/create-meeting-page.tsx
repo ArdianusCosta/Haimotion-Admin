@@ -11,6 +11,7 @@ import { useLanguage } from '@/components/language-provider'
 import { useCreateMeeting, useMeetingFormData } from '@/hooks/use-meetings'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Check, Globe, Lock, Clock, Users, ArrowLeft } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export function CreateMeetingPage({ onBack }: { onBack: () => void }) {
   const { t } = useLanguage()
@@ -108,15 +109,20 @@ export function CreateMeetingPage({ onBack }: { onBack: () => void }) {
                   <Label htmlFor="mtg-duration">
                     <span className="flex items-center gap-1.5"><Clock className="size-4 text-muted-foreground" />{t('Duration')}</span>
                   </Label>
-                  <select id="mtg-duration" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring" value={duration} onChange={e => setDuration(e.target.value)}>
-                    <option value="15">15 min</option>
-                    <option value="30">30 min</option>
-                    <option value="45">45 min</option>
-                    <option value="60">60 min</option>
-                    <option value="90">90 min</option>
-                    <option value="120">2 hours</option>
-                    <option value="180">3 hours</option>
-                  </select>
+                  <Select value={duration} onValueChange={setDuration}>
+                    <SelectTrigger className="w-full bg-background" id="mtg-duration">
+                      <SelectValue placeholder="Duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 min</SelectItem>
+                      <SelectItem value="30">30 min</SelectItem>
+                      <SelectItem value="45">45 min</SelectItem>
+                      <SelectItem value="60">60 min</SelectItem>
+                      <SelectItem value="90">90 min</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="180">3 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -127,17 +133,27 @@ export function CreateMeetingPage({ onBack }: { onBack: () => void }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm">{t('Project')}</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none" value={projectId || ''} onChange={e => setProjectId(e.target.value ? parseInt(e.target.value) : undefined)}>
-                      <option value="">{t('None')}</option>
-                      {formData?.projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
+                    <Select value={projectId?.toString() || "none"} onValueChange={val => setProjectId(val === "none" ? undefined : parseInt(val))}>
+                      <SelectTrigger className="w-full bg-transparent">
+                        <SelectValue placeholder={t('None')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t('None')}</SelectItem>
+                        {formData?.projects.map((p: any) => <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm">{t('Task')}</Label>
-                    <select className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus:outline-none" value={taskId || ''} onChange={e => setTaskId(e.target.value ? parseInt(e.target.value) : undefined)}>
-                      <option value="">{t('None')}</option>
-                      {formData?.tasks.map((t: any) => <option key={t.id} value={t.id}>{t.task}</option>)}
-                    </select>
+                    <Select value={taskId?.toString() || "none"} onValueChange={val => setTaskId(val === "none" ? undefined : parseInt(val))}>
+                      <SelectTrigger className="w-full bg-transparent">
+                        <SelectValue placeholder={t('None')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t('None')}</SelectItem>
+                        {formData?.tasks.map((t: any) => <SelectItem key={t.id} value={t.id.toString()}>{t.task}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>

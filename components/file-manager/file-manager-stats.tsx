@@ -1,15 +1,29 @@
 'use client'
 
 import React from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type FileManagerStatsProps = {
   statsData: any
+  isLoading?: boolean
   setFilter: (filter: string | null) => void
   setQuery: (query: string) => void
   setCurrentFolderId: (id: number | null) => void
 }
 
-export function FileManagerStats({ statsData, setFilter, setQuery, setCurrentFolderId }: FileManagerStatsProps) {
+export function FileManagerStats({ statsData, isLoading, setFilter, setQuery, setCurrentFolderId }: FileManagerStatsProps) {
+  if (isLoading) {
+    return (
+      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-border bg-card p-4 animate-in fade-in duration-500">
+            <Skeleton className="h-3 w-24 mb-3" />
+            <Skeleton className="h-6 w-32" />
+          </div>
+        ))}
+      </div>
+    )
+  }
   return (
     <div className="mb-6 grid gap-4 sm:grid-cols-3">
       <div className="rounded-xl border border-border bg-card p-4">
