@@ -43,6 +43,18 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'recruitment': 'Recruitment'
       }
       initialSection = hrRouteMap[subRoute] || 'HR Overview'
+    } else if (resolvedParams.slug[0] === 'crm' && resolvedParams.slug.length > 1) {
+      const subRoute = resolvedParams.slug[1]
+      const crmRouteMap: Record<string, string> = {
+        'overview': 'CRM Overview',
+        'leads': 'Leads',
+        'clients': 'Clients',
+        'pipeline': 'Pipeline',
+        'follow-ups': 'Follow Ups',
+        'activities': 'Activities',
+        'broadcast': 'Broadcast'
+      }
+      initialSection = crmRouteMap[subRoute] || 'CRM Overview'
     } else {
       const rawSlug = resolvedParams.slug[0]
       initialSection = rawSlug
@@ -61,6 +73,9 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
       }
       if (rawSlug === 'hr') {
         initialSection = 'HR Overview'
+      }
+      if (rawSlug === 'crm') {
+        initialSection = 'CRM Overview'
       }
     }
   }

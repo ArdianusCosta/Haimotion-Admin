@@ -55,6 +55,14 @@ import { AttendancePage } from '@/components/hr/attendance-page'
 import { PayrollPage } from '@/components/hr/payroll-page'
 import { RecruitmentPage } from '@/components/hr/recruitment-page'
 
+import { CrmOverviewPage } from '@/components/crm/crm-overview-page'
+import { CrmLeadsPage } from '@/components/crm/crm-leads-page'
+import { CrmClientsPage } from '@/components/crm/crm-clients-page'
+import { CrmPipelinePage } from '@/components/crm/crm-pipeline-page'
+import { CrmFollowUpsPage } from '@/components/crm/crm-follow-ups-page'
+import { CrmActivitiesPage } from '@/components/crm/crm-activities-page'
+import { CrmBroadcastPage } from '@/components/crm/crm-broadcast-page'
+
 import FileManager from '@/components/file-manager/file-manager'
 import { useLanguage } from '@/components/language-provider'
 import { useThemeSounds } from './use-theme-sounds'
@@ -125,6 +133,16 @@ const hrMenu = [
   { label: 'Attendance & Leave', icon: CalendarDays },
   { label: 'Payroll', icon: Receipt },
   { label: 'Recruitment', icon: Briefcase },
+]
+
+const crmMenu = [
+  { label: 'CRM Overview', icon: LayoutDashboard },
+  { label: 'Leads', icon: Target },
+  { label: 'Clients', icon: Briefcase },
+  { label: 'Pipeline', icon: GitPullRequest },
+  { label: 'Follow Ups', icon: Clock },
+  { label: 'Activities', icon: Activity },
+  { label: 'Broadcast', icon: MessageCircle },
 ]
 
 const administration = [
@@ -291,11 +309,24 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       'Payroll': 'hr/payroll',
       'Recruitment': 'hr/recruitment'
     }
+
+    // Custom routing for CRM module
+    const crmRouteMap: Record<string, string> = {
+      'CRM Overview': 'crm/overview',
+      'Leads': 'crm/leads',
+      'Clients': 'crm/clients',
+      'Pipeline': 'crm/pipeline',
+      'Follow Ups': 'crm/follow-ups',
+      'Activities': 'crm/activities',
+      'Broadcast': 'crm/broadcast'
+    }
     
     if (financeRouteMap[newSection]) {
       router.push('/' + financeRouteMap[newSection], { scroll: false })
     } else if (hrRouteMap[newSection]) {
       router.push('/' + hrRouteMap[newSection], { scroll: false })
+    } else if (crmRouteMap[newSection]) {
+      router.push('/' + crmRouteMap[newSection], { scroll: false })
     } else {
       const slug = newSection.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')
       router.push('/' + (slug === 'dashboard' ? '' : slug), { scroll: false })
@@ -343,6 +374,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       ...apps,
       ...financeMenu,
       ...hrMenu,
+      ...crmMenu,
       ...administration,
       { label: 'Settings', icon: Settings },
       { label: 'File Manager', icon: Folder }
@@ -639,6 +671,9 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Human Resources')}</p>
               {hrMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
+            <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('CRM')}</p>
+              {crmMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
+            </div>
 
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Administration')}</p>
               {administration.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
@@ -680,7 +715,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
                   <img src="/logohm-transparent.png" alt="HaiMotion Logo" className="h-12 w-auto object-contain" />
                 </div>
                 <div className="hidden md:flex items-center gap-1 overflow-x-auto">
-                  {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...administration].map(({ label, icon }) => (
+                  {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...hrMenu, ...crmMenu, ...administration].map(({ label, icon }) => (
                     <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${section === label ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{t(label)}</button>
                   ))}
                 </div>
@@ -777,6 +812,15 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               case 'Attendance & Leave': return <AttendancePage />
               case 'Payroll': return <PayrollPage />
               case 'Recruitment': return <RecruitmentPage />
+
+              // CRM Routes
+              case 'CRM Overview': return <CrmOverviewPage />
+              case 'Leads': return <CrmLeadsPage />
+              case 'Clients': return <CrmClientsPage />
+              case 'Pipeline': return <CrmPipelinePage />
+              case 'Follow Ups': return <CrmFollowUpsPage />
+              case 'Activities': return <CrmActivitiesPage />
+              case 'Broadcast': return <CrmBroadcastPage />
 
               case 'Roles & Permissions': return <RolesPermissionsPage />
               case 'User Management': return <UsersPage />
