@@ -14,10 +14,8 @@ export function SettingsSidebar({ activeTab, setActiveTab }: SettingsSidebarProp
 
   const tabs = [
     { name: 'General', icon: Globe, description: t('Workspace details and timezone') },
-    { name: 'Appearance', icon: Palette, description: t('Theme and UI preferences') },
     { name: 'Notifications', icon: Bell, description: t('Email and push alerts') },
     { name: 'Security', icon: Shield, description: t('2FA and active sessions') },
-    { name: 'Billing', icon: CreditCard, description: t('Payment methods and plans') },
   ]
 
   return (
@@ -26,11 +24,10 @@ export function SettingsSidebar({ activeTab, setActiveTab }: SettingsSidebarProp
         <button
           key={tab.name}
           onClick={() => setActiveTab(tab.name)}
-          className={`flex items-center gap-3 rounded-lg p-3 text-left transition-colors ${
-            activeTab === tab.name 
-              ? 'bg-primary/10 text-primary' 
+          className={`flex items-center gap-3 rounded-lg p-3 text-left transition-colors ${activeTab === tab.name
+              ? 'bg-primary/10 text-primary'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          }`}
+            }`}
         >
           <tab.icon className={`size-5 shrink-0 ${activeTab === tab.name ? 'text-primary' : 'text-muted-foreground'}`} />
           <div className="min-w-0 flex-1">

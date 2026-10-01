@@ -54,76 +54,39 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [isFaceProcessing, setIsFaceProcessing] = useState(false)
   const [savedDescriptor, setSavedDescriptor] = useState<number[] | null>(null)
 
-  const handleCameraLoginClick = async () => {
-    if (!email) {
-      setError('Masukkan alamat email kamu terlebih dahulu sebelum login dengan wajah.')
-      return
-    }
+  const handleCameraLoginClick = () => {
     setError('')
-    setIsFaceProcessing(true)
-    try {
-      const res = await fetch('/api/auth/face-get-descriptor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      })
-      const data = await res.json()
-      if (res.ok && data.faceDescriptor) {
-        setSavedDescriptor(data.faceDescriptor)
-        setIsFaceScannerOpen(true)
-      } else {
-        setError('Data wajah belum didaftarkan untuk email ini. Silakan login dengan password lalu daftarkan wajah di menu profil.')
-      }
-    } catch (e) {
-      setError('Gagal menghubungi server untuk memverifikasi data wajah.')
-    } finally {
-      setIsFaceProcessing(false)
-    }
+    setIsFaceScannerOpen(true)
   }
 
   const handleFaceDetected = async (descriptor: Float32Array) => {
-    if (!savedDescriptor) return
     setIsFaceProcessing(true)
     try {
-      // Calculate euclidean distance manually to avoid importing face-api.js on SSR
-      const desc2 = new Float32Array(savedDescriptor)
-      let sum = 0;
-      for (let i = 0; i < descriptor.length; i++) {
-        const diff = descriptor[i] - desc2[i];
-        sum += diff * diff;
-      }
-      const distance = Math.sqrt(sum);
-
-      if (distance < 0.6) {
-        // Wajah cocok, lakukan login
-        const res = await fetch('/api/auth/face-login', {
+      const res = await fetch('/api/auth/face-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ descriptor: Array.from(descriptor) })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        if (data.user.status === 'resign') {
+          setError('Anda sudah resign mohon hubungi admin')
+          setIsFaceScannerOpen(false)
+          return
+        }
+        localStorage.setItem('auth_user', JSON.stringify(data.user))
+        localStorage.setItem('play_welcome_voice', 'true')
+        
+        fetch('/api/activity-log', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        })
-        const data = await res.json()
-        if (res.ok && data.success) {
-          if (data.user.status === 'resign') {
-            setError('Anda sudah resign mohon hubungi admin')
-            setIsFaceScannerOpen(false)
-            return
-          }
-          localStorage.setItem('auth_user', JSON.stringify(data.user))
-          
-          fetch('/api/activity-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activityType: 'login', description: 'User logged in via AI Camera', userId: data.user.id })
-          }).catch(console.error)
+          body: JSON.stringify({ activityType: 'login', description: 'User logged in via AI Camera', userId: data.user.id })
+        }).catch(console.error)
 
-          setIsFaceScannerOpen(false)
-          onLogin()
-        } else {
-          setError('Gagal membuat sesi login.')
-          setIsFaceScannerOpen(false)
-        }
+        setIsFaceScannerOpen(false)
+        onLogin()
       } else {
-        setError('Wajah tidak cocok dengan yang terdaftar. Coba lagi.')
+        setError(data.error || 'Wajah tidak cocok dengan pengguna manapun yang terdaftar.')
         setIsFaceScannerOpen(false)
       }
     } catch (e) {

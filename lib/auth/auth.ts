@@ -62,7 +62,13 @@ const prismaWithHooks = prisma.$extends({
 });
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   trustedOrigins: ["http://192.168.0.29:3000", "http://192.168.7.21:3000"],
+  advanced: {
+    database: {
+      validateSchema: false
+    }
+  },
   database: prismaAdapter(prismaWithHooks as any, {
     provider: (process.env.ACTIVE_DB || 'postgres').toLowerCase() === 'mysql' ? 'mysql' : 'postgres',
   }),
@@ -71,7 +77,7 @@ export const auth = betterAuth({
     onError: (error, ctx) => {
       console.error("BETTER AUTH API ERROR:", error);
       import('fs').then(fs => {
-        fs.appendFileSync('better-auth-error.log', new Date().toISOString() + '\\n' + JSON.stringify(error, Object.getOwnPropertyNames(error)) + '\\n');
+        fs.appendFileSync('better-auth-error.log', new Date().toISOString() + '\n' + JSON.stringify(error, Object.getOwnPropertyNames(error)) + '\n');
       }).catch(() => {});
     }
   },
@@ -90,6 +96,18 @@ export const auth = betterAuth({
       status: {
         type: "string",
         defaultValue: "active"
+      },
+      firstname: {
+        type: "string",
+        required: false
+      },
+      lastname: {
+        type: "string",
+        required: false
+      },
+      password: {
+        type: "string",
+        required: false
       }
     }
   },
