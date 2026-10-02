@@ -109,20 +109,24 @@ const financeMenu = [
   { label: 'Beranda', icon: LayoutDashboard },
   { label: 'Kas & Bank', icon: Wallet },
   { label: 'Akun Perkiraan', icon: Wallet },
-  { label: 'Penjualan', icon: TrendingUp, subItems: [
-    { label: 'Penawaran Penjualan' },
-    { label: 'Uang Muka Penjualan' },
-    { label: 'Faktur Penjualan' },
-    { label: 'Penerimaan Penjualan' },
-    { label: 'Pelanggan' }
-  ] },
-  { label: 'Pembelian', icon: TrendingDown, subItems: [
-    { label: 'Pesanan Pembelian' },
-    { label: 'Faktur Pembelian' },
-    { label: 'Uang Muka Pembelian' },
-    { label: 'Pembayaran Pembelian' },
-    { label: 'Pemasok' }
-  ] },
+  {
+    label: 'Penjualan', icon: TrendingUp, subItems: [
+      { label: 'Penawaran Penjualan' },
+      { label: 'Uang Muka Penjualan' },
+      { label: 'Faktur Penjualan' },
+      { label: 'Penerimaan Penjualan' },
+      { label: 'Pelanggan' }
+    ]
+  },
+  {
+    label: 'Pembelian', icon: TrendingDown, subItems: [
+      { label: 'Pesanan Pembelian' },
+      { label: 'Faktur Pembelian' },
+      { label: 'Uang Muka Pembelian' },
+      { label: 'Pembayaran Pembelian' },
+      { label: 'Pemasok' }
+    ]
+  },
   { label: 'Barang & Jasa', icon: Package },
   { label: 'Karyawan', icon: Users },
   { label: 'Buku Besar', icon: FileSpreadsheet },
@@ -163,11 +167,29 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   const [section, setSection] = useState(initialSection)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const [isAccountOpen, setIsAccountOpen] = useState(false)
-  const [openFinanceGroups, setOpenFinanceGroups] = useState<Record<string, boolean>>({'Overview': true})
+  const [openFinanceGroups, setOpenFinanceGroups] = useState<Record<string, boolean>>({ 'Overview': true })
+
+  // Workspace Profile Logo State
+  const [workspaceLogo, setWorkspaceLogo] = useState('/logohm-transparent.png')
+
+  useEffect(() => {
+    const loadWorkspaceLogo = () => {
+      const stored = localStorage.getItem('workspace_profile')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          if (parsed.logo) setWorkspaceLogo(parsed.logo)
+        } catch (e) {}
+      }
+    }
+    loadWorkspaceLogo()
+    window.addEventListener('workspace-profile-updated', loadWorkspaceLogo)
+    return () => window.removeEventListener('workspace-profile-updated', loadWorkspaceLogo)
+  }, [])
 
   // Global Call State
-  const [activeCall, setActiveCall] = useState<{ roomName: string, type: 'voice'|'video', startedAt: number } | null>(null)
-  const [incomingCall, setIncomingCall] = useState<{ id: number, room_name: string, type: 'voice'|'video', callerName: string } | null>(null)
+  const [activeCall, setActiveCall] = useState<{ roomName: string, type: 'voice' | 'video', startedAt: number } | null>(null)
+  const [incomingCall, setIncomingCall] = useState<{ id: number, room_name: string, type: 'voice' | 'video', callerName: string } | null>(null)
 
   const handleStartCall = async (threadId: number, type: 'voice' | 'video') => {
     if (!user) return
@@ -196,7 +218,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
   // activeCallRef lets handleEndCall access the latest activeCall inside async callbacks
   // without stale closure issues
-  const activeCallRef = useRef<{ roomName: string, type: 'voice'|'video', startedAt: number } | null>(null)
+  const activeCallRef = useRef<{ roomName: string, type: 'voice' | 'video', startedAt: number } | null>(null)
   useEffect(() => {
     activeCallRef.current = activeCall
   }, [activeCall])
@@ -229,10 +251,10 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   useEffect(() => {
     if (!user?.id) return
     pusherClient.subscribe('presence-chat')
-    
+
     const personalChannelName = `private-user-${user.id}`
     const personalChannel = pusherClient.subscribe(personalChannelName)
-    
+
     personalChannel.bind('call:incoming', (callData: any) => {
       setIncomingCall({
         id: callData.id,
@@ -262,7 +284,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
 
   const sidebarRef = useRef<HTMLDivElement>(null)
-  
+
   useEffect(() => {
     if (sidebarRef.current) {
       const savedScroll = sessionStorage.getItem('sidebarScroll')
@@ -278,7 +300,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
   const handleNavigate = (newSection: string) => {
     setSection(newSection)
-    
+
     // Custom routing for finance module
     const financeRouteMap: Record<string, string> = {
       'Beranda': 'finance/overview',
@@ -300,7 +322,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       'Karyawan': 'finance/employees',
       'Buku Besar': 'finance/general-ledger'
     }
-    
+
     // Custom routing for HR module
     const hrRouteMap: Record<string, string> = {
       'HR Overview': 'hr/overview',
@@ -320,7 +342,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       'Activities': 'crm/activities',
       'Broadcast': 'crm/broadcast'
     }
-    
+
     if (financeRouteMap[newSection]) {
       router.push('/' + financeRouteMap[newSection], { scroll: false })
     } else if (hrRouteMap[newSection]) {
@@ -476,7 +498,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handleChange = () => {
       document.documentElement.classList.remove('light', 'dark', 'hacker', 'cewek')
-      
+
       if (themeMode === 'system') {
         const isDark = mediaQuery.matches
         setResolvedDark(isDark)
@@ -531,12 +553,12 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
     <div className="flex h-screen overflow-hidden text-foreground relative">
       {/* Global Call Overlays */}
       {activeCall && (
-        <LiveKitCallUI 
-          roomName={activeCall.roomName} 
-          displayName={`${user.firstname} ${user.lastname}`} 
+        <LiveKitCallUI
+          roomName={activeCall.roomName}
+          displayName={`${user.firstname} ${user.lastname}`}
           email={user.email}
           isAudioOnly={activeCall.type === 'voice'}
-          onClose={handleEndCall} 
+          onClose={handleEndCall}
         />
       )}
 
@@ -555,17 +577,17 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
 
       {/* Mobile Backdrop */}
       {mobileMenuOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
-          onClick={() => setMobileMenuOpen(false)} 
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
         />
       )}
       {!isTopnav && (
         <aside className={asideClasses}>
           <div className={`flex items-center justify-center border-b border-sidebar-border px-2 ${sidebarStyle === 'floating' ? 'h-14' : 'h-16'}`}>
             {effectiveCollapsed
-              ? <img src="/logohm-transparent.png" alt="Logo" className="h-8 w-auto object-contain" />
-              : <img src="/logohm-transparent.png" alt="HaiMotion Logo" className="h-14 w-auto object-contain" />
+              ? <img src={workspaceLogo} alt="Logo" className="h-8 w-auto object-contain max-h-10" />
+              : <img src={workspaceLogo} alt="Workspace Logo" className="h-14 w-auto object-contain max-h-14" />
             }
           </div>
           <div ref={sidebarRef} onScroll={handleSidebarScroll} className="flex flex-1 flex-col gap-7 px-3 py-6 overflow-y-auto">
@@ -641,8 +663,8 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
                 const isGroupActive = !subItems ? section === label : isSubActive;
                 return (
                   <div key={label} className="flex flex-col gap-1">
-                    <button 
-                      onClick={() => subItems ? setOpenGroups({...openGroups, [label]: !isOpen}) : handleNavigate(label)} 
+                    <button
+                      onClick={() => subItems ? setOpenGroups({ ...openGroups, [label]: !isOpen }) : handleNavigate(label)}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isGroupActive ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}
                     >
                       <Icon icon={icon} className="size-4 shrink-0" />
@@ -682,7 +704,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
           </div>
           <div className="border-t border-sidebar-border p-3">
             <div className="flex flex-col gap-1">
-              <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent">
+              {/* <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent">
                 <Avatar className="size-8">
                   <AvatarImage src={user?.avatar || undefined} />
                   <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
@@ -695,7 +717,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
                     <p className="truncate text-xs text-muted-foreground">{user?.email || 'Admin account'}</p>
                   </div>
                 )}
-              </button>
+              </button> */}
               <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg p-2 text-left text-red-500 hover:bg-red-500/10">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full"><LogOut className="size-4" /></div>
                 {!effectiveCollapsed && <span className="text-sm font-medium">Log out</span>}
@@ -712,7 +734,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             {isTopnav && (
               <div className="flex items-center gap-6">
                 <div className="flex items-center">
-                  <img src="/logohm-transparent.png" alt="HaiMotion Logo" className="h-12 w-auto object-contain" />
+                  <img src={workspaceLogo} alt="Workspace Logo" className="h-12 w-auto object-contain max-h-12" />
                 </div>
                 <div className="hidden md:flex items-center gap-1 overflow-x-auto">
                   {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...hrMenu, ...crmMenu, ...administration].map(({ label, icon }) => (
@@ -741,25 +763,18 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             <button className="relative rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notifications"><Bell className="size-4" /><span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" /></button>
             <div className="mx-2 hidden h-5 w-px bg-border sm:block" />
             <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-full hover:ring-2 hover:ring-ring outline-none cursor-pointer">
-                  <Avatar className="size-8">
-                    <AvatarImage src={user?.avatar || undefined} />
-                    <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                      {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
-                    </AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5 text-sm font-semibold">{user?.firstname ? `${user.firstname} ${user.lastname || ''}` : 'Admin'}</div>
-                  <DropdownMenuItem onClick={() => handleNavigate('Account Settings')}>
-                    <UserCheck className="mr-2 size-4" /> Account Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-500">
-                    <LogOut className="mr-2 size-4" /> Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <button
+                onClick={() => handleNavigate('Account Settings')}
+                className="flex size-8 items-center justify-center rounded-full hover:ring-2 hover:ring-ring outline-none cursor-pointer transition-all"
+                title="Account Settings"
+              >
+                <Avatar className="size-8">
+                  <AvatarImage src={user?.avatar || undefined} />
+                  <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                    {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
             </div>
           </div>
         </header>
@@ -839,7 +854,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
                       <img src={user.avatar} className="bg-bubble" style={{ width: '120px', height: '120px', top: '25%', left: '45%', animationDelay: '-1s' }} alt="" />
                     </div>
                   )}
-                  
+
                   <div className="mx-auto max-w-4xl pt-4 relative z-10">
                     <div className="mb-6 flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{t('Workspace')}</span><span>/</span><span className="text-foreground">{t('Account Settings')}</span>
@@ -859,10 +874,10 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       <div className="w-full max-w-xl rounded-2xl border border-border bg-popover p-2 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b border-border px-3 py-3">
           <Search className="size-4 text-muted-foreground" />
-          <input 
-            autoFocus 
-            placeholder="Search pages, apps, settings..." 
-            className="flex-1 bg-transparent text-sm outline-none" 
+          <input
+            autoFocus
+            placeholder="Search pages, apps, settings..."
+            className="flex-1 bg-transparent text-sm outline-none"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -871,9 +886,9 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
         <div className="flex flex-col gap-1 p-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
           {searchResults.length > 0 ? (
             searchResults.map((item) => (
-              <button 
+              <button
                 key={item.label}
-                onClick={() => { handleNavigate(item.label); setCommand(false); }} 
+                onClick={() => { handleNavigate(item.label); setCommand(false); }}
                 className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm hover:bg-muted"
               >
                 <item.icon className="size-4" />

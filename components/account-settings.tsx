@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useLanguage } from '@/components/language-provider'
 import dynamic from 'next/dynamic'
+import { AvatarCropperModal } from '@/components/avatar-cropper-modal'
 
 const FaceScanner = dynamic(() => import('@/components/face-scanner').then(mod => mod.FaceScanner), { ssr: false })
 
@@ -62,6 +63,7 @@ export function AccountSettings({ user }: { user?: any }) {
   })
 
   const [isUploading, setIsUploading] = useState(false)
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
@@ -110,23 +112,55 @@ export function AccountSettings({ user }: { user?: any }) {
   const roleName = user?.role?.name || (user?.type === 1 ? 'Super Admin' : 'Admin')
   const position = user?.name || ''
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setCropImageSrc(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
     setIsUploading(true)
     const form = new FormData()
-    form.append('file', file)
+    form.append('file', croppedBlob, 'avatar.png')
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: form })
       const uploadData = await res.json()
       if (res.ok) {
-        setFormData(prev => ({ ...prev, avatar: uploadData.url }))
-        toast.success('Avatar uploaded successfully!')
+        const newAvatarUrl = uploadData.url
+        setFormData(prev => ({ ...prev, avatar: newAvatarUrl }))
+        
+        // Save to Database immediately so it's not lost
+        if (user?.id) {
+          const updateRes = await fetch(`/api/users/${user.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ avatar: newAvatarUrl })
+          })
+          if (updateRes.ok) {
+            queryClient.invalidateQueries()
+            const stored = localStorage.getItem('auth_user')
+            if (stored) {
+              try {
+                const parsed = JSON.parse(stored)
+                parsed.avatar = newAvatarUrl
+                localStorage.setItem('auth_user', JSON.stringify(parsed))
+              } catch (e) {}
+            }
+          }
+        }
+
+        toast.success(t('Foto profil berhasil dipotong dan disimpan ke database!'))
+        setCropImageSrc(null)
       } else {
-        toast.error('Failed to upload avatar!')
+        toast.error(t('Gagal mengunggah foto profil!'))
       }
     } catch {
-      toast.error('An error occurred while uploading avatar')
+      toast.error(t('Terjadi kesalahan saat menyimpan foto profil.'))
     } finally {
       setIsUploading(false)
     }
@@ -146,10 +180,17 @@ export function AccountSettings({ user }: { user?: any }) {
       }
       return res.json()
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries()
+      const stored = localStorage.getItem('auth_user')
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          const updatedUser = { ...parsed, ...data }
+          localStorage.setItem('auth_user', JSON.stringify(updatedUser))
+        } catch (e) {}
+      }
       toast.success(t('Profile saved successfully!'))
-      setTimeout(() => window.location.reload(), 1500)
     },
     onError: (error: any) => {
       toast.error(`Error: ${error.message}`)
@@ -237,15 +278,14 @@ export function AccountSettings({ user }: { user?: any }) {
           <Divider title={t('Account & Security')} subtitle={t('Role, login email, and account password.')} />
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <FieldGroup label={t('User Role')} hint={t('Role is managed by admin')}>
-              <div className="flex items-center gap-2 rounded-md border border-input bg-muted/30 px-3 py-2 text-sm cursor-not-allowed">
-                <span className="flex size-2 rounded-full bg-primary shrink-0" />
-                <span className="font-medium">{roleName}</span>
-              </div>
-            </FieldGroup>
-
-            {/* Spacer to keep role alone on its row */}
-            <div className="hidden sm:block" />
+            <div className="sm:col-span-2">
+              <FieldGroup label={t('User Role')} hint={t('Role is managed by admin')}>
+                <div className="flex items-center gap-2 rounded-md border border-input bg-muted/30 px-3 py-2 text-sm cursor-not-allowed w-full">
+                  <span className="flex size-2 rounded-full bg-primary shrink-0" />
+                  <span className="font-medium">{roleName}</span>
+                </div>
+              </FieldGroup>
+            </div>
 
             <FieldGroup label={t('Email Login')} required>
               <Input
@@ -314,14 +354,14 @@ export function AccountSettings({ user }: { user?: any }) {
           {/* ─── Passkey / Face ID ─── */}
           <Divider title={t('Biometric Login')} subtitle={t('Login securely using your device biometrics or AI Camera.')} />
           
-          <div className="flex flex-col gap-4 items-start">
+          <div className="flex flex-col gap-4 items-start w-full">
             <p className="text-sm text-muted-foreground">{t('Register this device to allow logging in without a password.')}</p>
-            <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="outline" onClick={handleRegisterPasskey} disabled={isPasskeyLoading}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+              <Button type="button" variant="outline" className="w-full justify-center" onClick={handleRegisterPasskey} disabled={isPasskeyLoading}>
                 {isPasskeyLoading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Fingerprint className="mr-2 size-4" />}
                 {isPasskeyLoading ? t('Registering...') : t('Register Sidik Jari / Device')}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setIsFaceScannerOpen(true)}>
+              <Button type="button" variant="outline" className="w-full justify-center" onClick={() => setIsFaceScannerOpen(true)}>
                 <Camera className="mr-2 size-4" />
                 {t('Register AI Face (Camera)')}
               </Button>
@@ -345,7 +385,7 @@ export function AccountSettings({ user }: { user?: any }) {
               </div>
               {/* Hover overlay */}
               <label className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/40 opacity-0 hover:opacity-100 transition-opacity">
-                <input type="file" accept="image/*" onChange={handleFileUpload} className="sr-only" />
+                <input type="file" accept="image/*" onChange={handleFileSelect} className="sr-only" />
                 {isUploading
                   ? <Loader2 className="size-5 animate-spin text-white" />
                   : <Camera className="size-5 text-white" />
@@ -357,7 +397,7 @@ export function AccountSettings({ user }: { user?: any }) {
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <input type="file" accept="image/*" onChange={handleFileUpload}
+                  <input type="file" accept="image/*" onChange={handleFileSelect}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                   <Button type="button" variant="outline" size="sm" disabled={isUploading}>
                     {isUploading
@@ -395,6 +435,15 @@ export function AccountSettings({ user }: { user?: any }) {
           </Button>
         </div>
       </form>
+
+      {cropImageSrc && (
+        <AvatarCropperModal
+          imageSrc={cropImageSrc}
+          onCancel={() => setCropImageSrc(null)}
+          onCropComplete={handleCropComplete}
+          isUploading={isUploading}
+        />
+      )}
 
       {isFaceScannerOpen && (
         <FaceScanner

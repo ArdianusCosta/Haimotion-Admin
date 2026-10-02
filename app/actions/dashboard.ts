@@ -162,7 +162,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
   });
   
   const trendProjects = await prisma.project_list.findMany({
-    where: trendTaskWhere,
+    where: trendProjectWhere,
     select: { date_created: true, status: true }
   });
 
@@ -199,6 +199,13 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
 
   const trendData = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
 
+  // Fetch all active projects list for dropdown filter
+  const allProjectsList = await prisma.project_list.findMany({
+    where: { is_archived: false },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' }
+  });
+
   // 3. Pipeline (Project Statuses)
   const pipeline = await prisma.project_list.groupBy({
     by: ['status'],
@@ -210,14 +217,12 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
   const activeProjects = await prisma.project_list.findMany({
     where: activeProjectsWhere,
     include: {
-      _count: { select: { meetings: true } } // Placeholder, really we want task progress
+      _count: { select: { meetings: true } }
     },
     orderBy: { date_created: 'desc' },
     take: 5
   });
 
-  // Since we can't easily query related task count in a single prisma query easily without deep includes,
-  // we'll fetch tasks for these projects
   const activeProjectIds = activeProjects.map(p => p.id);
   const projectTasksData = await prisma.task_list.groupBy({
     by: ['project_id', 'status'],
@@ -239,29 +244,22 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     };
   });
 
-  // 5. Team Performance (Top 5 assignees)
-  const teamTasks = await prisma.taskAssignee.groupBy({
-    by: ['user_id'],
-    _count: { task_id: true }
-  });
-  
-  // Need to join with User and task status
+  // 5. Team Performance (Query active users from DB)
   const teamUsers = await prisma.user.findMany({
-    where: { id: { in: teamTasks.map(t => t.user_id) } },
-    select: { id: true, firstname: true, lastname: true, avatar: true }
+    where: { status: { not: 'resign' } },
+    select: { id: true, firstname: true, lastname: true, avatar: true },
+    take: 10
   });
 
-  // For accurate pending/completed per user:
   const allUserTasks = await prisma.taskAssignee.findMany({
     include: { task: { select: { status: true } } }
   });
 
   const teamPerformance = teamUsers.map(u => {
     const userTasks = allUserTasks.filter(t => t.user_id === u.id);
-    const completed = userTasks.filter(t => t.task.status === 5).length;
-    const pending = userTasks.filter(t => t.task.status !== 5).length;
+    const completed = userTasks.filter(t => t.task?.status === 5).length;
+    const pending = userTasks.filter(t => t.task?.status !== 5).length;
     
-    // Format avatar
     let avatarUrl = u.avatar || '';
     if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
       avatarUrl = `/avatars/${avatarUrl}`;
@@ -274,12 +272,11 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
       completed,
       pending
     };
-  }).sort((a, b) => b.completed - a.completed).slice(0, 5);
+  }).sort((a, b) => (b.completed + b.pending) - (a.completed + a.pending)).slice(0, 5);
 
   // 6. Recent Activity
   let formattedActivity: any[] = [];
   try {
-    // If Prisma schema error on include user, we fetch manually
     const activities = await prisma.activity_log.findMany({ orderBy: { created_at: 'desc' }, take: 8 });
     const userIds = activities.map(a => a.user_id).filter((v, i, a) => a.indexOf(v) === i);
     const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, firstname: true, lastname: true, avatar: true } });
@@ -310,6 +307,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     paretoData,
     pipeline,
     projectPerformance,
+    allProjectsList,
     teamPerformance,
     recentActivity: formattedActivity
   };

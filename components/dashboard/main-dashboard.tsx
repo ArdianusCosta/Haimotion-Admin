@@ -14,7 +14,7 @@ import { ProjectOverview } from './components/project-overview'
 import { RecentProjects } from './components/recent-projects'
 
 export function MainDashboard({ user }: { user: any }) {
-  const { range, setRange, projectFilter, setProjectFilter, loading, data } = useDashboard()
+  const { range, setRange, projectFilter, setProjectFilter, loading, isFetching, data } = useDashboard()
   const { language } = useLanguage()
   
   const [greeting, setGreeting] = useState("Halo")
@@ -95,6 +95,13 @@ export function MainDashboard({ user }: { user: any }) {
         </div>
         
         <div className="flex items-center gap-3">
+          {isFetching && (
+            <div className="flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 px-3 py-2 rounded-lg border border-primary/20 animate-pulse">
+              <div className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <span>Memperbarui...</span>
+            </div>
+          )}
+
           <Select value={range} onValueChange={setRange}>
             <SelectTrigger className="w-[200px] h-10 bg-background">
               <SelectValue placeholder="Pilih Periode" />
@@ -115,7 +122,7 @@ export function MainDashboard({ user }: { user: any }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="Semua Project">Semua Project</SelectItem>
-              {data.projectPerformance.map((p: any) => (
+              {(data.allProjectsList || data.projectPerformance || []).map((p: any) => (
                 <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
               ))}
             </SelectContent>

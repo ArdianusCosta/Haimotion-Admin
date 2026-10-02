@@ -72,6 +72,24 @@ export const auth = betterAuth({
   database: prismaAdapter(prismaWithHooks as any, {
     provider: (process.env.ACTIVE_DB || 'postgres').toLowerCase() === 'mysql' ? 'mysql' : 'postgres',
   }),
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          const email = (user.email || "").toLowerCase();
+          if (!email.endsWith("haimotion@gmail.com") && !email.endsWith("@haimotion.com")) {
+            throw new Error("Akses ditolak: Login Google hanya diizinkan untuk email yang berkahiran .haimotion@gmail.com");
+          }
+        }
+      }
+    }
+  },
   onAPIError: {
     throw: false,
     onError: (error, ctx) => {
