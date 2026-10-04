@@ -454,3 +454,74 @@ export async function updateProjectMembers(id: number, user_ids: number[]) {
     return { success: false, error: 'Failed to update members' }
   }
 }
+
+// MILESTONES (Phase 3)
+export async function getProjectMilestones(projectId: number) {
+  try {
+    const user = await requireAuth()
+    const hasAccess = await canAccessProject(user, projectId, 'viewer')
+    if (!hasAccess) return { success: false, error: 'Unauthorized' }
+
+    const milestones = await prisma.projectMilestone.findMany({
+      where: { project_id: projectId },
+      orderBy: { due_date: 'asc' }
+    })
+    return { success: true, data: milestones }
+  } catch (error: any) {
+    console.error('Failed to get milestones:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function createProjectMilestone(data: { project_id: number, title: string, description?: string, due_date: string }) {
+  try {
+    const user = await requireAuth()
+    const hasAccess = await canAccessProject(user, data.project_id, 'editor')
+    if (!hasAccess) return { success: false, error: 'Unauthorized' }
+
+    const milestone = await prisma.projectMilestone.create({
+      data: {
+        project_id: data.project_id,
+        title: data.title,
+        description: data.description,
+        due_date: new Date(data.due_date),
+        status: 'Pending'
+      }
+    })
+
+    await logActivity(user.id, 'Project Milestone Created', `Added milestone: ${data.title}`)
+    return { success: true, data: milestone }
+  } catch (error: any) {
+    console.error('Failed to create milestone:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateProjectMilestoneStatus(id: number, status: string, project_id: number) {
+  try {
+    const user = await requireAuth()
+    const hasAccess = await canAccessProject(user, project_id, 'editor')
+    if (!hasAccess) return { success: false, error: 'Unauthorized' }
+
+    const milestone = await prisma.projectMilestone.update({
+      where: { id },
+      data: { status }
+    })
+    return { success: true, data: milestone }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteProjectMilestone(id: number, project_id: number) {
+  try {
+    const user = await requireAuth()
+    const hasAccess = await canAccessProject(user, project_id, 'editor')
+    if (!hasAccess) return { success: false, error: 'Unauthorized' }
+
+    await prisma.projectMilestone.delete({ where: { id } })
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

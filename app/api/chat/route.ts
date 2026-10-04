@@ -83,8 +83,8 @@ export async function POST(req: Request) {
     let userContext = "the user";
     if (user.firstname) {
       userContext = `${user.firstname} ${user.lastname || ''}`.trim();
-      if (user.type === 1) userContext += ' (Administrator)';
-      else if (user.type === 2) userContext += ' (Staff)';
+      if (user.role_id === 1 || user.role?.name === 'Admin') userContext += ' (Administrator)';
+      else userContext += ' (Staff)';
     }
 
     const systemPromptText = `You are a helpful AI assistant integrated into a dashboard called HaiMotion. Your job is to assist ${userContext} with their business tasks, code, data analysis, or anything they need. Always be polite and occasionally address them by their name. If the user asks you to generate, create, or show an image/photo, you MUST reply with a markdown image using this EXACT format on a new line: \`![deskripsi gambar bahasa inggris](https://image.pollinations.ai/prompt/DESKRIPSI_GAMBAR_BAHASA_INGGRIS_DENGAN_UNDERSCORE?width=3840&height=2160&nologo=true&model=flux)\`. Do not say you cannot generate images. Just return the markdown.`;
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
       const apiKey = apiKeys[i];
       if (!apiKey) continue;
 
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${apiKey}`, {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

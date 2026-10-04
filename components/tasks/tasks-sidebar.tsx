@@ -1,83 +1,82 @@
-import { Inbox, Calendar, CalendarDays, FolderDot, Filter, Plus } from 'lucide-react'
+import { FolderDot, Plus, Search, Layers, LayoutGrid } from 'lucide-react'
 import { useTasks } from './tasks-provider'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useState } from 'react'
 
 export function TasksSidebar({ onNewTask }: { onNewTask: () => void }) {
   const { 
     projects, 
-    selectedTab, setSelectedTab,
     selectedProjectId, setSelectedProjectId,
-    inboxCount, todayCount, upcomingCount
   } = useTasks()
 
+  const [searchProject, setSearchProject] = useState('')
+
+  const filteredProjects = projects.filter((p: any) => 
+    p.name.toLowerCase().includes(searchProject.toLowerCase())
+  )
+
   return (
-    <div className="w-64 shrink-0 flex flex-col h-full border-r border-border/40 bg-card/30">
-      <div className="p-4">
-        <Button onClick={onNewTask} className="w-full justify-start shadow-sm font-medium h-10">
+    <div className="w-60 shrink-0 hidden md:flex flex-col h-full border-r border-border/40 bg-card/10">
+      <div className="p-4 border-b border-border/40">
+        <Button onClick={onNewTask} className="w-full justify-start shadow-sm font-medium h-10 bg-primary/90 hover:bg-primary">
           <Plus className="mr-2 size-4" /> New Task
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-6">
-        <div className="space-y-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="p-4 space-y-4">
           
-          {/* Main Filters */}
           <div>
-            <h4 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Views</h4>
-            <div className="space-y-1">
-              <button
-                onClick={() => { setSelectedTab('all'); setSelectedProjectId(null); }}
-                className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  selectedTab === 'all' && !selectedProjectId 
-                    ? 'bg-primary/10 text-primary' 
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Inbox className="size-4" />
-                  <span>All Tasks</span>
-                </div>
-                {inboxCount > 0 && <span className="text-xs bg-background/50 rounded-md px-1.5 py-0.5">{inboxCount}</span>}
-              </button>
-              
-              <button
-                onClick={() => { setSelectedTab('my-tasks'); setSelectedProjectId(null); }}
-                className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  selectedTab === 'my-tasks' && !selectedProjectId 
-                    ? 'bg-primary/10 text-primary' 
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Filter className="size-4" />
-                  <span>My Tasks</span>
-                </div>
-              </button>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <h4 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <LayoutGrid className="size-3" /> Projects
+              </h4>
             </div>
-          </div>
+            
+            <div className="relative mb-2">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+              <Input 
+                value={searchProject}
+                onChange={(e) => setSearchProject(e.target.value)}
+                placeholder="Search projects..."
+                className="pl-7 h-7 text-xs bg-transparent border-transparent shadow-none hover:bg-muted/30 focus-visible:ring-1 focus-visible:bg-background transition-all"
+              />
+            </div>
 
-          {/* Projects */}
-          <div>
-            <h4 className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Projects</h4>
-            <div className="space-y-1">
-              {projects.map((p: any) => (
+            <div className="space-y-0.5">
+              <button
+                onClick={() => setSelectedProjectId(null)}
+                className={`w-full flex items-center justify-between rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
+                  selectedProjectId === null 
+                    ? 'bg-primary/10 text-primary' 
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Layers className={`size-3.5 shrink-0 ${selectedProjectId === null ? 'text-primary' : 'text-muted-foreground/70'}`} />
+                  <span className="truncate">All Projects</span>
+                </div>
+              </button>
+
+              {filteredProjects.map((p: any) => (
                 <button
                   key={p.id}
                   onClick={() => setSelectedProjectId(p.id)}
-                  className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`w-full flex items-center justify-between rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors ${
                     selectedProjectId === p.id 
                       ? 'bg-primary/10 text-primary' 
                       : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <FolderDot className={`size-4 shrink-0 ${selectedProjectId === p.id ? 'text-primary' : 'text-muted-foreground/70'}`} />
+                    <FolderDot className={`size-3.5 shrink-0 ${selectedProjectId === p.id ? 'text-primary' : 'text-muted-foreground/70'}`} />
                     <span className="truncate">{p.name}</span>
                   </div>
                 </button>
               ))}
-              {projects.length === 0 && (
-                <p className="px-3 py-2 text-xs text-muted-foreground italic">No projects found.</p>
+              {filteredProjects.length === 0 && searchProject && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground italic">No projects found.</p>
               )}
             </div>
           </div>

@@ -8,12 +8,83 @@ export async function getEvents() {
   try {
     const user = await requireAuth();
     requirePermission(user, "calendar.view");
+    
+    // 1. Regular Events
     const events = await prisma.events.findMany({
-      orderBy: {
-        start_event: 'asc'
-      }
-    })
-    return { success: true, data: events }
+      orderBy: { start_event: 'asc' }
+    });
+    
+    // 2. Task Deadlines
+    const tasks = await prisma.task_list.findMany({
+      where: { end_date: { not: null } }
+    });
+    
+    // 3. CRM Follow-ups
+    const followUps = await prisma.crmFollowUp.findMany({
+      where: { due_date: { not: null } },
+      include: { lead: { select: { name: true } }, deal: { select: { name: true } } }
+    });
+    
+    // 4. HR Leaves
+    const leaves = await prisma.hrLeaveRequest.findMany({
+      where: { start_date: { not: null } },
+      include: { employee: { select: { name: true } } }
+    });
+    
+    const unifiedEvents = [
+      ...events.map(e => ({ ...e, source: 'calendar' })),
+      
+      ...tasks.map(t => {
+        const d = new Date(t.end_date!);
+        d.setHours(17, 0, 0, 0); // Default task deadline time to 5 PM
+        return {
+          id: `task-${t.id}`,
+          title: `Task: ${t.task}`,
+          start_event: d,
+          end_event: d,
+          color: 'bg-indigo-500 text-white',
+          description: t.description || '',
+          source: 'task',
+          original_id: t.id
+        };
+      }),
+      
+      ...followUps.map(f => {
+        const target = f.lead?.name || f.deal?.name || 'Client';
+        return {
+          id: `crm-${f.id}`,
+          title: `Follow-up: ${target} (${f.type})`,
+          start_event: new Date(f.due_date!),
+          end_event: new Date(f.due_date!),
+          color: 'bg-rose-500 text-white',
+          description: f.notes || '',
+          source: 'crm',
+          original_id: f.id
+        };
+      }),
+      
+      ...leaves.map(l => {
+        const start = new Date(l.start_date);
+        start.setHours(9, 0, 0, 0);
+        const end = new Date(l.end_date);
+        end.setHours(17, 0, 0, 0);
+        return {
+          id: `leave-${l.id}`,
+          title: `Leave: ${l.employee?.name || 'Employee'} (${l.type})`,
+          start_event: start,
+          end_event: end,
+          color: 'bg-emerald-500 text-white',
+          description: l.reason || '',
+          source: 'leave',
+          original_id: l.id
+        };
+      })
+    ];
+    
+    // Sort all events by start_event
+    unifiedEvents.sort((a, b) => new Date(a.start_event).getTime() - new Date(b.start_event).getTime());
+
+    return { success: true, data: unifiedEvents }
   } catch (error) {
     console.error('Failed to fetch events:', error)
     return { success: false, error: 'Failed to fetch events' }

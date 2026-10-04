@@ -320,3 +320,66 @@ export async function getTaskForEdit(taskId: number) {
     return { success: false, error: error.message };
   }
 }
+
+// TASK DEPENDENCIES (Phase 3)
+export async function getTaskDependencies(taskId: number) {
+  try {
+    const user = await requireAuth()
+    const hasAccess = await canAccessTask(user, taskId, 'viewer')
+    if (!hasAccess) return { success: false, error: 'Unauthorized' }
+
+    const dependencies = await prisma.taskDependency.findMany({
+      where: { task_id: taskId },
+      include: {
+        depends_on_task: {
+          select: { id: true, task: true, status: true, end_date: true }
+        }
+      }
+    })
+    return { success: true, data: dependencies }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function addTaskDependency(taskId: number, dependsOnId: number, type: string = 'BLOCKS') {
+  try {
+    const user = await requireAuth()
+    const hasAccess = await canAccessTask(user, taskId, 'editor')
+    if (!hasAccess) return { success: false, error: 'Unauthorized' }
+
+    if (taskId === dependsOnId) return { success: false, error: 'Task cannot depend on itself' }
+
+    const existing = await prisma.taskDependency.findFirst({
+      where: { task_id: taskId, depends_on_id: dependsOnId }
+    })
+    
+    if (existing) return { success: false, error: 'Dependency already exists' }
+
+    const dependency = await prisma.taskDependency.create({
+      data: {
+        task_id: taskId,
+        depends_on_id: dependsOnId,
+        type
+      }
+    })
+
+    await logActivity(user.id, 'Task Dependency Added', `Task #${taskId} now depends on #${dependsOnId}`)
+    return { success: true, data: dependency }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function removeTaskDependency(id: number, taskId: number) {
+  try {
+    const user = await requireAuth()
+    const hasAccess = await canAccessTask(user, taskId, 'editor')
+    if (!hasAccess) return { success: false, error: 'Unauthorized' }
+
+    await prisma.taskDependency.delete({ where: { id } })
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

@@ -249,3 +249,72 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
     </Dialog>
   )
 }
+
+export function InvoicePaymentModal({ open, onOpenChange, invoice, onSave }: any) {
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState('Transfer')
+  const [reference, setReference] = useState('')
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+
+  React.useEffect(() => {
+    if (invoice) {
+      setAmount(invoice.amount?.toString() || '')
+    }
+  }, [invoice])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave({
+      invoice_id: invoice.id,
+      amount: parseFloat(amount),
+      method,
+      reference,
+      payment_date: paymentDate
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              Record a payment for invoice {invoice?.reference}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Payment Date</Label>
+              <Input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} required />
+            </div>
+            <div className="grid gap-2">
+              <Label>Amount (IDR)</Label>
+              <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="1" max={invoice?.amount || undefined} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Payment Method</Label>
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Credit Card">Credit Card</SelectItem>
+                  <SelectItem value="Cheque">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Reference Note</Label>
+              <Input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. BCA 123456" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit">Save Payment</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

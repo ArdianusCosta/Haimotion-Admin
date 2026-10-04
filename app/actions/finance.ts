@@ -136,7 +136,7 @@ export async function getInvoices(filters?: { status?: string, search?: string }
   return prisma.financeInvoice.findMany({
     where,
     orderBy: { created_at: 'desc' },
-    include: { items: true }
+    include: { items: true, payments: true }
   })
 }
 
@@ -633,4 +633,73 @@ export async function updateAccount(id: number, data: any) {
 export async function deleteAccount(id: number) {
   await requireAuth()
   return prisma.financeAccount.delete({ where: { id } })
+}
+
+// -----------------------------------------------------------------------------
+// PHASE 3: CATEGORIES, BUDGETS, AND PAYMENTS
+// -----------------------------------------------------------------------------
+export async function getFinanceCategories() {
+  await requireAuth()
+  try {
+    const categories = await prisma.financeCategory.findMany({ orderBy: { name: 'asc' } })
+    return { success: true, data: categories }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getFinanceBudgets(projectId?: number) {
+  await requireAuth()
+  try {
+    const where = projectId ? { project_id: projectId } : {}
+    const budgets = await prisma.financeBudget.findMany({
+      where,
+      include: { category: true, project: { select: { name: true } } },
+      orderBy: { start_date: 'desc' }
+    })
+    return { success: true, data: budgets }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function createFinanceBudget(data: { name: string, amount: number, start_date: string, end_date: string, category_id?: number, project_id?: number }) {
+  await requireAuth()
+  try {
+    const budget = await prisma.financeBudget.create({
+      data: {
+        name: data.name,
+        amount: data.amount,
+        spent: 0,
+        start_date: new Date(data.start_date),
+        end_date: new Date(data.end_date),
+        category_id: data.category_id,
+        project_id: data.project_id
+      }
+    })
+    return { success: true, data: budget }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function createFinancePayment(data: { invoice_id: number, amount: number, payment_date: string, method?: string, reference?: string, notes?: string }) {
+  await requireAuth()
+  try {
+    const payment = await prisma.financePayment.create({
+      data: {
+        invoice_id: data.invoice_id,
+        amount: data.amount,
+        payment_date: new Date(data.payment_date),
+        method: data.method || 'Transfer',
+        reference: data.reference,
+        notes: data.notes
+      }
+    })
+    
+    // Automatically update invoice status to Paid if fully paid, but for simplicity we'll just return the payment
+    return { success: true, data: payment }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
 }

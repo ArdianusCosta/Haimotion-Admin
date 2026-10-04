@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCrmDeals, updateCrmDealStage, createCrmDeal } from '@/app/actions/crm'
+import { getCrmDeals, updateCrmDealStage, createCrmDeal, getCrmPipelines } from '@/app/actions/crm'
 import { Button } from '@/components/ui/button'
 import { Plus, MoreHorizontal } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -12,8 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 
-const STAGES = ['New', 'Qualified', 'Proposal', 'Negotiation', 'Won', 'Lost']
-
 export function CrmPipelinePage() {
   const queryClient = useQueryClient()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -21,9 +19,21 @@ export function CrmPipelinePage() {
   
   const [formData, setFormData] = useState({
     title: '',
-    stage: 'New',
+    stage_id: '',
     value: '',
   })
+
+  const { data: pipelines, isLoading: isLoadingPipelines } = useQuery({
+    queryKey: ['crmPipelines'],
+    queryFn: async () => {
+      const res = await getCrmPipelines()
+      if (!res.success) throw new Error(res.error)
+      return res.data || []
+    }
+  })
+
+  const activePipeline = pipelines?.[0]
+  const stages = activePipeline?.stages || []
 
   const { data: deals, isLoading } = useQuery({
     queryKey: ['crmDeals'],
@@ -35,7 +45,7 @@ export function CrmPipelinePage() {
   })
 
   const updateStageMutation = useMutation({
-    mutationFn: ({ id, stage }: { id: number, stage: string }) => updateCrmDealStage(id, stage),
+    mutationFn: ({ id, stage, pipeline_id, stage_id }: { id: number, stage: string, pipeline_id: number, stage_id: number }) => updateCrmDealStage(id, stage, pipeline_id, stage_id),
     onSuccess: (res) => {
       if (res.success) {
         queryClient.invalidateQueries({ queryKey: ['crmDeals'] })
@@ -51,7 +61,7 @@ export function CrmPipelinePage() {
       if (res.success) {
         toast.success('Deal created successfully')
         setIsCreateOpen(false)
-        setFormData({ title: '', stage: 'New', value: '' })
+        setFormData({ title: '', stage_id: '', value: '' })
         queryClient.invalidateQueries({ queryKey: ['crmDeals'] })
       } else {
         toast.error(res.error || 'Failed to create deal')
@@ -63,7 +73,17 @@ export function CrmPipelinePage() {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title) return toast.error('Title is required')
-    createMutation.mutate(formData)
+    if (!activePipeline) return toast.error('No pipeline found')
+    
+    const selectedStage = stages.find((s: any) => s.id.toString() === formData.stage_id)
+    if (!selectedStage) return toast.error('Stage is required')
+
+    createMutation.mutate({
+      ...formData,
+      stage: selectedStage.name,
+      stage_id: parseInt(formData.stage_id),
+      pipeline_id: activePipeline.id
+    })
   }
 
   const handleDragStart = (e: React.DragEvent, id: number) => {
@@ -77,13 +97,18 @@ export function CrmPipelinePage() {
     e.dataTransfer.dropEffect = 'move'
   }
 
-  const handleDrop = (e: React.DragEvent, targetStage: string) => {
+  const handleDrop = (e: React.DragEvent, targetStageObj: any) => {
     e.preventDefault()
-    if (draggedDealId !== null) {
+    if (draggedDealId !== null && activePipeline) {
       // Optimistic update
-      const deal = deals.find((d: any) => d.id === draggedDealId)
-      if (deal && deal.stage !== targetStage) {
-        updateStageMutation.mutate({ id: draggedDealId, stage: targetStage })
+      const deal = deals?.find((d: any) => d.id === draggedDealId)
+      if (deal && deal.stage_id !== targetStageObj.id) {
+        updateStageMutation.mutate({ 
+          id: draggedDealId, 
+          stage: targetStageObj.name,
+          pipeline_id: activePipeline.id,
+          stage_id: targetStageObj.id
+        })
       }
       setDraggedDealId(null)
     }
@@ -100,20 +125,21 @@ export function CrmPipelinePage() {
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
         <div className="flex gap-4 h-full min-w-max items-start">
-          {STAGES.map(stage => {
-            const stageDeals = deals?.filter((d: any) => d.stage === stage) || []
+          {isLoadingPipelines && <Skeleton className="w-80 h-full rounded-xl" />}
+          {stages.map((stage: any) => {
+            const stageDeals = deals?.filter((d: any) => d.stage_id === stage.id || d.stage === stage.name) || []
             const stageTotal = stageDeals.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
 
             return (
               <div 
-                key={stage} 
+                key={stage.id} 
                 className="w-80 bg-muted/50 rounded-xl border flex flex-col flex-shrink-0 h-full max-h-full"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage)}
               >
                 <div className="p-3 border-b flex items-center justify-between bg-card rounded-t-xl shrink-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm">{stage}</h3>
+                    <h3 className="font-semibold text-sm">{stage.name}</h3>
                     <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
                       {stageDeals.length}
                     </span>
@@ -186,14 +212,14 @@ export function CrmPipelinePage() {
               <div className="space-y-2">
                 <Label>Stage</Label>
                 <Select 
-                  value={formData.stage} 
-                  onValueChange={v => setFormData({...formData, stage: v})}
+                  value={formData.stage_id} 
+                  onValueChange={v => setFormData({...formData, stage_id: v})}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select stage" />
                   </SelectTrigger>
                   <SelectContent>
-                    {STAGES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {stages.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

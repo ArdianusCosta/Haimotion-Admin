@@ -240,6 +240,83 @@ export async function deleteCrmLead(id: number) {
   }
 }
 
+export async function convertCrmLead(id: number) {
+  const user = await getUserSession()
+  if (!user) throw new Error('Unauthorized')
+
+  try {
+    const lead = await prisma.crmLead.findUnique({ where: { id } })
+    if (!lead) return { success: false, error: 'Lead not found' }
+
+    if (lead.status === 'Converted') {
+      return { success: false, error: 'Lead is already converted' }
+    }
+
+    // 1. Update Lead Status
+    await prisma.crmLead.update({
+      where: { id },
+      data: { status: 'Converted' }
+    })
+
+    // 2. Create Client (only if company is provided)
+    let clientId = null
+    if (lead.company) {
+      const client = await prisma.crmClient.create({
+        data: {
+          company_name: lead.company,
+          industry: lead.industry || null,
+          status: 'Active',
+          source: lead.source,
+          assigned_user_id: lead.assigned_user_id,
+          contacts: {
+            create: {
+              name: lead.name,
+              email: lead.email || '',
+              phone: lead.phone || '',
+              is_primary: true
+            }
+          }
+        }
+      })
+      clientId = client.id
+    }
+
+    // 3. Get Default Pipeline
+    const pipeline = await prisma.crmPipeline.findFirst({
+      include: { stages: { orderBy: { order: 'asc' } } }
+    })
+
+    // 4. Create Deal
+    if (pipeline && pipeline.stages.length > 0) {
+      await prisma.crmDeal.create({
+        data: {
+          title: `${lead.company || lead.name} Deal`,
+          lead_id: lead.id,
+          client_id: clientId,
+          assigned_user_id: lead.assigned_user_id,
+          stage: pipeline.stages[0].name,
+          stage_id: pipeline.stages[0].id,
+          pipeline_id: pipeline.id,
+          value: lead.estimated_value || null,
+        }
+      })
+    }
+
+    await prisma.activity_log.create({
+      data: {
+        user_id: user.id,
+        activity_type: 'CRM Lead Converted',
+        description: `Converted Lead: ${lead.name} to Client & Deal`
+      }
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error('Failed to convert CRM lead:', error)
+    return { success: false, error: error.message }
+  }
+}
+
 // DEALS ACTIONS
 export async function getCrmDeals() {
   const user = await getUserSession()
@@ -252,7 +329,9 @@ export async function getCrmDeals() {
         lead: { select: { id: true, name: true, company: true } },
         assigned_user: {
           select: { id: true, firstname: true, lastname: true, avatar: true }
-        }
+        },
+        pipeline: true,
+        pipeline_stage: true
       },
       orderBy: { created_at: 'desc' }
     })
@@ -274,7 +353,9 @@ export async function createCrmDeal(data: any) {
         client_id: data.client_id,
         lead_id: data.lead_id,
         assigned_user_id: data.assigned_user_id,
-        stage: data.stage || 'Proposal',
+        stage: data.stage || 'Proposal', // Fallback for legacy
+        pipeline_id: data.pipeline_id,
+        stage_id: data.stage_id,
         value: data.value ? parseFloat(data.value) : null,
         probability: data.probability ? parseInt(data.probability) : 0,
         expected_close: data.expected_close ? new Date(data.expected_close) : null,
@@ -296,14 +377,18 @@ export async function createCrmDeal(data: any) {
   }
 }
 
-export async function updateCrmDealStage(id: number, stage: string) {
+export async function updateCrmDealStage(id: number, stage: string, pipeline_id?: number, stage_id?: number) {
   const user = await getUserSession()
   if (!user) throw new Error('Unauthorized')
 
   try {
+    const updateData: any = { stage }
+    if (pipeline_id !== undefined) updateData.pipeline_id = pipeline_id
+    if (stage_id !== undefined) updateData.stage_id = stage_id
+
     const deal = await prisma.crmDeal.update({
       where: { id },
-      data: { stage }
+      data: updateData
     })
     return { success: true, data: deal }
   } catch (error: any) {
@@ -447,3 +532,46 @@ export async function getCrmActivities() {
     return { success: false, error: error.message }
   }
 }
+
+// PIPELINE & STAGES ACTIONS (Phase 2)
+export async function getCrmPipelines() {
+  const user = await getUserSession()
+  if (!user) throw new Error('Unauthorized')
+
+  try {
+    let pipelines = await prisma.crmPipeline.findMany({
+      include: {
+        stages: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    })
+
+    // Auto-create default pipeline if none exists
+    if (pipelines.length === 0) {
+      const defaultPipeline = await prisma.crmPipeline.create({
+        data: {
+          name: 'Default Pipeline',
+          stages: {
+            create: [
+              { name: 'New', order: 1, probability: 10 },
+              { name: 'Qualified', order: 2, probability: 30 },
+              { name: 'Proposal', order: 3, probability: 50 },
+              { name: 'Negotiation', order: 4, probability: 80 },
+              { name: 'Won', order: 5, probability: 100 },
+              { name: 'Lost', order: 6, probability: 0 }
+            ]
+          }
+        },
+        include: { stages: { orderBy: { order: 'asc' } } }
+      })
+      pipelines = [defaultPipeline]
+    }
+
+    return { success: true, data: pipelines }
+  } catch (error: any) {
+    console.error('Failed to get CRM pipelines:', error)
+    return { success: false, error: error.message }
+  }
+}
+

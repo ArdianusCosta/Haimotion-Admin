@@ -70,7 +70,7 @@ export const auth = betterAuth({
     }
   },
   database: prismaAdapter(prismaWithHooks as any, {
-    provider: (process.env.ACTIVE_DB || 'postgres').toLowerCase() === 'mysql' ? 'mysql' : 'postgres',
+    provider: 'mysql',
   }),
   socialProviders: {
     google: {

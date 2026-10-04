@@ -96,32 +96,34 @@ function TasksContent() {
       <TasksSidebar onNewTask={openNewTaskDialog} />
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar relative">
         {/* Top Navigation Bar */}
-        <div className="flex items-center justify-between border-b border-border/40 bg-background/95 px-6 py-4 sticky top-0 z-30 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold tracking-tight text-foreground">Tasks</h1>
-            <span className="hidden sm:inline-flex text-sm text-muted-foreground">Manage your work and projects</span>
+        <div className="flex items-center justify-between border-b border-border/40 bg-background/95 px-6 py-5 sticky top-0 z-30 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Tasks</h1>
+            <p className="hidden sm:block text-sm text-muted-foreground mt-0.5">Manage and organize your team's work</p>
           </div>
-
+          <Button onClick={openNewTaskDialog} className="shadow-sm bg-primary/90 hover:bg-primary h-9 px-4 md:hidden">
+            <Plus className="mr-2 size-4" /> New Task
+          </Button>
         </div>
 
         <div className="flex-1 p-6 md:p-8 w-full space-y-8">
         {/* Statistics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="rounded-xl border border-border/40 bg-card p-5 shadow-sm hover:shadow transition-shadow">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Today</p>
-            <p className="text-3xl font-bold text-foreground">{todayCount}</p>
+          <div className="flex flex-col gap-1 rounded-xl border border-border/40 bg-card/40 p-4 shadow-sm hover:shadow-md hover:bg-card/60 transition-all">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Active</p>
+            <p className="text-2xl font-semibold text-foreground">{todayCount + upcomingCount + overdueCount}</p>
           </div>
-          <div className="rounded-xl border border-border/40 bg-card p-5 shadow-sm hover:shadow transition-shadow">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Upcoming</p>
-            <p className="text-3xl font-bold text-foreground">{upcomingCount}</p>
+          <div className="flex flex-col gap-1 rounded-xl border border-border/40 bg-card/40 p-4 shadow-sm hover:shadow-md hover:bg-card/60 transition-all">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Today</p>
+            <p className="text-2xl font-semibold text-foreground">{todayCount}</p>
           </div>
-          <div className="rounded-xl border border-border/40 bg-card p-5 shadow-sm hover:shadow transition-shadow">
-            <p className="text-xs font-semibold uppercase tracking-widest text-destructive/80 mb-1">Overdue</p>
-            <p className="text-3xl font-bold text-destructive">{overdueCount}</p>
+          <div className="flex flex-col gap-1 rounded-xl border border-destructive/20 bg-destructive/5 p-4 shadow-sm hover:shadow-md transition-all">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-destructive/80">Overdue</p>
+            <p className="text-2xl font-semibold text-destructive">{overdueCount}</p>
           </div>
-          <div className="rounded-xl border border-border/40 bg-card p-5 shadow-sm hover:shadow transition-shadow">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Completed</p>
-            <p className="text-3xl font-bold text-muted-foreground">{completedCount}</p>
+          <div className="flex flex-col gap-1 rounded-xl border border-border/40 bg-card/40 p-4 shadow-sm hover:shadow-md hover:bg-card/60 transition-all opacity-80">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Completed</p>
+            <p className="text-2xl font-semibold text-muted-foreground">{completedCount}</p>
           </div>
         </div>
 

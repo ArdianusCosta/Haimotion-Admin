@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCrmLeads, createCrmLead, deleteCrmLead, updateCrmLeadStage } from '@/app/actions/crm'
+import { getCrmLeads, createCrmLead, deleteCrmLead, updateCrmLeadStage, convertCrmLead } from '@/app/actions/crm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Search, MoreHorizontal, Trash, Mail, Phone, Target, GitPullRequest } from 'lucide-react'
@@ -77,6 +77,18 @@ export function CrmLeadsPage() {
       } else {
         toast.error(res.error || 'Failed to delete lead')
       }
+    }
+  })
+
+  const convertMutation = useMutation({
+    mutationFn: convertCrmLead,
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success('Lead successfully converted to Client & Deal!')
+        queryClient.invalidateQueries({ queryKey: ['crmLeads'] })
+        queryClient.invalidateQueries({ queryKey: ['crmDeals'] })
+        queryClient.invalidateQueries({ queryKey: ['crmClients'] })
+      } else toast.error(res.error || 'Failed to convert lead')
     }
   })
   
@@ -207,6 +219,14 @@ export function CrmLeadsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem>View Details</DropdownMenuItem>
+                        {lead.status !== 'Converted' && (
+                          <DropdownMenuItem 
+                            onClick={() => convertMutation.mutate(lead.id)}
+                            className="font-medium text-primary focus:text-primary focus:bg-primary/10"
+                          >
+                            Convert to Client & Deal
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem 
                           onClick={() => updateStageMutation.mutate({ id: lead.id, stage: 'Qualified', status: 'In Progress' })}
                         >

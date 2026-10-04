@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { Plus, Search, Filter, Download, MoreHorizontal } from 'lucide-react'
 import { FinancePageHeader, FinanceStatusBadge } from '../components'
-import { InvoiceModal, ConfirmDeleteModal } from '../components/modals'
+import { InvoiceModal, ConfirmDeleteModal, InvoicePaymentModal } from '../components/modals'
+import { createFinancePayment } from '@/app/actions/finance'
 import { useInvoices, useCreateInvoice, useUpdateInvoice, useDeleteInvoice, useExportInvoices, useImportInvoices } from '../queries'
 import { formatCurrency } from '../utils'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -18,6 +19,9 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<number | null>(null)
+  
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [invoiceToPay, setInvoiceToPay] = useState<any | null>(null)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -51,10 +55,23 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
     }
   }
 
-  const handleRecordPayment = (inv: any) => {
-    updateInvoice.mutate({ id: inv.id, data: { status: 'Paid' } }, {
-      onSuccess: () => toast.success(`Payment recorded for ${inv.reference}`)
-    })
+  const handleRecordPayment = async (paymentData: any) => {
+    const res = await createFinancePayment(paymentData)
+    if (res.success) {
+      toast.success(`Payment recorded successfully`)
+      
+      const currentPaid = invoiceToPay?.payments?.reduce((sum: number, p: any) => sum + p.amount, 0) || 0;
+      const newTotalPaid = currentPaid + paymentData.amount;
+      const isFullyPaid = newTotalPaid >= invoiceToPay?.amount;
+      
+      updateInvoice.mutate({ 
+        id: paymentData.invoice_id, 
+        data: { status: isFullyPaid ? 'Paid' : 'Partially Paid' } 
+      })
+      setPaymentModalOpen(false)
+    } else {
+      toast.error(res.error)
+    }
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +131,7 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
               <option value="All">All Status</option>
               <option value="Draft">Draft</option>
               <option value="Sent">Sent</option>
+              <option value="Partially Paid">Partially Paid</option>
               <option value="Paid">Paid</option>
               <option value="Overdue">Overdue</option>
               <option value="Cancelled">Cancelled</option>
@@ -129,7 +147,7 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
                 <th className="px-5 py-3 font-medium text-xs">{t('Customer')}</th>
                 <th className="px-5 py-3 font-medium text-xs">{t('Date')}</th>
                 <th className="px-5 py-3 font-medium text-xs">{t('Due Date')}</th>
-                <th className="px-5 py-3 font-medium text-xs text-right">{t('Amount')}</th>
+                <th className="px-5 py-3 font-medium text-xs text-right">Amount (Paid / Total)</th>
                 <th className="px-5 py-3 font-medium text-xs">{t('Status')}</th>
                 <th className="px-5 py-3 font-medium text-xs text-right">{t('Actions')}</th>
               </tr>
@@ -160,7 +178,16 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
                     <td className="px-5 py-4">{inv.customer_name}</td>
                     <td className="px-5 py-4 text-muted-foreground">{formatDate(inv.date)}</td>
                     <td className="px-5 py-4 text-muted-foreground">{formatDate(inv.due_date)}</td>
-                    <td className="px-5 py-4 text-right font-medium">{formatCurrency(inv.amount)}</td>
+                    <td className="px-5 py-4 text-right font-medium">
+                      <div className="flex flex-col items-end">
+                        <span className="text-foreground">{formatCurrency(inv.amount)}</span>
+                        {(inv.payments?.length > 0 || inv.status === 'Partially Paid') && (
+                          <span className="text-[10px] text-emerald-500 mt-0.5">
+                            Paid: {formatCurrency(inv.payments?.reduce((s: number, p: any) => s + p.amount, 0) || 0)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-5 py-4">
                       <FinanceStatusBadge status={inv.status} />
                     </td>
@@ -173,7 +200,11 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
                         } />
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => { setSelectedInvoice(inv); setIsModalOpen(true); }}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleRecordPayment(inv)}>Record Payment</DropdownMenuItem>
+                          {inv.status !== 'Paid' && (
+                            <DropdownMenuItem onClick={() => { setInvoiceToPay(inv); setPaymentModalOpen(true); }}>
+                              Record Payment
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => { setItemToDelete(inv.id); setDeleteModalOpen(true); }} className="text-rose-500 focus:text-rose-500">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -191,6 +222,13 @@ export function InvoicesPage() {  const { t, formatDate } = useLanguage()
         onOpenChange={setIsModalOpen} 
         onSave={handleSave} 
         initialData={selectedInvoice} 
+      />
+
+      <InvoicePaymentModal 
+        open={paymentModalOpen} 
+        onOpenChange={setPaymentModalOpen} 
+        invoice={invoiceToPay} 
+        onSave={handleRecordPayment} 
       />
 
       <ConfirmDeleteModal 

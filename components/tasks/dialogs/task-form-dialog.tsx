@@ -52,156 +52,172 @@ export function TaskFormDialog({
             </div>
             
             <div className={`grid gap-5 ${formData.id > 0 ? "px-6 pb-6" : ""}`}>
-              <div className="grid gap-2">
-                <Label htmlFor="title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Task Title</Label>
-                <Input 
-                  id="title" 
-                  value={formData.title} 
-                  onChange={e => setFormData({...formData, title: e.target.value})} 
-                  required 
-                  placeholder="E.g., Update landing page copy" 
-                  className="bg-card/50 text-base font-medium h-11 transition-all focus:bg-background shadow-sm"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-5">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/5 px-2.5 py-1.5 rounded-md border border-primary/10 inline-flex">Basic Information</h3>
                 <div className="grid gap-2">
-                  <Label htmlFor="project" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Project</Label>
-                  <Select 
-                    value={formData.projectId ? formData.projectId.toString() : ""} 
-                    onValueChange={(v) => setFormData({...formData, projectId: parseInt(v)})}
-                  >
-                    <SelectTrigger className="w-full bg-card/50 h-10 shadow-sm transition-all focus:bg-background">
-                      <div className="flex items-center gap-2 text-foreground">
-                         <FolderDot className="size-4 text-muted-foreground" />
-                         <SelectValue placeholder="Select project..." />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((p: any) => (
-                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="title" className="text-xs font-semibold text-muted-foreground">Task Title</Label>
+                  <Input 
+                    id="title" 
+                    value={formData.title} 
+                    onChange={e => setFormData({...formData, title: e.target.value})} 
+                    required 
+                    placeholder="E.g., Update landing page copy" 
+                    className="bg-card/50 text-base font-medium h-11 transition-all focus:bg-background shadow-sm"
+                  />
                 </div>
                 
-                <div className="grid gap-2">
-                  <Label htmlFor="status" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</Label>
-                  <Select 
-                    value={formData.status.toString()} 
-                    onValueChange={(v) => setFormData({...formData, status: parseInt(v)})}
-                  >
-                    <SelectTrigger className="w-full bg-card/50 h-10 shadow-sm transition-all focus:bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(TASK_STATUS_MAP).map(([val, label]) => (
-                        <SelectItem key={val} value={val}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-5">
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Start Date</Label>
-                  <div className="relative">
-                     <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                     <Input disabled value={todayStr} type="text" className="pl-9 h-10 opacity-50 cursor-not-allowed bg-muted/30 border-dashed" title="Auto-generated" />
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="grid gap-2">
+                    <Label htmlFor="project" className="text-xs font-semibold text-muted-foreground">Project</Label>
+                    <Select 
+                      value={formData.projectId ? formData.projectId.toString() : ""} 
+                      onValueChange={(v) => setFormData({...formData, projectId: parseInt(v)})}
+                    >
+                      <SelectTrigger className="w-full bg-card/50 h-10 shadow-sm transition-all focus:bg-background">
+                        <div className="flex items-center gap-2 text-foreground">
+                           <FolderDot className="size-4 text-muted-foreground" />
+                           <SelectValue placeholder="Select project..." />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projects.map((p: any) => (
+                          <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="dueDate" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Due Date</Label>
-                  <div className="relative">
-                    <Input 
-                      id="dueDate" 
-                      type="date"
-                      value={formData.dueDate} 
-                      onChange={e => setFormData({...formData, dueDate: e.target.value})} 
-                      className="h-10 bg-card/50 shadow-sm transition-all focus:bg-background"
-                    />
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="status" className="text-xs font-semibold text-muted-foreground">Status</Label>
+                    <Select 
+                      value={formData.status.toString()} 
+                      onValueChange={(v) => setFormData({...formData, status: parseInt(v)})}
+                    >
+                      <SelectTrigger className="w-full bg-card/50 h-10 shadow-sm transition-all focus:bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(TASK_STATUS_MAP).map(([val, label]) => (
+                          <SelectItem key={val} value={val}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
-
-              <div className="grid gap-2 relative assignee-dropdown-container">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assignees</Label>
-                <div 
-                  className="flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card/50 px-3 py-2 text-sm shadow-sm transition-all hover:bg-card hover:border-primary/50 cursor-pointer"
-                  onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                >
-                  {formData.assignees.length === 0 && <span className="text-muted-foreground">Select team members...</span>}
-                  {formData.assignees.map((id: number) => {
-                    const u = users.find((u: any) => Number(u.id) === Number(id))
-                    if (!u) return null
-                    return (
-                      <span key={id} className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary border border-primary/20 transition-colors">
-                        <Avatar className="size-4">
-                          <AvatarFallback className="bg-transparent text-[8px] font-bold">{u.name[0]}</AvatarFallback>
-                        </Avatar>
-                        {u.name}
-                        <button type="button" onClick={(e) => {
-                          e.stopPropagation();
-                          setFormData({...formData, assignees: formData.assignees.filter((a: number) => Number(a) !== Number(id))})
-                        }} className="ml-0.5 hover:text-destructive transition-colors"><X className="size-3" /></button>
-                      </span>
-                    )
-                  })}
-                </div>
-                
-                {showAssigneeDropdown && (
-                  <div className="absolute top-[calc(100%+4px)] left-0 z-50 max-h-48 w-full overflow-hidden rounded-xl border border-border/80 bg-popover shadow-xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
-                    <div className="p-2 border-b border-border/50 sticky top-0 bg-popover/95 backdrop-blur z-10">
-                      <input 
-                        autoFocus
-                        placeholder="Search team members..." 
-                        value={assigneeSearchQuery}
-                        onChange={(e) => setAssigneeSearchQuery(e.target.value)}
-                        className="w-full rounded-md bg-muted/50 py-2 px-3 text-sm outline-none transition-colors focus:bg-background focus:ring-1 focus:ring-primary"
+              
+              {/* Schedule */}
+              <div className="space-y-4 pt-4 border-t border-border/40">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/5 px-2.5 py-1.5 rounded-md border border-primary/10 inline-flex">Schedule</h3>
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-semibold text-muted-foreground">Start Date</Label>
+                    <div className="relative">
+                       <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                       <Input disabled value={todayStr} type="text" className="pl-9 h-10 opacity-50 cursor-not-allowed bg-muted/30 border-dashed" title="Auto-generated" />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="dueDate" className="text-xs font-semibold text-muted-foreground">Due Date</Label>
+                    <div className="relative">
+                      <Input 
+                        id="dueDate" 
+                        type="date"
+                        value={formData.dueDate} 
+                        onChange={e => setFormData({...formData, dueDate: e.target.value})} 
+                        className="h-10 bg-card/50 shadow-sm transition-all focus:bg-background"
                       />
                     </div>
-                    <div className="overflow-y-auto p-1.5 max-h-36 custom-scrollbar">
-                      {users.filter((u: any) => u.name.toLowerCase().includes(assigneeSearchQuery.toLowerCase())).map((u: any) => {
-                        const isSelected = formData.assignees.some((id: number) => Number(id) === Number(u.id))
-                        return (
-                          <div 
-                            key={u.id}
-                            className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted ${isSelected ? 'bg-muted/60' : ''}`}
-                            onClick={() => {
-                              if (isSelected) {
-                                setFormData({...formData, assignees: formData.assignees.filter((id: number) => Number(id) !== Number(u.id))})
-                              } else {
-                                setFormData({...formData, assignees: [...formData.assignees, Number(u.id)]})
-                              }
-                              setShowAssigneeDropdown(false)
-                              setAssigneeSearchQuery('')
-                            }}
-                          >
-                            <div className={`flex size-4 shrink-0 items-center justify-center rounded-[4px] border ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background/50'}`}>
-                               {isSelected && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="size-2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>}
-                            </div>
-                            <Avatar className="size-6 border border-border/50">
-                                <AvatarFallback className="bg-primary/10 text-[9px] font-bold text-primary">{u.name[0]}</AvatarFallback>
-                            </Avatar>
-                            <span className={isSelected ? 'font-medium' : ''}>{u.name}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="description" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Description</Label>
-                <textarea 
-                  id="description" 
-                  value={formData.description} 
-                  onChange={e => setFormData({...formData, description: e.target.value})} 
-                  className="flex min-h-[120px] w-full rounded-lg border border-input bg-card/50 p-3 text-sm ring-offset-background placeholder:text-muted-foreground outline-none transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary custom-scrollbar shadow-sm"
-                  placeholder="Provide a detailed description of the task..."
-                />
+              {/* Assignment */}
+              <div className="space-y-4 pt-4 border-t border-border/40">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/5 px-2.5 py-1.5 rounded-md border border-primary/10 inline-flex">Assignment</h3>
+                <div className="grid gap-2 relative assignee-dropdown-container">
+                  <Label className="text-xs font-semibold text-muted-foreground">Assignees</Label>
+                  <div 
+                    className="flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card/50 px-3 py-2 text-sm shadow-sm transition-all hover:bg-card hover:border-primary/50 cursor-pointer"
+                    onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                  >
+                    {formData.assignees.length === 0 && <span className="text-muted-foreground">Select team members...</span>}
+                    {formData.assignees.map((id: number) => {
+                      const u = users.find((u: any) => Number(u.id) === Number(id))
+                      if (!u) return null
+                      return (
+                        <span key={id} className="flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary border border-primary/20 transition-colors">
+                          <Avatar className="size-4">
+                            <AvatarFallback className="bg-transparent text-[8px] font-bold">{u.name[0]}</AvatarFallback>
+                          </Avatar>
+                          {u.name}
+                          <button type="button" onClick={(e) => {
+                            e.stopPropagation();
+                            setFormData({...formData, assignees: formData.assignees.filter((a: number) => Number(a) !== Number(id))})
+                          }} className="ml-0.5 hover:text-destructive transition-colors"><X className="size-3" /></button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                  
+                  {showAssigneeDropdown && (
+                    <div className="absolute top-[calc(100%+4px)] left-0 z-50 max-h-48 w-full overflow-hidden rounded-xl border border-border/80 bg-popover shadow-xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+                      <div className="p-2 border-b border-border/50 sticky top-0 bg-popover/95 backdrop-blur z-10">
+                        <input 
+                          autoFocus
+                          placeholder="Search team members..." 
+                          value={assigneeSearchQuery}
+                          onChange={(e) => setAssigneeSearchQuery(e.target.value)}
+                          className="w-full rounded-md bg-muted/50 py-2 px-3 text-sm outline-none transition-colors focus:bg-background focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="overflow-y-auto p-1.5 max-h-36 custom-scrollbar">
+                        {users.filter((u: any) => u.name.toLowerCase().includes(assigneeSearchQuery.toLowerCase())).map((u: any) => {
+                          const isSelected = formData.assignees.some((id: number) => Number(id) === Number(u.id))
+                          return (
+                            <div 
+                              key={u.id}
+                              className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted ${isSelected ? 'bg-muted/60' : ''}`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setFormData({...formData, assignees: formData.assignees.filter((id: number) => Number(id) !== Number(u.id))})
+                                } else {
+                                  setFormData({...formData, assignees: [...formData.assignees, Number(u.id)]})
+                                }
+                                setShowAssigneeDropdown(false)
+                                setAssigneeSearchQuery('')
+                              }}
+                            >
+                              <div className={`flex size-4 shrink-0 items-center justify-center rounded-[4px] border ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background/50'}`}>
+                                 {isSelected && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="size-2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                              </div>
+                              <Avatar className="size-6 border border-border/50">
+                                  <AvatarFallback className="bg-primary/10 text-[9px] font-bold text-primary">{u.name[0]}</AvatarFallback>
+                              </Avatar>
+                              <span className={isSelected ? 'font-medium' : ''}>{u.name}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Details */}
+              <div className="space-y-4 pt-4 border-t border-border/40">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-primary bg-primary/5 px-2.5 py-1.5 rounded-md border border-primary/10 inline-flex">Additional Details</h3>
+                <div className="grid gap-2">
+                  <Label htmlFor="description" className="text-xs font-semibold text-muted-foreground">Description</Label>
+                  <textarea 
+                    id="description" 
+                    value={formData.description} 
+                    onChange={e => setFormData({...formData, description: e.target.value})} 
+                    className="flex min-h-[120px] w-full rounded-lg border border-input bg-card/50 p-3 text-sm ring-offset-background placeholder:text-muted-foreground outline-none transition-all focus:bg-background focus-visible:ring-1 focus-visible:ring-primary custom-scrollbar shadow-sm"
+                    placeholder="Provide a detailed description of the task..."
+                  />
+                </div>
               </div>
 
             </div>

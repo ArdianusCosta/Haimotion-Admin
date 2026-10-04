@@ -56,7 +56,7 @@ export function FinanceStatusBadge({ status }: { status: string }) {
   } else if (['Overdue', 'Rejected', 'Cancelled'].includes(status)) {
     bg = 'bg-rose-500/10'
     text = 'text-rose-500'
-  } else if (['Pending', 'Draft'].includes(status)) {
+  } else if (['Pending', 'Draft', 'Partially Paid'].includes(status)) {
     bg = 'bg-amber-500/10'
     text = 'text-amber-500'
   }

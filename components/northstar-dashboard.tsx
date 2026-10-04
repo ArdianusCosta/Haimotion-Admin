@@ -7,6 +7,7 @@ import { SectionPage } from '@/components/section-page'
 import { ChatPage } from '@/components/chat-page'
 import { AnalyticsPage } from '@/components/analytics-page'
 
+import { GlobalSearch } from '@/components/global-search'
 import { MailPage } from '@/components/mail-page'
 import { KanbanPage } from '@/components/kanban-page'
 import { CalendarPage } from '@/components/calendar-page'
@@ -744,7 +745,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               </div>
             )}
             <div className="hidden h-5 w-px bg-border md:block" />
-            <button onClick={() => setCommand(true)} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground hover:bg-muted"><Search className="size-4" /><span className="hidden sm:inline">{t('Search anything')}</span><kbd className="ml-3 hidden rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] sm:inline">⌘ K</kbd></button>
+            <GlobalSearch />
           </div>
           <div className="flex items-center gap-1">
             <button onClick={() => setCustomizerOpen(true)} className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Preferences"><Settings className="size-4" /></button>

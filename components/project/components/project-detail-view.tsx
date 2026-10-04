@@ -30,6 +30,8 @@ import { STATUS_LABELS } from './project-list-view'
 import { ProjectFormDialog } from '@/components/project-form-dialog'
 import { ProjectContributorsDialog } from '@/components/project-contributors-dialog'
 import { ProjectDomainChecker } from './project-domain-checker'
+import { ProjectMilestones } from './project-milestones'
+import { ProjectBudgetCard } from './project-budget-card'
 
 export function ProjectDetailView({
   selectedProject, setSelectedProjectId,
@@ -230,6 +232,16 @@ export function ProjectDetailView({
               </button>
             </div>
           </div>
+        </div>
+
+        {/* ═══════════════════ MILESTONES ═══════════════════ */}
+        <div className="mb-5">
+          <ProjectMilestones projectId={selectedProject.id} />
+        </div>
+
+        {/* ═══════════════════ BUDGET ═══════════════════ */}
+        <div className="mb-5">
+          <ProjectBudgetCard projectId={selectedProject.id} />
         </div>
 
         {/* ═══════════════════ DOMAIN CHECKER ═══════════════════ */}

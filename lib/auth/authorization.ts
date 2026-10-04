@@ -48,7 +48,7 @@ export async function requireAuth() {
   
 
 export function hasPermission(user: any, permissionName: string): boolean {
-  if (user.type === 1) return true;
+  if (user.role_id === 1 || user.role?.name?.toLowerCase() === 'admin' || user.type === 1) return true;
   if (!user.role || !user.role.permissions) return false;
   return user.role.permissions.some((p: any) => p.permission === permissionName);
 }

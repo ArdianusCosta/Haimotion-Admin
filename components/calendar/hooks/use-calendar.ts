@@ -52,6 +52,10 @@ export function useCalendar() {
 
   const openEventDialog = (event?: any, dateStr?: string) => {
     if (event) {
+      if (event.source && event.source !== 'calendar') {
+        toast.info(`This is a ${event.source} event. Please edit it in the respective module.`);
+        return;
+      }
       const start = new Date(event.start_event)
       const end = new Date(event.end_event)
       setFormData({
@@ -195,7 +199,11 @@ export function useCalendar() {
     toast.success('Calendar exported successfully!')
   }
 
-  const handleDragStart = (e: React.DragEvent, eventId: number) => {
+  const handleDragStart = (e: React.DragEvent, eventId: number | string) => {
+    if (typeof eventId === 'string' && eventId.includes('-')) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('eventId', eventId.toString())
   }
 

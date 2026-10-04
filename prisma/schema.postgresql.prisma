@@ -52,6 +52,9 @@ model User {
   task_assignees          TaskAssignee[]
   user_group_read_status  user_group_read_status[]
   role                    Role?                    @relation(fields: [role_id], references: [id])
+  department_manager      HrDepartment[]           @relation("DepartmentManager")
+  calendar_events         CalendarEvent[]
+  calendar_participants   CalendarParticipant[]
 
   // CRM Relations
   crm_clients_assigned CrmClient[]   @relation("AssignedClients")
@@ -205,21 +208,23 @@ model notification_list {
 }
 
 model project_list {
-  id           Int             @id @default(autoincrement())
-  name         String          @db.VarChar(200)
-  description  String          @db.Text
-  status       Int             @db.SmallInt
-  start_date   DateTime        @db.Date
-  end_date     DateTime        @db.Date
+  id           Int                @id @default(autoincrement())
+  name         String             @db.VarChar(200)
+  description  String             @db.Text
+  status       Int                @db.SmallInt
+  start_date   DateTime           @db.Date
+  end_date     DateTime           @db.Date
   manager_id   Int
-  date_created DateTime        @default(now()) @db.Timestamp()
-  client_name  String?         @db.VarChar(200)
-  is_archived  Boolean         @default(false)
-  is_favorite  Boolean         @default(false)
+  date_created DateTime           @default(now()) @db.Timestamp()
+  client_name  String?            @db.VarChar(200)
+  is_archived  Boolean            @default(false)
+  is_favorite  Boolean            @default(false)
   client_id    Int?
-  crm_client   CrmClient?      @relation(fields: [client_id], references: [id])
+  crm_client   CrmClient?         @relation(fields: [client_id], references: [id])
   meetings     Meeting[]
   members      ProjectMember[]
+  milestones   ProjectMilestone[]
+  finance_budgets FinanceBudget[]
 }
 
 model system_settings {
@@ -232,23 +237,28 @@ model system_settings {
 }
 
 model task_list {
-  id              Int            @id @default(autoincrement())
-  project_id      Int
-  user_id         Int?
-  task            String         @db.VarChar(200)
-  description     String         @db.Text
-  status          Int            @db.SmallInt
-  start_date      DateTime?      @db.Date
-  end_date        DateTime?      @db.Date
-  date_created    DateTime       @default(now()) @db.Timestamp()
-  created_by      Int?
-  content_pillar  String?        @db.Text
-  platform        String?        @db.Text
-  reference_links String?        @db.Text
-  date_updated    DateTime?      @db.Timestamp()
-  dependencies    String?        @db.Text
-  meetings        Meeting[]
-  assignees       TaskAssignee[]
+  id                Int               @id @default(autoincrement())
+  project_id        Int
+  user_id           Int?
+  task              String            @db.VarChar(200)
+  description       String            @db.Text
+  status            Int               @db.SmallInt
+  start_date        DateTime?         @db.Date
+  end_date          DateTime?         @db.Date
+  date_created      DateTime          @default(now()) @db.Timestamp()
+  created_by        Int?
+  content_pillar    String?           @db.Text
+  platform          String?           @db.Text
+  reference_links   String?           @db.Text
+  date_updated      DateTime?         @db.Timestamp()
+  dependencies      String?           @db.Text
+  meetings          Meeting[]
+  assignees         TaskAssignee[]
+  milestone_id      Int?
+  milestone         ProjectMilestone? @relation(fields: [milestone_id], references: [id])
+  checklists        TaskChecklist[]
+  task_dependencies TaskDependency[]  @relation("TaskDependencies")
+  task_depended_by  TaskDependency[]  @relation("TaskDependedBy")
 }
 
 model user_group_read_status {
@@ -567,6 +577,7 @@ model FinanceInvoice {
   updated_at     DateTime             @default(now()) @updatedAt
   created_by     Int?
   items          FinanceInvoiceItem[]
+  payments       FinancePayment[]
 
   @@map("finance_invoices")
 }
@@ -584,16 +595,18 @@ model FinanceInvoiceItem {
 }
 
 model FinanceExpense {
-  id          Int      @id @default(autoincrement())
-  date        DateTime @db.Date
-  description String   @db.Text
-  category    String   @db.VarChar(100)
-  amount      Float
-  vendor      String   @db.VarChar(200)
-  status      String   @default("Pending") @db.VarChar(50)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now()) @updatedAt
-  created_by  Int?
+  id               Int              @id @default(autoincrement())
+  date             DateTime         @db.Date
+  description      String           @db.Text
+  category         String           @db.VarChar(100)
+  amount           Float
+  vendor           String           @db.VarChar(200)
+  status           String           @default("Pending") @db.VarChar(50)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @default(now()) @updatedAt
+  created_by       Int?
+  category_id      Int?
+  finance_category FinanceCategory? @relation(fields: [category_id], references: [id])
 
   @@map("finance_expenses")
 }
@@ -616,14 +629,20 @@ model FinanceTransaction {
 }
 
 model HrEmployee {
-  id         Int      @id @default(autoincrement())
-  name       String   @db.VarChar(200)
-  email      String   @unique @db.VarChar(200)
-  role       String   @db.VarChar(100)
-  department String   @db.VarChar(100)
-  status     String   @default("Active") @db.VarChar(50)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(200)
+  email          String           @unique @db.VarChar(200)
+  role           String           @db.VarChar(100)
+  department     String           @db.VarChar(100)
+  status         String           @default("Active") @db.VarChar(50)
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @default(now()) @updatedAt
+  department_id  Int?
+  hr_department  HrDepartment?    @relation(fields: [department_id], references: [id])
+  position_id    Int?
+  hr_position    HrPosition?      @relation(fields: [position_id], references: [id])
+  work_schedules HrWorkSchedule[]
+  overtimes      HrOvertime[]
 
   @@map("hr_employees")
 }
@@ -898,8 +917,12 @@ model CrmDeal {
   created_at DateTime @default(now()) @db.Timestamp()
   updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
-  activities CrmActivity[]
-  follow_ups CrmFollowUp[]
+  activities     CrmActivity[]
+  follow_ups     CrmFollowUp[]
+  pipeline_id    Int?
+  pipeline       CrmPipeline?      @relation(fields: [pipeline_id], references: [id])
+  stage_id       Int?
+  pipeline_stage CrmPipelineStage? @relation(fields: [stage_id], references: [id])
 
   @@index([client_id])
   @@index([lead_id])
@@ -1055,4 +1078,233 @@ model CrmBroadcastRecipient {
 
   @@index([campaign_id])
   @@map("crm_broadcast_recipients")
+}
+
+// -------------------------------------------------------------
+// PHASE 1 MODELS (Master Prompt Requirement)
+// -------------------------------------------------------------
+
+model ProjectMilestone {
+  id          Int          @id @default(autoincrement())
+  project_id  Int
+  project     project_list @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  title       String       @db.VarChar(255)
+  description String?      @db.Text
+  due_date    DateTime?    @db.Date
+  status      String       @default("Pending") @db.VarChar(50)
+  created_at  DateTime     @default(now()) @db.Timestamp()
+  updated_at  DateTime     @default(now()) @updatedAt @db.Timestamp()
+  tasks       task_list[]
+
+  @@index([project_id])
+  @@map("project_milestones")
+}
+
+model TaskChecklist {
+  id         Int       @id @default(autoincrement())
+  task_id    Int
+  task       task_list @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  label      String    @db.VarChar(255)
+  is_done    Boolean   @default(false)
+  order      Int       @default(0)
+  created_at DateTime  @default(now()) @db.Timestamp()
+  updated_at DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  @@index([task_id])
+  @@map("task_checklists")
+}
+
+model TaskDependency {
+  id              Int       @id @default(autoincrement())
+  task_id         Int
+  task            task_list @relation("TaskDependencies", fields: [task_id], references: [id], onDelete: Cascade)
+  depends_on_id   Int
+  depends_on_task task_list @relation("TaskDependedBy", fields: [depends_on_id], references: [id], onDelete: Cascade)
+  created_at      DateTime  @default(now()) @db.Timestamp()
+
+  @@unique([task_id, depends_on_id])
+  @@index([depends_on_id])
+  @@map("task_dependencies")
+}
+
+model CrmPipeline {
+  id         Int                @id @default(autoincrement())
+  name       String             @db.VarChar(255)
+  is_active  Boolean            @default(true)
+  created_at DateTime           @default(now()) @db.Timestamp()
+  updated_at DateTime           @default(now()) @updatedAt @db.Timestamp()
+  stages     CrmPipelineStage[]
+  deals      CrmDeal[]
+
+  @@map("crm_pipelines")
+}
+
+model CrmPipelineStage {
+  id          Int         @id @default(autoincrement())
+  pipeline_id Int
+  pipeline    CrmPipeline @relation(fields: [pipeline_id], references: [id], onDelete: Cascade)
+  name        String      @db.VarChar(100)
+  order       Int         @default(0)
+  probability Int         @default(0)
+  created_at  DateTime    @default(now()) @db.Timestamp()
+  updated_at  DateTime    @default(now()) @updatedAt @db.Timestamp()
+  deals       CrmDeal[]
+
+  @@index([pipeline_id])
+  @@map("crm_pipeline_stages")
+}
+
+model FinanceCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  type        String   @db.VarChar(50)
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  expenses FinanceExpense[]
+  budgets  FinanceBudget[]
+
+  @@map("finance_categories")
+}
+
+model FinancePayment {
+  id             Int            @id @default(autoincrement())
+  invoice_id     Int
+  invoice        FinanceInvoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  amount         Float
+  payment_date   DateTime       @db.Date
+  payment_method String         @db.VarChar(100)
+  reference      String?        @db.VarChar(255)
+  notes          String?        @db.Text
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @default(now()) @updatedAt
+
+  @@index([invoice_id])
+  @@map("finance_payments")
+}
+
+model FinanceBudget {
+  id          Int              @id @default(autoincrement())
+  name        String           @db.VarChar(255)
+  amount      Float
+  period      String?          @db.VarChar(50)
+  spent       Float            @default(0)
+  start_date  DateTime         @db.Date
+  end_date    DateTime         @db.Date
+  category_id Int?
+  category    FinanceCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  project_id  Int?
+  project     project_list?    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @default(now()) @updatedAt
+
+  @@index([category_id])
+  @@index([project_id])
+  @@map("finance_budgets")
+}
+
+model HrDepartment {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(255)
+  description String?      @db.Text
+  manager_id  Int?
+  manager     User?        @relation("DepartmentManager", fields: [manager_id], references: [id])
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @default(now()) @updatedAt
+  employees   HrEmployee[]
+  HrPosition  HrPosition[]
+
+  @@index([manager_id])
+  @@map("hr_departments")
+}
+
+model HrPosition {
+  id            Int           @id @default(autoincrement())
+  title         String        @db.VarChar(255)
+  department_id Int?
+  department    HrDepartment? @relation(fields: [department_id], references: [id], onDelete: SetNull)
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @default(now()) @updatedAt
+  employees     HrEmployee[]
+
+  @@index([department_id])
+  @@map("hr_positions")
+}
+
+model HrWorkSchedule {
+  id          Int        @id @default(autoincrement())
+  employee_id Int
+  employee    HrEmployee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  day_of_week Int
+  start_time  String     @db.VarChar(10)
+  end_time    String     @db.VarChar(10)
+  is_active   Boolean    @default(true)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @default(now()) @updatedAt
+
+  @@index([employee_id])
+  @@map("hr_work_schedules")
+}
+
+model HrOvertime {
+  id          Int        @id @default(autoincrement())
+  employee_id Int
+  employee    HrEmployee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  date        DateTime   @db.Date
+  hours       Float
+  reason      String     @db.Text
+  status      String     @default("Pending") @db.VarChar(50)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @default(now()) @updatedAt
+
+  @@index([employee_id])
+  @@map("hr_overtimes")
+}
+
+model CalendarEvent {
+  id           Int                   @id @default(autoincrement())
+  title        String                @db.VarChar(255)
+  description  String?               @db.Text
+  start_date   DateTime              @db.Timestamp()
+  end_date     DateTime              @db.Timestamp()
+  is_all_day   Boolean               @default(false)
+  location     String?               @db.VarChar(255)
+  event_type   String                @default("General") @db.VarChar(50)
+  color        String?               @db.VarChar(50)
+  organizer_id Int?
+  organizer    User?                 @relation(fields: [organizer_id], references: [id])
+  created_at   DateTime              @default(now())
+  updated_at   DateTime              @default(now()) @updatedAt
+  participants CalendarParticipant[]
+  reminders    CalendarReminder[]
+
+  @@index([organizer_id])
+  @@map("calendar_events")
+}
+
+model CalendarParticipant {
+  id         Int           @id @default(autoincrement())
+  event_id   Int
+  event      CalendarEvent @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  user_id    Int
+  user       User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  status     String        @default("Pending") @db.VarChar(50)
+  created_at DateTime      @default(now())
+
+  @@unique([event_id, user_id])
+  @@index([user_id])
+  @@map("calendar_participants")
+}
+
+model CalendarReminder {
+  id             Int           @id @default(autoincrement())
+  event_id       Int
+  event          CalendarEvent @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  minutes_before Int
+  method         String        @default("Notification") @db.VarChar(50)
+  created_at     DateTime      @default(now())
+
+  @@index([event_id])
+  @@map("calendar_reminders")
 }
