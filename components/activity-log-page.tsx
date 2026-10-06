@@ -22,12 +22,12 @@ export function ActivityLogPage() {
     return logs.filter(log => {
       // Search logic
       const searchLower = search.toLowerCase()
+      const fullName = `${log.user?.firstname || ''} ${log.user?.lastname || ''}`.toLowerCase()
       const matchesSearch = 
         !search ||
-        log.description.toLowerCase().includes(searchLower) ||
-        log.activity_type.toLowerCase().includes(searchLower) ||
-        log.user?.firstname?.toLowerCase().includes(searchLower) ||
-        log.user?.lastname?.toLowerCase().includes(searchLower)
+        log.description?.toLowerCase().includes(searchLower) ||
+        log.activity_type?.toLowerCase().includes(searchLower) ||
+        fullName.includes(searchLower)
 
       // Filter logic
       const matchesUser = filterUser === "all" || log.user?.firstname === filterUser
@@ -174,7 +174,7 @@ export function ActivityLogPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input 
-              placeholder="Search activities..." 
+              placeholder="Search activities or users..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 bg-background"
