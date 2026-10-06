@@ -8,8 +8,7 @@ export function TrendChart({ data, range, setRange }: { data: any, range: string
   const [hiddenLines, setHiddenLines] = useState<Record<string, boolean>>({
     tasksCreated: false,
     tasksCompleted: false,
-    projectsCreated: false,
-    workHours: false
+    projectsCreated: false
   })
 
   const toggleLine = (dataKey: string) => {
@@ -21,7 +20,7 @@ export function TrendChart({ data, range, setRange }: { data: any, range: string
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-semibold text-base">{t('Tren Performa')}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">{t('Perkembangan project, task dan jam kerja selama periode ini')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('Perkembangan project dan task selama periode ini')}</p>
         </div>
         <Select value={range} onValueChange={setRange}>
           <SelectTrigger className="w-[150px] h-8 text-xs bg-background">
@@ -55,7 +54,6 @@ export function TrendChart({ data, range, setRange }: { data: any, range: string
               <Line hide={hiddenLines.projectsCreated} type="monotone" dataKey="projectsCreated" name="Project" stroke="var(--primary)" strokeWidth={2} dot={{r:3}} activeDot={{r: 5}} />
               <Line hide={hiddenLines.tasksCompleted} type="monotone" dataKey="tasksCompleted" name="Task Selesai" stroke="var(--chart-1)" strokeWidth={2} dot={{r:3}} activeDot={{r: 5}} />
               <Line hide={hiddenLines.tasksCreated} type="monotone" dataKey="tasksCreated" name="Task Dibuat" stroke="var(--chart-4)" strokeWidth={2} dot={{r:3}} activeDot={{r: 5}} />
-              <Line hide={hiddenLines.workHours} type="monotone" dataKey="workHours" name="Jam Kerja" stroke="var(--chart-3)" strokeWidth={2} dot={{r:3}} activeDot={{r: 5}} />
             </LineChart>
           </ResponsiveContainer>
         </div>

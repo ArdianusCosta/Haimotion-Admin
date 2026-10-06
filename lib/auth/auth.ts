@@ -1,5 +1,5 @@
-import fs from 'fs';
 import { betterAuth } from "better-auth";
+import crypto from 'crypto';
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -94,9 +94,6 @@ export const auth = betterAuth({
     throw: false,
     onError: (error, ctx) => {
       console.error("BETTER AUTH API ERROR:", error);
-      import('fs').then(fs => {
-        fs.appendFileSync('better-auth-error.log', new Date().toISOString() + '\n' + JSON.stringify(error, Object.getOwnPropertyNames(error)) + '\n');
-      }).catch(() => {});
     }
   },
   user: {
@@ -143,7 +140,6 @@ export const auth = betterAuth({
         }
         
         // Fallback for legacy MD5 hashed passwords
-        const crypto = require('crypto');
         const md5Password = crypto.createHash('md5').update(password).digest('hex');
         if (md5Password === hash) {
           return true;

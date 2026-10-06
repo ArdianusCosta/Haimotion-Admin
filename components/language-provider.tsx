@@ -29,7 +29,7 @@ const dictionaries: Record<Language, Translations> = {
     'Barang & Jasa': 'Products & Services',
     'Buku Besar': 'General Ledger',
     'Karyawan': 'Employees',
-    'Analytics': 'Analytics',
+
     'Orders': 'Orders',
     'Products': 'Products',
     'Customers': 'Customers',
@@ -423,7 +423,7 @@ const dictionaries: Record<Language, Translations> = {
     'Barang & Jasa': 'Barang & Jasa',
     'Buku Besar': 'Buku Besar',
     'Karyawan': 'Karyawan',
-    'Analytics': 'Analitik',
+
     'Orders': 'Pesanan',
     'Products': 'Produk',
     'Customers': 'Pelanggan',

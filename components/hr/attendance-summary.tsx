@@ -176,7 +176,6 @@ export function AttendanceSummary() {
                   <th rowSpan={2} className="px-4 py-3 font-medium border-r">{t('Name')}</th>
                   <th rowSpan={2} className="px-4 py-3 font-medium border-r">{t('Department')}</th>
                   <th rowSpan={2} className="px-4 py-3 font-medium border-r">{t('Period')}</th>
-                  <th colSpan={2} className="px-4 py-2 font-medium text-center border-b border-r">{t('Work Hours')}</th>
                   <th colSpan={2} className="px-4 py-2 font-medium text-center border-b border-r">{t('Late')}</th>
                   <th colSpan={2} className="px-4 py-2 font-medium text-center border-b border-r">{t('Early Leave')}</th>
                   <th rowSpan={2} className="px-4 py-3 font-medium border-r text-center">{t('Attendance Days (Std/Act)')}</th>
@@ -184,8 +183,6 @@ export function AttendanceSummary() {
                   <th rowSpan={2} className="px-4 py-3 font-medium text-center">{t('Leave')}</th>
                 </tr>
                 <tr>
-                  <th className="px-4 py-2 font-medium bg-muted/30 border-r">{t('Standard')}</th>
-                  <th className="px-4 py-2 font-medium bg-muted/30 border-r">{t('Actual')}</th>
                   <th className="px-4 py-2 font-medium bg-muted/30 border-r">{t('Hours')}</th>
                   <th className="px-4 py-2 font-medium bg-muted/30 border-r">{t('Minutes')}</th>
                   <th className="px-4 py-2 font-medium bg-muted/30 border-r">{t('Hours')}</th>
@@ -203,8 +200,6 @@ export function AttendanceSummary() {
                       <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
                       <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
                       <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
-                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
-                      <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
                       <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-12 mx-auto" /></td>
                       <td className="px-4 py-4 border-r"><Skeleton className="h-4 w-8 mx-auto" /></td>
                       <td className="px-4 py-4"><Skeleton className="h-4 w-8 mx-auto" /></td>
@@ -215,8 +210,6 @@ export function AttendanceSummary() {
                     <td className="px-4 py-3 font-medium text-foreground border-r">{att.employee?.name}</td>
                     <td className="px-4 py-3 border-r">{att.department || '-'}</td>
                     <td className="px-4 py-3 border-r text-xs whitespace-nowrap">{att.period || '-'}</td>
-                    <td className="px-4 py-3 border-r text-center">{att.work_hours_standard}</td>
-                    <td className="px-4 py-3 border-r text-center">{att.work_hours_actual}</td>
                     <td className="px-4 py-3 border-r text-center text-orange-500">{att.late_hours}</td>
                     <td className="px-4 py-3 border-r text-center text-orange-500">{att.late_minutes}</td>
                     <td className="px-4 py-3 border-r text-center text-red-500">{att.early_leave_hours}</td>
@@ -228,7 +221,7 @@ export function AttendanceSummary() {
                 ))}
                 {filtered?.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
+                    <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                       {t('No records found')}
                     </td>
                   </tr>

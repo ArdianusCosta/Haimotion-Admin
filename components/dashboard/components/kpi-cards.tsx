@@ -44,19 +44,11 @@ export function KpiCards({ data }: { data: any }) {
       icon: TrendingUp,
       color: 'bg-chart-4 text-primary-foreground',
       link: '/tasks'
-    },
-    {
-      label: 'Total Jam Kerja',
-      value: data.kpis.totalWorkHours.value + ' jam',
-      prev: data.kpis.totalWorkHours.prev,
-      icon: Clock,
-      color: 'bg-chart-2 text-primary-foreground',
-      link: '/timesheet'
     }
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
       {kpis.map((kpi, idx) => {
         const Arrow = kpi.prev && kpi.value >= kpi.prev ? ArrowUpRight : ArrowDownRight
         const isPositive = kpi.prev && kpi.value >= kpi.prev

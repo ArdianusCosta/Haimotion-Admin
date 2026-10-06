@@ -5,7 +5,6 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { SectionPage } from '@/components/section-page'
 import { ChatPage } from '@/components/chat-page'
-import { AnalyticsPage } from '@/components/analytics-page'
 
 import { GlobalSearch } from '@/components/global-search'
 import { MailPage } from '@/components/mail-page'
@@ -85,7 +84,7 @@ import {
 } from 'lucide-react'
 
 const nav = [
-  { label: 'Dashboard', icon: LayoutDashboard }, { label: 'Analytics', icon: Activity },
+  { label: 'Dashboard', icon: LayoutDashboard },
 ]
 const chatsMenu = [
   { label: 'Messenger', icon: MessageCircle, badge: '4' },
@@ -784,7 +783,6 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             switch (section) {
               case 'Dashboard': return <MainDashboard user={user} />
               case 'Messenger': return <ChatPage onStartCall={handleStartCall} />
-              case 'Analytics': return <AnalyticsPage />
               case 'Email': return <MailPage />
               case 'Kanban': return <KanbanPage />
               case 'Calendar': return <CalendarPage />
