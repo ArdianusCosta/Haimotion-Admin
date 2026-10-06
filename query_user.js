@@ -1,12 +1,9 @@
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
 async function main() {
-  const bcrypt = require('bcryptjs')
-  const newHash = await bcrypt.hash('costa123', 10)
-  const updatedUser = await prisma.user.update({
-    where: { email: 'costa@gmail.com' },
-    data: { password: newHash }
+  const accounts = await prisma.account.findMany({
+    where: { userId: 75 } // Assuming userId 75 is costa@gmail.com
   })
-  console.log("Updated costa@gmail.com password!")
+  console.log("Accounts for costa@gmail.com:", accounts)
 }
 main()
