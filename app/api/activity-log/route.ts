@@ -3,6 +3,8 @@ import { getUserSession } from "@/lib/auth/authorization";
 import prisma from "@/lib/prisma";
 import { logActivity } from "@/lib/activity-log";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const user = await getUserSession();
@@ -10,8 +12,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // You could check for admin roles here if needed
-    
     // Fetch logs, include user details
     const logs = await prisma.activity_log.findMany({
       orderBy: { created_at: 'desc' },
@@ -19,16 +19,16 @@ export async function GET(request: Request) {
     });
     
     // Manual join to User table since schema might not have relations defined for activity_log
-    const userIds = Array.from(new Set(logs.map(log => log.user_id)));
+    const userIds = Array.from(new Set(logs.map(log => Number(log.user_id))));
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, firstname: true, lastname: true, email: true, avatar: true }
     });
-    const userMap = new Map(users.map(u => [u.id, u]));
+    const userMap = new Map(users.map(u => [Number(u.id), u]));
 
     const enrichedLogs = logs.map(log => ({
       ...log,
-      user: userMap.get(log.user_id) || null
+      user: userMap.get(Number(log.user_id)) || null
     }));
 
     return NextResponse.json(enrichedLogs);
