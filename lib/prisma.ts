@@ -1,8 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 
-// Force bypass any stuck OS terminal environment variables
-const activeDb = 'mysql';
-const datasourceUrl = process.env.MYSQL_URL;
+const activeDb = (process.env.ACTIVE_DB || 'postgres').toLowerCase();
+const datasourceUrl = activeDb === 'postgres' ? process.env.POSTGRES_URL : process.env.MYSQL_URL;
 if (datasourceUrl) {
   process.env.DATABASE_URL = datasourceUrl;
 }

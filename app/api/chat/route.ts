@@ -93,35 +93,45 @@ export async function POST(req: Request) {
     let success = false;
     let lastErrorText = "";
 
-    // Try keys sequentially or randomly. Here we try all available keys one by one until success.
+    const candidateModels = [
+      'gemini-3.5-flash',
+      'gemini-3.8-flash',
+      'gemini-3.6-flash',
+      'gemini-flash-latest'
+    ];
+
+    // Try keys and models sequentially until success
     for (let i = 0; i < apiKeys.length; i++) {
       const apiKey = apiKeys[i];
       if (!apiKey) continue;
 
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          system_instruction: { parts: [{ text: systemPromptText }] },
-          contents 
-        })
-      });
+      for (const model of candidateModels) {
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            system_instruction: { parts: [{ text: systemPromptText }] },
+            contents 
+          })
+        });
 
-      if (response.ok) {
-        success = true;
-        break;
-      } else {
-        const errText = await response.text();
-        lastErrorText = errText;
-        console.warn(`[Gemini API] Key index ${i} failed with status ${response.status}:`, errText);
-        
-        // If it's a 429 Quota Exceeded or 503 Service Unavailable, try the next one
-        if ((response.status === 429 || response.status === 503) && i < apiKeys.length - 1) {
-          continue;
+        if (response.ok) {
+          success = true;
+          break;
         } else {
-          break; // Other errors or no more keys, stop retrying
+          const errText = await response.text();
+          lastErrorText = errText;
+          console.warn(`[Gemini API] Key index ${i} model ${model} failed with status ${response.status}:`, errText);
+          if (response.status === 404) {
+            continue; // Try next model candidate
+          }
+          if (response.status === 429 || response.status === 503) {
+            break; // Try next API key
+          }
         }
       }
+
+      if (success) break;
     }
 
     if (!success || !response) {

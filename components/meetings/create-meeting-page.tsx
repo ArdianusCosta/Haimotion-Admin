@@ -58,7 +58,7 @@ export function CreateMeetingPage({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background relative max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col h-full bg-background relative w-full py-6 px-4 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full size-10 shrink-0">

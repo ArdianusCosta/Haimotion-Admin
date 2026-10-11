@@ -37,15 +37,24 @@ class FaceErrorBoundary extends React.Component<{children: React.ReactNode}, {er
   }
 }
 
-const FaceScanner = dynamic(() => import('@/components/face-scanner').then(mod => mod.FaceScanner), { ssr: false })
+interface LoginPageProps {
+  onLogin: () => void;
+  initialError?: string;
+}
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, initialError }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialError || '')
   const [successMsg, setSuccessMsg] = useState('')
+
+  useEffect(() => {
+    if (initialError) {
+      setError(initialError)
+    }
+  }, [initialError])
   
   const [showPassword, setShowPassword] = useState(false)
   const [view, setView] = useState<'login' | 'forgot-password'>('login')

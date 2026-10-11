@@ -225,6 +225,10 @@ model project_list {
   members      ProjectMember[]
   milestones   ProjectMilestone[]
   finance_budgets FinanceBudget[]
+
+  @@index([status])
+  @@index([manager_id])
+  @@index([is_archived])
 }
 
 model system_settings {
@@ -259,6 +263,10 @@ model task_list {
   checklists        TaskChecklist[]
   task_dependencies TaskDependency[]  @relation("TaskDependencies")
   task_depended_by  TaskDependency[]  @relation("TaskDependedBy")
+
+  @@index([project_id])
+  @@index([status])
+  @@index([user_id])
 }
 
 model user_group_read_status {
@@ -781,6 +789,7 @@ model MeetingParticipant {
   meeting     Meeting   @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
   user        User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@unique([meeting_id, user_id])
   @@index([meeting_id])
   @@index([user_id])
   @@map("meeting_participants")

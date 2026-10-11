@@ -56,7 +56,7 @@ export function PayrollPage() {
 
   return (
     <div className="p-8 flex-1 overflow-y-auto w-full">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <HRPageHeader 
           title={t('Payroll')} 
           description={t('View and manage employee salaries, allowances, and deductions.')}

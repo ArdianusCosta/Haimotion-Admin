@@ -39,7 +39,7 @@ export function EmployeesPage() {
 
   return (
     <div className="p-8 flex-1 overflow-y-auto w-full">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <HRPageHeader 
           title={t('Employees')} 
           description={t('View your organization\'s members. To add or remove users, use User Management.')}

@@ -31,7 +31,7 @@ export function RecruitmentPage() {
 
   return (
     <div className="p-8 flex-1 overflow-y-auto w-full">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <HRPageHeader 
           title={t('Recruitment')} 
           description={t('Applicant Tracking System to manage active job applications.')}

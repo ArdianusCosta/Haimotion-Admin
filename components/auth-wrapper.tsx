@@ -10,6 +10,7 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
   const { data: session, isPending } = authClient.useSession();
   const [mounted, setMounted] = useState(false)
   const [localUser, setLocalUser] = useState<any>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -21,16 +22,33 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
     }
   }, [])
 
-  if (!mounted || isPending) return null
-
   const activeUser = serverUser || session?.user || localUser;
 
-  if (!activeUser) {
-    return <LoginPage onLogin={() => {
+  useEffect(() => {
+    if (activeUser && activeUser.status === 'resign') {
+      localStorage.removeItem('auth_user')
+      localStorage.removeItem('auth_state')
+      setErrorMessage('Anda sudah resign mohon hubungi admin')
+      setLocalUser(null)
+      authClient.signOut().catch(console.error)
+    }
+  }, [activeUser])
+
+  if (!mounted || isPending) return null
+
+  if (!activeUser || activeUser.status === 'resign') {
+    return <LoginPage initialError={errorMessage || (activeUser?.status === 'resign' ? 'Anda sudah resign mohon hubungi admin' : undefined)} onLogin={() => {
       const stored = localStorage.getItem('auth_user')
       if (stored) {
         try {
-          setLocalUser(JSON.parse(stored))
+          const u = JSON.parse(stored)
+          if (u.status === 'resign') {
+            setErrorMessage('Anda sudah resign mohon hubungi admin')
+            localStorage.removeItem('auth_user')
+            authClient.signOut().catch(console.error)
+            return
+          }
+          setLocalUser(u)
         } catch (e) {}
       }
       window.location.reload();

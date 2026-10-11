@@ -15,7 +15,6 @@ import { ProjectPage } from '@/components/project-page'
 import { LayoutsPage } from '@/components/layouts-page'
 import { AiPage } from '@/components/ai-page'
 import { TasksPage } from '@/components/tasks-page'
-import { TimesheetsPage } from '@/components/timesheets-page'
 
 import { RolesPermissionsPage } from '@/components/roles-permissions-page'
 import { UsersPage } from '@/components/users-page'
@@ -99,7 +98,6 @@ const workMenu = [
   { label: 'Tasks', icon: ListTodo },
   { label: 'Calendar', icon: CalendarDays },
   { label: 'Meetings', icon: Video },
-  { label: 'Timesheets', icon: Clock },
 ]
 const apps = [
   { label: 'Layouts', icon: LayoutTemplate }
@@ -429,7 +427,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
   const [activeFont, setActiveFont] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_font_family') || 'Inter' : 'Inter')
 
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system' | 'hacker' | 'cewek'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_theme_mode') as any) || 'system' : 'system')
-  const [contentWidth, setContentWidth] = useState<'centered' | 'full'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_content_width') as any) || 'centered' : 'centered')
+  const [contentWidth, setContentWidth] = useState<'centered' | 'full'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_content_width') as any) || 'full' : 'full')
   const [headerStyle, setHeaderStyle] = useState<'sticky' | 'scroll' | 'inset'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_header_style') as any) || 'sticky' : 'sticky')
   const [sidebarStyle, setSidebarStyle] = useState<'sidebar' | 'floating' | 'icon' | 'offcanvas'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_sidebar_style') as any) || 'sidebar' : 'sidebar')
   const [resolvedDark, setResolvedDark] = useState(false)
@@ -778,7 +776,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
             </div>
           </div>
         </header>
-        <div className={`mx-auto p-4 md:p-8 ${contentWidth === 'centered' ? 'max-w-[1500px]' : 'w-full max-w-none'}`}>
+        <div className={`p-4 md:p-8 ${contentWidth === 'centered' ? 'w-full' : 'w-full max-w-none'}`}>
           {isFiles ? <FileManager user={user} /> : (() => {
             switch (section) {
               case 'Dashboard': return <MainDashboard user={user} />
@@ -789,7 +787,6 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
               case 'Settings': return <SettingsPage user={user} />
               case 'Project': return <ProjectPage />
               case 'Tasks': return <TasksPage />
-              case 'Timesheets': return <TimesheetsPage />
               case 'AI Assistant': return <AiPage />
               case 'Layouts': return <LayoutsPage layoutStyle={layoutStyle} setLayoutStyle={(val) => handlePrefChange('layout_style', val, setLayoutStyle)} />
               case 'Finance Dashboard': return <FinanceOverviewPage user={user} />

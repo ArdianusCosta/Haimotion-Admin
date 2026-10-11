@@ -90,7 +90,7 @@ export function ActivityLogPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 animate-in fade-in-50 duration-500 max-w-5xl mx-auto pb-10">
+      <div className="space-y-6 animate-in fade-in-50 duration-500 w-full pb-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Activity Log</h1>
@@ -125,7 +125,7 @@ export function ActivityLogPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in-50 duration-500 max-w-5xl mx-auto pb-10">
+    <div className="space-y-8 animate-in fade-in-50 duration-500 w-full pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Activity Log</h1>

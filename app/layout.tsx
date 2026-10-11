@@ -13,7 +13,7 @@ const firaCode = Fira_Code({ subsets: ['latin'], variable: '--font-fira-code', d
 const oswald = Oswald({ subsets: ['latin'], variable: '--font-oswald', display: 'swap' })
 
 export const metadata: Metadata = {
-  title: 'HaiMotion — Business workspace',
+  title: 'HaiMotion — Dashboard',
   description: 'A focused command center for modern teams.',
   generator: 'HaiMotion',
   icons: {
