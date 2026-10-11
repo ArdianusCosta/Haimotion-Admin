@@ -33,7 +33,13 @@ if (activeDb === 'postgres') {
   console.log('🐘 PostgreSQL/Supabase Mode Active. Generating Postgres-compatible Prisma schema...');
   
   schemaContent = schemaContent.replace(/provider\s*=\s*"mysql"/, 'provider = "postgresql"');
-  schemaContent = schemaContent.replace(/env\("(DATABASE_URL|MYSQL_URL)"\)/, 'env("POSTGRES_URL")');
+  
+  const pgEnv = (process.env.POSTGRES_URL || envs.POSTGRES_URL) 
+    ? 'POSTGRES_URL' 
+    : ((process.env.POSTGRES_PRISMA_URL || envs.POSTGRES_PRISMA_URL) 
+      ? 'POSTGRES_PRISMA_URL' 
+      : 'DATABASE_URL');
+  schemaContent = schemaContent.replace(/env\("(DATABASE_URL|MYSQL_URL|POSTGRES_URL)"\)/, `env("${pgEnv}")`);
   
   schemaContent = schemaContent.replace(/@db\.TinyInt/g, '@db.SmallInt');
   schemaContent = schemaContent.replace(/@db\.DateTime\(\d+\)/g, '@db.Timestamp()');

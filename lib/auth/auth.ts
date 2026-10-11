@@ -61,16 +61,41 @@ const prismaWithHooks = prisma.$extends({
   }
 });
 
+const activeDb = (process.env.ACTIVE_DB || 'postgres').toLowerCase();
+const dbProvider = activeDb === 'postgres' ? 'postgresql' : 'mysql';
+
+const getBaseURL = () => {
+  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+};
+
+const getTrustedOrigins = () => {
+  const origins = [
+    "http://192.168.0.29:3000",
+    "http://192.168.7.21:3000",
+    "http://localhost:3000",
+  ];
+  if (process.env.BETTER_AUTH_URL) origins.push(process.env.BETTER_AUTH_URL);
+  if (process.env.NEXT_PUBLIC_APP_URL) origins.push(process.env.NEXT_PUBLIC_APP_URL);
+  if (process.env.VERCEL_URL) origins.push(`https://${process.env.VERCEL_URL}`);
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) origins.push(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
+  return Array.from(new Set(origins));
+};
+
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-  trustedOrigins: ["http://192.168.0.29:3000", "http://192.168.7.21:3000"],
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: getBaseURL(),
+  trustedOrigins: getTrustedOrigins(),
   advanced: {
     database: {
       validateSchema: false
     }
   },
   database: prismaAdapter(prismaWithHooks as any, {
-    provider: 'mysql',
+    provider: dbProvider,
   }),
   socialProviders: {
     google: {
@@ -156,9 +181,15 @@ export const auth = betterAuth({
   },
   plugins: [
     passkey({
-      rpID: process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL).hostname : "localhost",
+      rpID: (() => {
+        try {
+          return new URL(getBaseURL()).hostname;
+        } catch {
+          return "localhost";
+        }
+      })(),
       rpName: "HaiMotion",
-      origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      origin: getBaseURL(),
     })
   ]
 });

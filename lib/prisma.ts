@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 
 const activeDb = (process.env.ACTIVE_DB || 'postgres').toLowerCase();
-const datasourceUrl = activeDb === 'postgres' ? process.env.POSTGRES_URL : process.env.MYSQL_URL;
+const datasourceUrl = activeDb === 'postgres' 
+  ? (process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.DATABASE_URL)
+  : (process.env.MYSQL_URL || process.env.DATABASE_URL);
 if (datasourceUrl) {
   process.env.DATABASE_URL = datasourceUrl;
 }
