@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
+import { cleanUserName, hasResignTag } from '@/lib/utils'
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,8 +19,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const data = await request.json()
     
     const updateData: any = {}
-    if (data.firstname !== undefined) updateData.firstname = data.firstname
-    if (data.lastname !== undefined) updateData.lastname = data.lastname
+    if (data.firstname !== undefined) {
+      if (hasResignTag(data.firstname) && data.status === undefined) {
+        updateData.status = 'resign'
+      }
+      updateData.firstname = cleanUserName(data.firstname)
+    }
+    if (data.lastname !== undefined) {
+      if (hasResignTag(data.lastname) && data.status === undefined) {
+        updateData.status = 'resign'
+      }
+      updateData.lastname = cleanUserName(data.lastname)
+    }
     if (data.email !== undefined) updateData.email = data.email
     if (data.notification_email !== undefined) updateData.notification_email = data.notification_email
     if (data.password) {

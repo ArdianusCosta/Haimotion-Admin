@@ -103,29 +103,29 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('First Name')} <span className="text-destructive">*</span></label>
-              <input required value={formData.firstname} onChange={e => setFormData({...formData, firstname: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
+              <input required value={formData.firstname} onChange={e => setFormData({...formData, firstname: e.target.value})} placeholder={t('e.g. John')} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Last Name')}</label>
-              <input value={formData.lastname} onChange={e => setFormData({...formData, lastname: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
+              <input value={formData.lastname} onChange={e => setFormData({...formData, lastname: e.target.value})} placeholder={t('e.g. Doe')} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Email')} <span className="text-destructive">*</span></label>
-              <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
+              <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="name@haimotion.com" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Notification Email')}</label>
-              <input type="email" value={formData.notification_email} onChange={e => setFormData({...formData, notification_email: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
+              <input type="email" value={formData.notification_email} onChange={e => setFormData({...formData, notification_email: e.target.value})} placeholder="notifications@haimotion.com" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('NIK')}</label>
-              <input value={formData.nik} onChange={e => setFormData({...formData, nik: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
+              <input value={formData.nik} onChange={e => setFormData({...formData, nik: e.target.value})} placeholder="3201xxxxxxxxxxxx" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
             </div>
             <div className="space-y-1.5 col-span-2 sm:col-span-1">
               <label className="text-sm font-medium">{t('Avatar')}</label>
@@ -167,7 +167,7 @@ export function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">{t('Address')}</label>
-            <textarea rows={2} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
+            <textarea rows={2} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder={t('e.g. Jl. Sudirman No. 123, Jakarta')} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50" />
           </div>
           
 

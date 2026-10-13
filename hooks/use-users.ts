@@ -3,11 +3,11 @@ import { User, Role } from '@/types/user'
 import { toast } from 'sonner'
 import { useLanguage } from '@/components/language-provider'
 
-export function useUsers(page: number, limit: number, debouncedSearch: string, roleFilter: string) {
+export function useUsers(page: number, limit: number, debouncedSearch: string, roleFilter: string, statusFilter: string = 'all') {
   return useQuery({
-    queryKey: ['users', page, debouncedSearch, roleFilter],
+    queryKey: ['users', page, debouncedSearch, roleFilter, statusFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/users?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&role=${roleFilter}`)
+      const res = await fetch(`/api/users?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&role=${roleFilter}&status=${statusFilter}`)
       if (!res.ok) throw new Error('Network response was not ok')
       return res.json()
     }

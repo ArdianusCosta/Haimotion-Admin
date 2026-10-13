@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { pusherServer } from '@/lib/pusher'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
+import { cleanUserName, parseUserInfo } from '@/lib/utils'
 
 export async function getUnreadChatCount() {
   try {
@@ -33,7 +34,7 @@ export async function getConversations(userId: number | string) {
   
   const uid = typeof userId === 'string' ? parseInt(userId) : userId;
   
-  // Get 1-on-1 threads
+  // 1. Get 1-on-1 threads
   const threads = await prisma.chatThread.findMany({
     where: {
       OR: [
@@ -42,8 +43,28 @@ export async function getConversations(userId: number | string) {
       ]
     },
     include: {
-      user1: { select: { id: true, firstname: true, lastname: true, avatar: true } },
-      user2: { select: { id: true, firstname: true, lastname: true, avatar: true } },
+      user1: { 
+        select: { 
+          id: true, 
+          firstname: true, 
+          lastname: true, 
+          avatar: true,
+          email: true,
+          status: true,
+          role: { select: { name: true } }
+        } 
+      },
+      user2: { 
+        select: { 
+          id: true, 
+          firstname: true, 
+          lastname: true, 
+          avatar: true,
+          email: true,
+          status: true,
+          role: { select: { name: true } }
+        } 
+      },
       messages: {
         orderBy: { created_at: 'desc' },
         take: 1
@@ -62,24 +83,117 @@ export async function getConversations(userId: number | string) {
     orderBy: {
       last_message_at: 'desc'
     }
-  })
+  });
 
-  return threads.map(t => {
+  const formattedThreads = threads.map(t => {
     const otherUser = t.user1_id === uid ? t.user2 : t.user1
     const lastMessage = t.messages[0]
+    const { displayName, position, initials } = parseUserInfo(otherUser.firstname, otherUser.lastname, otherUser.role?.name)
     
     return {
       id: t.id,
-      type: 'thread',
-      name: `${otherUser.firstname} ${otherUser.lastname}`,
-      initials: `${otherUser.firstname[0]}${otherUser.lastname[0]}`,
+      key: `thread-${t.id}`,
+      type: 'thread' as const,
+      name: displayName,
+      initials,
       avatar: otherUser.avatar,
-      preview: lastMessage?.message_content || 'No messages yet',
+      preview: lastMessage?.message_content || (lastMessage?.attachment ? 'Sent an attachment' : 'No messages yet'),
       time: lastMessage?.created_at || t.last_message_at,
       otherUserId: otherUser.id,
+      email: otherUser.email,
+      role: position,
+      status: otherUser.status || 'active',
       unreadCount: t._count.messages
     }
-  })
+  });
+
+  // 2. Get Groups where current user is a member
+  const groupMemberships = await prisma.group_members.findMany({
+    where: { user_id: uid },
+    include: {
+      chat_groups: {
+        include: {
+          messages: {
+            orderBy: { created_at: 'desc' },
+            take: 1,
+            include: {
+              sender: {
+                select: { id: true, firstname: true, lastname: true }
+              }
+            }
+          },
+          group_members: {
+            include: {
+              users: {
+                select: {
+                  id: true,
+                  firstname: true,
+                  lastname: true,
+                  avatar: true,
+                  role: { select: { name: true } }
+                }
+              }
+            }
+          },
+          user_group_read_status: {
+            where: { user_id: uid }
+          }
+        }
+      }
+    }
+  });
+
+  const formattedGroups = groupMemberships.map(m => {
+    const group = m.chat_groups;
+    const lastMsg = group.messages[0];
+    
+    // Group initials from words or first 2 chars
+    const words = group.name.trim().split(/\s+/);
+    const initials = words.length > 1 
+      ? `${words[0][0]}${words[1][0]}`.toUpperCase()
+      : group.name.slice(0, 2).toUpperCase();
+
+    const senderName = lastMsg?.sender ? cleanUserName(lastMsg.sender.firstname) : '';
+    const preview = lastMsg
+      ? (lastMsg.attachment && !lastMsg.message_content 
+          ? `${senderName ? `${senderName}: ` : ''}Sent an attachment` 
+          : `${senderName ? `${senderName}: ` : ''}${lastMsg.message_content}`)
+      : 'No messages yet';
+
+    const members = group.group_members.map(gm => {
+      const { displayName, position } = parseUserInfo(gm.users.firstname, gm.users.lastname, gm.users.role?.name)
+      return {
+        id: gm.users.id,
+        name: displayName,
+        avatar: gm.users.avatar,
+        isAdmin: !!gm.is_admin,
+        role: position
+      }
+    });
+
+    return {
+      id: group.id,
+      key: `group-${group.id}`,
+      type: 'group' as const,
+      name: group.name,
+      initials,
+      avatar: null,
+      preview,
+      time: lastMsg?.created_at || group.last_message_at || group.date_created,
+      groupId: group.id,
+      description: group.description,
+      memberCount: group.group_members.length,
+      members,
+      createdBy: group.created_by,
+      unreadCount: 0
+    }
+  });
+
+  // Combine and sort by newest activity
+  const allConversations = [...formattedThreads, ...formattedGroups];
+  allConversations.sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
+
+  return allConversations;
 }
 
 export async function markThreadAsRead(threadId: number) {
@@ -276,4 +390,462 @@ export async function getOrCreateThread(userId1: number, userId2: number) {
   }
 
   return thread
+}
+
+export async function getUserChatProfile(targetUserId: number, threadId?: number) {
+  try {
+    await requireAuth();
+    const user = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+        email: true,
+        notification_email: true,
+        avatar: true,
+        status: true,
+        nik: true,
+        address: true,
+        date_created: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      }
+    });
+
+    if (!user) return null;
+
+    let sharedFiles: any[] = [];
+    if (threadId) {
+      sharedFiles = await prisma.chatMessage.findMany({
+        where: {
+          thread_id: threadId,
+          attachment: { not: null }
+        },
+        orderBy: { created_at: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          attachment: true,
+          message_content: true,
+          created_at: true,
+          sender_id: true,
+        }
+      });
+    }
+
+    return {
+      user,
+      sharedFiles
+    };
+  } catch (error) {
+    console.error('Error in getUserChatProfile:', error);
+    return null;
+  }
+}
+
+export async function createChatGroup(name: string, description: string | undefined, memberIds: (number | string)[]) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+
+  if (!name.trim()) {
+    throw new Error('Group name is required');
+  }
+
+  // Ensure all member IDs are strictly integers (Int in Prisma)
+  const parsedMemberIds = memberIds
+    .map(id => typeof id === 'string' ? parseInt(id, 10) : Number(id))
+    .filter(id => !isNaN(id) && id > 0);
+
+  // Ensure creator is in members
+  const uniqueMemberIds = Array.from(new Set([...parsedMemberIds, uid]));
+
+  const group = await prisma.chatGroup.create({
+    data: {
+      name: name.trim(),
+      description: description?.trim() || null,
+      created_by: uid,
+      date_created: new Date(),
+      last_message_at: new Date(),
+      group_members: {
+        create: uniqueMemberIds.map(id => ({
+          user_id: Number(id),
+          is_admin: Number(id) === uid,
+          date_joined: new Date()
+        }))
+      }
+    },
+    include: {
+      group_members: {
+        include: {
+          users: {
+            select: {
+              id: true,
+              firstname: true,
+              lastname: true,
+              avatar: true,
+              role: { select: { name: true } }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Create initial system message in group
+  await prisma.groupMessage.create({
+    data: {
+      group_id: Number(group.id),
+      sender_id: uid,
+      message_content: `Group "${group.name}" was created.`,
+      created_at: new Date()
+    }
+  });
+
+  // Notify each member via Pusher
+  for (const mId of uniqueMemberIds) {
+    try {
+      await pusherServer.trigger(`private-user-${mId}`, 'group:created', { groupId: group.id });
+    } catch (e) {
+      // Non-fatal
+    }
+  }
+
+  return group;
+}
+
+export async function getGroupMessages(groupId: number | string) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+  const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  const messages = await prisma.groupMessage.findMany({
+    where: { group_id: gid },
+    include: {
+      sender: {
+        select: {
+          id: true,
+          firstname: true,
+          lastname: true,
+          avatar: true,
+          role: { select: { name: true } }
+        }
+      }
+    },
+    orderBy: { created_at: 'asc' }
+  });
+
+  return messages.map(m => ({
+    id: m.id,
+    group_id: m.group_id,
+    sender_id: m.sender_id,
+    message_content: m.message_content,
+    attachment: m.attachment,
+    created_at: m.created_at,
+    sender: {
+      id: m.sender.id,
+      name: `${cleanUserName(m.sender.firstname)} ${cleanUserName(m.sender.lastname)}`.trim(),
+      avatar: m.sender.avatar,
+      role: m.sender.role?.name || 'Staff'
+    }
+  }));
+}
+
+export async function sendGroupMessage(groupId: number | string, senderId: number | string, content: string, attachmentUrl?: string) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+  const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  const msg = await prisma.groupMessage.create({
+    data: {
+      group_id: gid,
+      sender_id: uid,
+      message_content: content,
+      attachment: attachmentUrl || null,
+      created_at: new Date()
+    },
+    include: {
+      sender: {
+        select: {
+          id: true,
+          firstname: true,
+          lastname: true,
+          avatar: true,
+          role: { select: { name: true } }
+        }
+      }
+    }
+  });
+
+  await prisma.chatGroup.update({
+    where: { id: gid },
+    data: { last_message_at: new Date() }
+  });
+
+  const { displayName, position } = parseUserInfo(msg.sender.firstname, msg.sender.lastname, msg.sender.role?.name);
+
+  const formatted = {
+    id: msg.id,
+    group_id: msg.group_id,
+    sender_id: msg.sender_id,
+    message_content: msg.message_content,
+    attachment: msg.attachment,
+    created_at: msg.created_at,
+    sender: {
+      id: msg.sender.id,
+      name: displayName,
+      avatar: msg.sender.avatar,
+      role: position
+    }
+  };
+
+  try {
+    await pusherServer.trigger(`private-group-${gid}`, 'message:created', formatted);
+  } catch (e) {
+    console.error('Pusher trigger error:', e);
+  }
+
+  return formatted;
+}
+
+export async function markGroupAsRead(groupId: number | string) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+  const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  await prisma.user_group_read_status.upsert({
+    where: {
+      group_id_user_id: {
+        group_id: gid,
+        user_id: uid
+      }
+    },
+    update: { last_read_at: new Date() },
+    create: {
+      group_id: gid,
+      user_id: uid,
+      last_read_at: new Date()
+    }
+  });
+
+  return { success: true };
+}
+
+export async function getActiveUsersForGroup() {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+
+  const users = await prisma.user.findMany({
+    where: {
+      id: { not: uid },
+      status: { not: 'resign' }
+    },
+    select: {
+      id: true,
+      firstname: true,
+      lastname: true,
+      avatar: true,
+      email: true,
+      role: { select: { name: true } }
+    },
+    orderBy: { firstname: 'asc' }
+  });
+
+  return users.map(u => {
+    const { displayName, position, initials } = parseUserInfo(u.firstname, u.lastname, u.role?.name)
+    return {
+      id: u.id,
+      name: displayName,
+      email: u.email,
+      avatar: u.avatar,
+      role: position,
+      position,
+      initials
+    }
+  });
+}
+
+export async function triggerGroupTyping(groupId: number | string, senderName: string) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+  const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  await pusherServer.trigger(`private-group-${gid}`, 'typing', { groupId: gid, senderId: uid, senderName });
+  return { success: true };
+}
+
+// ─── Group Management ──────────────────────────────────────────────────────────
+
+export async function updateChatGroup(
+  groupId: number | string,
+  name: string,
+  description?: string
+) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+  const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  // Only admins can update
+  const membership = await prisma.group_members.findFirst({
+    where: { group_id: gid, user_id: uid, is_admin: true }
+  });
+  if (!membership) throw new Error('Hanya admin grup yang dapat mengedit profil grup');
+
+  const updated = await prisma.chatGroup.update({
+    where: { id: gid },
+    data: {
+      name: name.trim(),
+      description: description?.trim() || null,
+    }
+  });
+
+  // Notify group members via Pusher
+  try {
+    await pusherServer.trigger(`private-group-${gid}`, 'group:updated', {
+      groupId: gid,
+      name: updated.name,
+      description: updated.description,
+    });
+  } catch {}
+
+  return JSON.parse(JSON.stringify(updated));
+}
+
+export async function addGroupMembers(
+  groupId: number | string,
+  memberIds: number[]
+) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+  const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  // Only admins can add members
+  const membership = await prisma.group_members.findFirst({
+    where: { group_id: gid, user_id: uid, is_admin: true }
+  });
+  if (!membership) throw new Error('Hanya admin grup yang dapat menambahkan anggota');
+
+  // Filter out already-existing members
+  const existing = await prisma.group_members.findMany({
+    where: { group_id: gid, user_id: { in: memberIds } },
+    select: { user_id: true }
+  });
+  const existingIds = new Set(existing.map((e) => e.user_id));
+  const newIds = memberIds.filter((id) => !existingIds.has(id));
+
+  if (newIds.length > 0) {
+    await prisma.group_members.createMany({
+      data: newIds.map((id) => ({
+        group_id: gid,
+        user_id: id,
+        is_admin: false,
+        date_joined: new Date(),
+      }))
+    });
+
+    // Notify new members
+    for (const id of newIds) {
+      try {
+        await pusherServer.trigger(`private-user-${id}`, 'group:created', { groupId: gid });
+      } catch {}
+    }
+
+    // System message
+    try {
+      await prisma.groupMessage.create({
+        data: {
+          group_id: gid,
+          sender_id: uid,
+          message_content: `${newIds.length} anggota baru telah ditambahkan ke grup.`,
+          created_at: new Date(),
+        }
+      });
+    } catch {}
+  }
+
+  // Return updated member list
+  return await _getGroupMembers(gid);
+}
+
+export async function removeGroupMember(
+  groupId: number | string,
+  targetUserId: number
+) {
+  const user = await requireAuth();
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
+  const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  // Only admins can remove members (and can't remove themselves)
+  const membership = await prisma.group_members.findFirst({
+    where: { group_id: gid, user_id: uid, is_admin: true }
+  });
+  if (!membership) throw new Error('Hanya admin grup yang dapat mengeluarkan anggota');
+  if (targetUserId === uid) throw new Error('Anda tidak dapat mengeluarkan diri sendiri');
+
+  await prisma.group_members.deleteMany({
+    where: { group_id: gid, user_id: targetUserId }
+  });
+
+  // Notify removed user
+  try {
+    await pusherServer.trigger(`private-user-${targetUserId}`, 'group:removed', { groupId: gid });
+  } catch {}
+
+  // System message
+  try {
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { firstname: true, lastname: true }
+    });
+    const targetName = targetUser
+      ? `${cleanUserName(targetUser.firstname)} ${cleanUserName(targetUser.lastname)}`.trim()
+      : 'Seorang anggota';
+    await prisma.groupMessage.create({
+      data: {
+        group_id: gid,
+        sender_id: uid,
+        message_content: `${targetName} telah dikeluarkan dari grup.`,
+        created_at: new Date(),
+      }
+    });
+  } catch {}
+
+  return await _getGroupMembers(gid);
+}
+
+/** Internal helper: fetch formatted member list for a group */
+async function _getGroupMembers(gid: number) {
+  const rows = await prisma.group_members.findMany({
+    where: { group_id: gid },
+    include: {
+      users: {
+        select: {
+          id: true,
+          firstname: true,
+          lastname: true,
+          avatar: true,
+          role: { select: { name: true } }
+        }
+      }
+    }
+  });
+
+  return rows.map((gm) => {
+    const { displayName, position } = parseUserInfo(
+      gm.users.firstname,
+      gm.users.lastname,
+      gm.users.role?.name
+    );
+    return {
+      id: gm.users.id,
+      name: displayName,
+      avatar: gm.users.avatar,
+      isAdmin: !!gm.is_admin,
+      role: position,
+    };
+  });
 }

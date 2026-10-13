@@ -402,6 +402,12 @@ const dictionaries: Record<Language, Translations> = {
     'User deleted successfully!': 'User deleted successfully!',
     'Avatar uploaded successfully!': 'Avatar uploaded successfully!',
     'Avatar upload failed!': 'Avatar upload failed!',
+    'e.g. John': 'e.g. John',
+    'e.g. Doe': 'e.g. Doe',
+    'e.g. Jl. Sudirman No. 123, Jakarta': 'e.g. Jl. Sudirman No. 123, Jakarta',
+    'Resign': 'Resign',
+    'All Status': 'All Status',
+    'Active': 'Active',
   },
   id: {
     // Navigation
@@ -796,6 +802,12 @@ const dictionaries: Record<Language, Translations> = {
     'User deleted successfully!': 'Pengguna berhasil dihapus!',
     'Avatar uploaded successfully!': 'Avatar berhasil diunggah!',
     'Avatar upload failed!': 'Unggah avatar gagal!',
+    'e.g. John': 'cth: John',
+    'e.g. Doe': 'cth: Doe',
+    'e.g. Jl. Sudirman No. 123, Jakarta': 'cth: Jl. Sudirman No. 123, Jakarta',
+    'Resign': 'Resign',
+    'All Status': 'Semua Status',
+    'Active': 'Aktif',
   }
 }
 

@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
+import { cleanUserName, hasResignTag } from '@/lib/utils'
 
 export async function GET(request: Request) {
   try {
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
     
     const search = searchParams.get('search') || ''
     const role = searchParams.get('role') || 'all'
+    const status = searchParams.get('status') || 'all'
 
     const whereClause: any = {}
     if (search) {
@@ -28,12 +30,15 @@ export async function GET(request: Request) {
     if (role !== 'all') {
       whereClause.role_id = parseInt(role)
     }
+    if (status !== 'all') {
+      whereClause.status = status
+    }
     
     // Cari role id yang merupakan admin
     const adminRoles = await prisma.role.findMany({ where: { name: { contains: 'Admin' } }, select: { id: true } })
     const adminRoleIds = adminRoles.map(r => r.id)
 
-    const [users, totalFiltered, totalAll, admins, employees] = await Promise.all([
+    const [users, totalFiltered, totalAll, admins, employees, resigned] = await Promise.all([
       prisma.user.findMany({
         where: whereClause,
         take: limit,
@@ -46,7 +51,8 @@ export async function GET(request: Request) {
       prisma.user.count({ where: whereClause }),
       prisma.user.count(),
       prisma.user.count({ where: { role_id: { in: adminRoleIds.length ? adminRoleIds : [-1] } } }),
-      prisma.user.count({ where: { role_id: { notIn: adminRoleIds.length ? adminRoleIds : [-1] } } })
+      prisma.user.count({ where: { role_id: { notIn: adminRoleIds.length ? adminRoleIds : [-1] } } }),
+      prisma.user.count({ where: { status: 'resign' } })
     ])
     
     return NextResponse.json({
@@ -60,7 +66,8 @@ export async function GET(request: Request) {
       counts: {
         total: totalAll,
         admins,
-        employees
+        employees,
+        resigned
       }
     })
   } catch (error) {
@@ -82,17 +89,24 @@ export async function POST(request: Request) {
     // Default avatar if not provided
     const avatar = data.avatar || ''
     
+    // Clean resign tag from names and determine status
+    const hasResign = hasResignTag(data.firstname) || hasResignTag(data.lastname)
+    const cleanedFirstname = cleanUserName(data.firstname)
+    const cleanedLastname = cleanUserName(data.lastname || '')
+    const userStatus = data.status || (hasResign ? 'resign' : 'active')
+    
     const newUser = await prisma.user.create({
       data: {
-        firstname: data.firstname,
-        lastname: data.lastname || '',
+        firstname: cleanedFirstname,
+        lastname: cleanedLastname,
         email: data.email,
         notification_email: data.notification_email || null,
         password: hashedPassword,
         role_id: data.role_id ? parseInt(data.role_id) : null,
         avatar: avatar,
         nik: data.nik || null,
-        address: data.address || null
+        address: data.address || null,
+        status: userStatus
       }
     })
     

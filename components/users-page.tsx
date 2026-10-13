@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Plus, Users as UsersIcon, UserCheck, UserMinus } from 'lucide-react'
+import { Search, Plus, Users as UsersIcon, UserCheck, UserMinus, UserX } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
 import { User } from '@/types/user'
 import { useUsers, useRoles } from '@/hooks/use-users'
@@ -14,6 +14,7 @@ export function UsersPage() {
   const { t } = useLanguage()
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const limit = 10
   
@@ -37,15 +38,15 @@ export function UsersPage() {
   // Reset page when filter changes
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, roleFilter])
+  }, [debouncedSearch, roleFilter, statusFilter])
 
   // Data fetching via custom hooks
-  const { data, isLoading } = useUsers(page, limit, debouncedSearch, roleFilter)
+  const { data, isLoading } = useUsers(page, limit, debouncedSearch, roleFilter, statusFilter)
   const { data: rolesData } = useRoles()
   
   const users: User[] = data?.data || []
   const pagination = data?.pagination || { total: 0, page: 1, limit: 10, totalPages: 1 }
-  const counts = data?.counts || { total: 0, admins: 0, employees: 0 }
+  const counts = data?.counts || { total: 0, admins: 0, employees: 0, resigned: 0 }
   const rolesList: { id: number, name: string }[] = rolesData?.roles || []
 
   const openAddModal = () => {
@@ -85,7 +86,7 @@ export function UsersPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
@@ -116,8 +117,20 @@ export function UsersPage() {
                 <p className="text-sm font-medium text-muted-foreground">{t('Admin')}</p>
                 <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{counts.admins}</p>
               </div>
-              <div className="flex size-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+              <div className="flex size-12 items-center justify-center rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400">
                 <UserMinus className="size-6" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">{t('Resign')}</p>
+                <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{counts.resigned || 0}</p>
+              </div>
+              <div className="flex size-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                <UserX className="size-6" />
               </div>
             </div>
           </div>
@@ -135,16 +148,28 @@ export function UsersPage() {
             />
           </div>
           
-          <select 
-            value={roleFilter} 
-            onChange={e => setRoleFilter(e.target.value)}
-            className="rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50"
-          >
-            <option value="all">{t('All Roles')}</option>
-            {rolesList.map(role => (
-              <option key={role.id} value={role.id.toString()}>{role.name}</option>
-            ))}
-          </select>
+          <div className="flex flex-wrap items-center gap-3">
+            <select 
+              value={statusFilter} 
+              onChange={e => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 cursor-pointer"
+            >
+              <option value="all">{t('All Status')}</option>
+              <option value="active">{t('Active')}</option>
+              <option value="resign">{t('Resign')}</option>
+            </select>
+
+            <select 
+              value={roleFilter} 
+              onChange={e => setRoleFilter(e.target.value)}
+              className="rounded-lg border border-border bg-background py-2 pl-3 pr-8 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 cursor-pointer"
+            >
+              <option value="all">{t('All Roles')}</option>
+              {rolesList.map(role => (
+                <option key={role.id} value={role.id.toString()}>{role.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <UserTable 
