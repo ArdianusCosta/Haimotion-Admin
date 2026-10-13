@@ -95,7 +95,7 @@ export function ActivityLogItem({ log, isLast }: { log: ActivityLog, isLast?: bo
           <Avatar className="size-10 shrink-0 border bg-background">
             <AvatarImage src={log.user?.avatar || ''} className="object-cover" />
             <AvatarFallback className="bg-primary/5 text-primary text-xs">
-              {log.user?.firstname ? (log.user.firstname[0] + (log.user.lastname?.[0] || '')).toUpperCase() : 'U'}
+              {log.user?.firstname ? (log.user.firstname[0] + (log.user.lastname?.[0] || '')).toUpperCase() : (log.user?.name ? log.user.name.slice(0, 2).toUpperCase() : 'U')}
             </AvatarFallback>
           </Avatar>
         </div>
@@ -103,7 +103,7 @@ export function ActivityLogItem({ log, isLast }: { log: ActivityLog, isLast?: bo
         <div className="flex flex-1 flex-col justify-center space-y-1 py-1 min-w-0 overflow-hidden">
           <div className="flex items-start sm:items-center justify-between gap-4">
             <p className="text-sm text-foreground/90 leading-snug truncate">
-              <span className="font-semibold text-foreground mr-1.5">{log.user?.firstname || 'Unknown User'}</span>
+              <span className="font-semibold text-foreground mr-1.5">{log.user?.firstname || log.user?.name || 'Unknown User'}</span>
               <span className="text-muted-foreground">{action}</span>
             </p>
             <span className="text-xs text-muted-foreground whitespace-nowrap ml-4 shrink-0">{time}</span>
@@ -144,15 +144,15 @@ export function ActivityLogItem({ log, isLast }: { log: ActivityLog, isLast?: bo
             <Avatar className="size-12 border bg-background shadow-sm shrink-0 mt-0.5">
               <AvatarImage src={log.user?.avatar || ''} className="object-cover" />
               <AvatarFallback className="text-muted-foreground bg-muted">
-                {log.user?.firstname ? log.user.firstname[0].toUpperCase() : 'U'}
+                {log.user?.firstname ? log.user.firstname[0].toUpperCase() : (log.user?.name ? log.user.name[0].toUpperCase() : 'U')}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0 space-y-1">
               <p className="text-sm font-semibold text-foreground leading-snug break-words">
-                {log.user?.firstname || 'Unknown User'}
+                {log.user?.firstname ? `${log.user.firstname} ${log.user.lastname || ''}`.trim() : (log.user?.name || 'Unknown User')}
               </p>
               <p className="text-xs text-muted-foreground break-words font-medium">
-                {log.user?.lastname || 'HaiMotion User'}
+                {log.user?.email || log.user?.lastname || 'HaiMotion User'}
               </p>
             </div>
           </div>

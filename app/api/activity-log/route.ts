@@ -19,10 +19,10 @@ export async function GET(request: Request) {
     });
     
     // Manual join to User table since schema might not have relations defined for activity_log
-    const userIds = Array.from(new Set(logs.map(log => Number(log.user_id))));
+    const userIds = Array.from(new Set(logs.map(log => Number(log.user_id)).filter(id => !isNaN(id) && id > 0)));
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, firstname: true, lastname: true, email: true, avatar: true }
+      select: { id: true, firstname: true, lastname: true, name: true, email: true, avatar: true }
     });
     const userMap = new Map(users.map(u => [Number(u.id), u]));
 
@@ -41,21 +41,32 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getUserSession();
-    const { activityType, description, userId: reqUserId } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const { activityType, description, userId: reqUserId, projectId, taskId } = body;
     
-    // For login events, the session cookie might not be fully propagated yet to the fetch request,
-    // so we allow passing the userId explicitly.
+    // Resolve user ID: use session user ID or fallback to reqUserId (essential for login and logout transitions)
     let userId = user?.id;
-    if (activityType === 'login' && reqUserId) {
-      userId = reqUserId;
-    } else if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (reqUserId) {
+      const parsedReqId = parseInt(String(reqUserId), 10);
+      if (!isNaN(parsedReqId) && parsedReqId > 0) {
+        userId = parsedReqId;
+      }
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized: User not identified" }, { status: 401 });
+    }
+
+    if (!activityType) {
+      return NextResponse.json({ error: "activityType is required" }, { status: 400 });
     }
 
     await logActivity({
-      userId: userId,
+      userId,
       activityType,
-      description
+      description: description || `User performed ${activityType}`,
+      projectId,
+      taskId
     });
 
     return NextResponse.json({ success: true });

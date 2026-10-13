@@ -87,14 +87,17 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
     setIsGoogleLoading(true)
     setError('')
     try {
+      localStorage.setItem('pending_oauth_login', 'google')
       const { data, error: authError } = await authClient.signIn.social({
         provider: 'google',
         callbackURL: window.location.origin
       })
       if (authError) {
+        localStorage.removeItem('pending_oauth_login')
         setError(authError.message || 'Gagal login dengan Google.')
       }
     } catch (err) {
+      localStorage.removeItem('pending_oauth_login')
       setError('Gagal menghubungkan ke Google OAuth. Pastikan GOOGLE_CLIENT_ID dan GOOGLE_CLIENT_SECRET sudah diisi di .env')
     } finally {
       setIsGoogleLoading(false)
@@ -123,12 +126,6 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
         }
         localStorage.setItem('auth_user', JSON.stringify(data.user))
         localStorage.setItem('play_welcome_voice', 'true')
-        
-        fetch('/api/activity-log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activityType: 'login', description: 'User logged in via AI Camera', userId: data.user.id })
-        }).catch(console.error)
 
         setIsFaceScannerOpen(false)
         onLogin()
@@ -171,10 +168,15 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
         localStorage.setItem('play_welcome_voice', 'true')
         
         try {
+          const userDisplayName = (data.user as any).name || `${(data.user as any).firstname || ''} ${(data.user as any).lastname || ''}`.trim() || data.user.email;
           await fetch('/api/activity-log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ activityType: 'login', description: 'User logged in via email', userId: (data.user as any).id })
+            body: JSON.stringify({ 
+              activityType: 'login', 
+              description: `User ${userDisplayName} logged in via email`, 
+              userId: (data.user as any).id 
+            })
           });
         } catch (e) {
           console.error('Failed to log login activity', e);
@@ -380,10 +382,15 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
                     localStorage.setItem('auth_user', JSON.stringify(data.user))
                     
                     try {
+                      const userDisplayName = (data.user as any).name || `${(data.user as any).firstname || ''} ${(data.user as any).lastname || ''}`.trim() || data.user.email;
                       await fetch('/api/activity-log', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ activityType: 'login', description: 'User logged in via passkey', userId: (data.user as any).id })
+                        body: JSON.stringify({ 
+                          activityType: 'login', 
+                          description: `User ${userDisplayName} logged in via passkey`, 
+                          userId: (data.user as any).id 
+                        })
                       });
                     } catch (e) {
                       console.error('Failed to log login activity', e);
