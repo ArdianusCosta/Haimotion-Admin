@@ -20,6 +20,7 @@ const TYPE_ICONS: Record<string, string> = {
   general: '🔔',
 }
 
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
