@@ -1,8 +1,10 @@
 allowBuilds:
-  '@prisma/client': set this to true or false
-  '@prisma/engines': set this to true or false
-  core-js: set this to true or false
-  prisma: set this to true or false
+  '@firebase/util': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  core-js: true
+  prisma: true
+  protobufjs: true
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
