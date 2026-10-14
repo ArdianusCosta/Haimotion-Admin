@@ -49,6 +49,7 @@ if (activeDb === 'postgres') {
 
   schemaContent = schemaContent.replace(/(@@(index|unique)\([^)]+?)(,\s*map:\s*"[^"]+")\)/g, '$1)');
   schemaContent = schemaContent.replace(/(@unique\(\s*map:\s*"[^"]+"\s*\))/g, '@unique');
+  schemaContent = schemaContent.replace(/\(length:\s*\d+\)/g, '');
 
   const generatedPath = path.join(process.cwd(), 'prisma/schema.postgresql.prisma');
   fs.writeFileSync(generatedPath, schemaContent);

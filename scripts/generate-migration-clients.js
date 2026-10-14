@@ -26,6 +26,7 @@ pgSchema = pgSchema.replace(/@db\.Time\(\d+\)/g, '@db.Time()');
 pgSchema = pgSchema.replace(/@db\.Float/g, '@db.Real');
 pgSchema = pgSchema.replace(/(@@(index|unique)\([^)]+?)(,\s*map:\s*"[^"]+")\)/g, '$1)');
 pgSchema = pgSchema.replace(/(@unique\(\s*map:\s*"[^"]+"\s*\))/g, '@unique');
+pgSchema = pgSchema.replace(/\(length:\s*\d+\)/g, '');
 
 const pgSchemaPath = path.join(process.cwd(), 'prisma/schema.migrate-postgres.prisma');
 fs.writeFileSync(pgSchemaPath, pgSchema);
