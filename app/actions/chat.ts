@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { pusherServer } from '@/lib/pusher'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { cleanUserName, parseUserInfo } from '@/lib/utils'
+import { notifyChatMessage } from '@/app/actions/notifications'
 
 export async function getUnreadChatCount() {
   try {
@@ -279,6 +280,22 @@ export async function sendMessage(threadId: number, senderId: number, content: s
   })
 
   await pusherServer.trigger(`private-thread-${threadId}`, 'message:created', message)
+
+  // Send FCM push notification to the receiver (fire-and-forget)
+  try {
+    const thread = await prisma.chatThread.findUnique({ where: { id: threadId } })
+    if (thread) {
+      const receiverId = thread.user1_id === senderId ? thread.user2_id : thread.user1_id
+      const senderName = `${message.sender.firstname} ${message.sender.lastname || ''}`.trim()
+      const preview = attachment && !content ? '📎 Attachment' : content
+      notifyChatMessage({
+        userIds: [receiverId],
+        senderName,
+        messagePreview: preview,
+        chatLink: `/chat`,
+      }).catch(() => {}) // non-blocking
+    }
+  } catch (_) {}
 
   return message
 }
@@ -608,6 +625,30 @@ export async function sendGroupMessage(groupId: number | string, senderId: numbe
   } catch (e) {
     console.error('Pusher trigger error:', e);
   }
+
+  // Send FCM push notification to all group members except sender (fire-and-forget)
+  try {
+    const group = await prisma.chatGroup.findUnique({
+      where: { id: gid },
+      select: { name: true, group_members: { select: { user_id: true } } }
+    })
+    if (group) {
+      const receiverIds = group.group_members
+        .map((m: { user_id: number }) => m.user_id)
+        .filter((id: number) => id !== uid)
+      if (receiverIds.length > 0) {
+        const preview = attachmentUrl && !content ? '📎 Attachment' : content
+        notifyChatMessage({
+          userIds: receiverIds,
+          senderName: displayName,
+          messagePreview: preview,
+          chatLink: `/chat`,
+          isGroup: true,
+          groupName: group.name,
+        }).catch(() => {}) // non-blocking
+      }
+    }
+  } catch (_) {}
 
   return formatted;
 }

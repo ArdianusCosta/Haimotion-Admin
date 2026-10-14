@@ -5,6 +5,7 @@ import { LoginPage } from './login-page'
 import HaiMotionDashboard from './northstar-dashboard'
 import { LanguageProvider } from './language-provider'
 import { authClient } from '@/lib/auth/client'
+import { FirebaseInitializer } from './firebase-initializer'
 
 export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: { initialSection?: string, slug?: string[], serverUser?: any }) {
   const { data: session, isPending } = authClient.useSession();
@@ -57,6 +58,7 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
 
   return (
     <LanguageProvider>
+      <FirebaseInitializer />
       <HaiMotionDashboard initialSection={initialSection} user={activeUser} slug={slug} />
     </LanguageProvider>
   )

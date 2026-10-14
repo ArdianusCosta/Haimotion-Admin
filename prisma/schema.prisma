@@ -55,6 +55,8 @@ model User {
   department_manager      HrDepartment[]           @relation("DepartmentManager")
   calendar_events         CalendarEvent[]
   calendar_participants   CalendarParticipant[]
+  push_subscriptions      PushSubscription[]
+  notifications           Notification[]
 
   // CRM Relations
   crm_clients_assigned CrmClient[]   @relation("AssignedClients")
@@ -1316,4 +1318,40 @@ model CalendarReminder {
 
   @@index([event_id])
   @@map("calendar_reminders")
+}
+
+// ============ PUSH NOTIFICATIONS ============
+
+model PushSubscription {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token      String   @db.Text
+  device     String?  @db.VarChar(255)
+  browser    String?  @db.VarChar(100)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@unique([user_id, token(length: 255)])
+  @@index([user_id])
+  @@map("push_subscriptions")
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  title      String   @db.VarChar(255)
+  body       String   @db.Text
+  icon       String?  @db.VarChar(500)
+  link       String?  @db.VarChar(500)
+  type       String   @default("general") @db.VarChar(50)
+  data       String?  @db.Text
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+  read_at    DateTime?
+
+  @@index([user_id])
+  @@index([user_id, is_read])
+  @@map("notifications")
 }

@@ -14,3 +14,7 @@ node_modules
 .next/
 .DS_Store
 .env
+
+# Firebase Service Account (SENSITIVE - never commit!)
+lib/firebase/service-account.json
+*-firebase-adminsdk-*.json

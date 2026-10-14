@@ -68,13 +68,15 @@ import { useThemeSounds } from './use-theme-sounds'
 import { authClient } from '@/lib/auth/client'
 import { pusherClient } from '@/lib/pusher-client'
 import { LiveKitCallUI } from './livekit-call'
+import { NotificationProvider } from '@/components/notifications/notification-provider'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 import { createCallSession, endCallSession, getUnreadChatCount } from '@/app/actions/chat'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { AccountSettings } from '@/components/account-settings'
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Bell, CalendarDays, Check,
+  Activity, ArrowDownRight, ArrowUpRight, CalendarDays, Check,
   ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, Download,
   File, FileImage, FileSpreadsheet, Folder, FolderOpen, Grid2X2, LayoutDashboard,
   List, Mail, Menu, MessageCircle, MoreHorizontal, Package, PanelLeft,
@@ -156,7 +158,7 @@ const administration = [
 
 function Icon({ icon: I, className = '' }: { icon: React.ElementType; className?: string }) { return <I className={className} aria-hidden="true" /> }
 
-export default function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { initialSection?: string, user?: any, slug?: string[] }) {
+function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { initialSection?: string, user?: any, slug?: string[] }) {
   const { t } = useLanguage()
   const router = useRouter()
 
@@ -758,7 +760,7 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <button className="relative rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notifications"><Bell className="size-4" /><span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" /></button>
+            <NotificationBell />
             <div className="mx-2 hidden h-5 w-px bg-border sm:block" />
             <div className="flex items-center gap-2">
               <button
@@ -979,5 +981,13 @@ export default function HaiMotionDashboard({ initialSection = 'Dashboard', user,
       </div>
     )}
   </div>
+}
+
+export default function HaiMotionDashboardWithNotifications(props: { initialSection?: string, user?: any, slug?: string[] }) {
+  return (
+    <NotificationProvider userId={props.user?.id}>
+      <HaiMotionDashboard {...props} />
+    </NotificationProvider>
+  )
 }
 
