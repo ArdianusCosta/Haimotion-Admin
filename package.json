@@ -67,5 +67,5 @@
     "prisma": "5.22.0",
     "tailwindcss": "^4.3.3",
     "typescript": "5.7.3"
-  },
+  }
 }
