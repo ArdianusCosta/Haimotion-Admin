@@ -1,6 +1,8 @@
 export interface ActivityUser {
   firstname: string;
   lastname?: string;
+  name?: string | null;
+  email?: string | null;
   avatar?: string;
 }
 

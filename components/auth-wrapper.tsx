@@ -32,6 +32,21 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
       setErrorMessage('Anda sudah resign mohon hubungi admin')
       setLocalUser(null)
       authClient.signOut().catch(console.error)
+    } else if (activeUser && activeUser.id) {
+      const pendingOauth = localStorage.getItem('pending_oauth_login');
+      if (pendingOauth) {
+        localStorage.removeItem('pending_oauth_login');
+        const userDisplayName = activeUser.name || `${activeUser.firstname || ''} ${activeUser.lastname || ''}`.trim() || activeUser.email;
+        fetch('/api/activity-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activityType: 'login',
+            description: `User ${userDisplayName} logged in via Google`,
+            userId: activeUser.id
+          })
+        }).catch(console.error);
+      }
     }
   }, [activeUser])
 

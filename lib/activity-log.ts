@@ -8,13 +8,22 @@ export async function logActivity({
   projectId,
   taskId
 }: {
-  userId: number,
+  userId: number | string,
   activityType: string,
   description: string,
-  projectId?: number,
-  taskId?: number
+  projectId?: number | string | null,
+  taskId?: number | string | null
 }) {
   try {
+    const parsedUserId = typeof userId === 'number' ? userId : parseInt(String(userId), 10);
+    if (isNaN(parsedUserId) || !parsedUserId) {
+      console.warn("Invalid userId provided to logActivity:", userId);
+      return;
+    }
+
+    const parsedProjectId = projectId ? (typeof projectId === 'number' ? projectId : parseInt(String(projectId), 10)) : null;
+    const parsedTaskId = taskId ? (typeof taskId === 'number' ? taskId : parseInt(String(taskId), 10)) : null;
+
     let ipAddress = null
     let userAgent = null
     
@@ -22,7 +31,7 @@ export async function logActivity({
       const headersList = await headers()
       const forwardedFor = headersList.get('x-forwarded-for')
       const realIp = headersList.get('x-real-ip')
-      ipAddress = forwardedFor ? forwardedFor.split(',')[0] : (realIp || '127.0.0.1')
+      ipAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : (realIp || '127.0.0.1')
       userAgent = headersList.get('user-agent') || 'Unknown'
     } catch (e) {
       // headers() might fail if not called within request context
@@ -31,11 +40,11 @@ export async function logActivity({
 
     await prisma.activity_log.create({
       data: {
-        user_id: userId,
+        user_id: parsedUserId,
         activity_type: activityType,
         description,
-        project_id: projectId,
-        task_id: taskId,
+        project_id: parsedProjectId && !isNaN(parsedProjectId) ? parsedProjectId : null,
+        task_id: parsedTaskId && !isNaN(parsedTaskId) ? parsedTaskId : null,
         ip_address: ipAddress,
         user_agent: userAgent
       }

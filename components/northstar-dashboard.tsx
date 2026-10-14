@@ -366,10 +366,16 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
 
   const handleLogout = async () => {
     try {
+      const userDisplayName = user?.name || `${user?.firstname || ''} ${user?.lastname || ''}`.trim() || user?.email || 'User';
+      const userId = user?.id ? (typeof user.id === 'string' ? parseInt(user.id, 10) : user.id) : undefined;
       await fetch('/api/activity-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activityType: 'logout', description: 'User logged out' })
+        body: JSON.stringify({ 
+          activityType: 'logout', 
+          description: `User ${userDisplayName} logged out`,
+          userId
+        })
       });
     } catch (e) {
       console.error('Failed to log logout activity', e);
@@ -763,18 +769,30 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
             <NotificationBell />
             <div className="mx-2 hidden h-5 w-px bg-border sm:block" />
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleNavigate('Account Settings')}
-                className="flex size-8 items-center justify-center rounded-full hover:ring-2 hover:ring-ring outline-none cursor-pointer transition-all"
-                title="Account Settings"
-              >
-                <Avatar className="size-8">
-                  <AvatarImage src={user?.avatar || undefined} />
-                  <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
-                    {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : 'A'}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-full hover:ring-2 hover:ring-ring outline-none cursor-pointer transition-all">
+                  <Avatar className="size-8">
+                    <AvatarImage src={user?.avatar || undefined} />
+                    <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                      {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : (user?.name ? user.name.slice(0, 2).toUpperCase() : 'A')}
+                    </AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5 border-b mb-1">
+                    <p className="text-sm font-semibold truncate">{user?.name || `${user?.firstname || ''} ${user?.lastname || ''}`.trim() || 'User'}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                  <DropdownMenuItem onClick={() => handleNavigate('Account Settings')} className="cursor-pointer gap-2">
+                    <Settings className="size-4" />
+                    <span>{t('Account Settings')}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-2 text-red-500 focus:text-red-500 focus:bg-red-500/10">
+                    <LogOut className="size-4" />
+                    <span>{t('Log out')}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>

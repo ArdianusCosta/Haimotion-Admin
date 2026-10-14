@@ -3,18 +3,20 @@
 import { useState, useMemo } from "react"
 import { useActivityLogs } from "@/hooks/use-activity-log"
 import { ActivityLogList } from "@/components/activity-log/activity-log-list"
+import { ActivityLogExportDialog } from "@/components/activity-log/activity-log-export-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Search, Filter, X, Download, Activity, Users, LayoutGrid, Clock } from "lucide-react"
+import { Search, Filter, X, Download, Activity, Users, LayoutGrid, Clock, RefreshCw } from "lucide-react"
 
 export function ActivityLogPage() {
-  const { data: logs, isLoading, error } = useActivityLogs()
+  const { data: logs, isLoading, error, refetch } = useActivityLogs()
   const [search, setSearch] = useState("")
   const [filterUser, setFilterUser] = useState<string>("all")
   const [filterModule, setFilterModule] = useState<string>("all")
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
 
   // Filter logs based on search and filters
   const filteredLogs = useMemo(() => {
@@ -22,7 +24,7 @@ export function ActivityLogPage() {
     return logs.filter(log => {
       // Search logic
       const searchLower = search.toLowerCase()
-      const fullName = `${log.user?.firstname || ''} ${log.user?.lastname || ''}`.toLowerCase()
+      const fullName = `${log.user?.firstname || ''} ${log.user?.lastname || ''} ${log.user?.name || ''}`.toLowerCase()
       const matchesSearch = 
         !search ||
         log.description?.toLowerCase().includes(searchLower) ||
@@ -30,9 +32,15 @@ export function ActivityLogPage() {
         fullName.includes(searchLower)
 
       // Filter logic
-      const matchesUser = filterUser === "all" || log.user?.firstname === filterUser
-      const moduleName = log.activity_type.split('_')[0].toLowerCase()
-      const matchesModule = filterModule === "all" || moduleName === filterModule.toLowerCase()
+      const userDisplayName = log.user?.firstname || log.user?.name || ''
+      const matchesUser = filterUser === "all" || userDisplayName === filterUser
+
+      const typeLower = (log.activity_type || '').toLowerCase()
+      const isAuthType = typeLower.includes('login') || typeLower.includes('logout')
+      const moduleName = isAuthType ? 'authentication' : typeLower.split('_')[0]
+      const matchesModule = filterModule === "all" || 
+        moduleName === filterModule.toLowerCase() ||
+        (filterModule.toLowerCase() === 'authentication' && isAuthType)
 
       return matchesSearch && matchesUser && matchesModule
     })
@@ -44,12 +52,17 @@ export function ActivityLogPage() {
     
     const today = new Date()
     const todayLogs = logs.filter(l => {
+      if (!l.created_at) return false
       const d = new Date(l.created_at)
       return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
     })
     
     const uniqueUsers = new Set(logs.map(l => l.user_id))
-    const uniqueModules = new Set(logs.map(l => l.activity_type.split('_')[0]))
+    const uniqueModules = new Set(logs.map(l => {
+      const typeLower = (l.activity_type || '').toLowerCase()
+      if (typeLower.includes('login') || typeLower.includes('logout')) return 'Authentication'
+      return typeLower.split('_')[0]
+    }))
 
     return {
       total: logs.length,
@@ -65,7 +78,8 @@ export function ActivityLogPage() {
     const users = new Map()
     logs.forEach(l => {
       if (l.user && !users.has(l.user_id)) {
-        users.set(l.user_id, l.user.firstname)
+        const displayName = l.user.firstname || l.user.name || l.user.email
+        users.set(l.user_id, displayName)
       }
     })
     return Array.from(users.values())
@@ -73,10 +87,18 @@ export function ActivityLogPage() {
 
   const uniqueModulesList = useMemo(() => {
     if (!logs) return []
-    const modules = new Set(logs.map(l => {
-      const m = l.activity_type.split('_')[0]
-      return m.charAt(0).toUpperCase() + m.slice(1)
-    }))
+    const modules = new Set<string>()
+    logs.forEach(l => {
+      const typeLower = (l.activity_type || '').toLowerCase()
+      if (typeLower.includes('login') || typeLower.includes('logout')) {
+        modules.add('Authentication')
+      } else {
+        const m = typeLower.split('_')[0]
+        if (m) {
+          modules.add(m.charAt(0).toUpperCase() + m.slice(1))
+        }
+      }
+    })
     return Array.from(modules)
   }, [logs])
 
@@ -131,9 +153,14 @@ export function ActivityLogPage() {
           <h1 className="text-3xl font-bold tracking-tight">Activity Log</h1>
           <p className="text-muted-foreground mt-1">Monitor system activities and audit events across HaiMotion.</p>
         </div>
-        <Button variant="outline" className="gap-2 shrink-0">
-          <Download className="size-4" /> Export
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading} className="gap-2">
+            <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setIsExportDialogOpen(true)} className="gap-2">
+            <Download className="size-4" /> Export
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -251,13 +278,14 @@ export function ActivityLogPage() {
       <div className="bg-background rounded-xl">
         <ActivityLogList logs={filteredLogs} />
       </div>
-      
-      {/* Temporary Debug Block */}
-      {logs && logs.length > 0 && (
-        <pre className="text-xs bg-muted p-4 mt-8 rounded-lg overflow-auto">
-          DEBUG FIRST LOG: {JSON.stringify(logs[0], null, 2)}
-        </pre>
-      )}
+
+      <ActivityLogExportDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        logs={filteredLogs}
+        filterUser={filterUser}
+        filterModule={filterModule}
+      />
     </div>
   )
 }

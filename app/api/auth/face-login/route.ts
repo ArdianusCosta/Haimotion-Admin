@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { auth } from '@/lib/auth/auth';
 import { createHMAC } from '@better-auth/utils/hmac';
 import { cookies } from 'next/headers';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(request: Request) {
   try {
@@ -91,6 +92,13 @@ export async function POST(request: Request) {
       sameSite: 'lax',
       path: '/',
       expires: session.expiresAt
+    });
+
+    const userDisplayName = targetUser.name || `${targetUser.firstname || ''} ${targetUser.lastname || ''}`.trim() || targetUser.email;
+    await logActivity({
+      userId: targetUser.id,
+      activityType: 'login',
+      description: `User ${userDisplayName} logged in via AI Camera`
     });
 
     return NextResponse.json({ success: true, user: targetUser });
