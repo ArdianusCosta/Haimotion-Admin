@@ -113,27 +113,31 @@ export function NotificationBell() {
             </div>
           </div>
 
-          {/* Push Permission Banner */}
-          {isPushSupported && pushPermission !== 'granted' && pushPermission !== 'denied' && (
-            <div className="border-b border-border bg-primary/5 px-4 py-3">
-              <p className="text-xs text-muted-foreground">
-                Aktifkan push notification untuk terima notif di HP kamu 📱
-              </p>
-              <button
-                onClick={requestPushPermission}
-                className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Aktifkan Notifikasi
-              </button>
-            </div>
-          )}
-
-          {/* Blocked Banner */}
-          {isPushSupported && pushPermission === 'denied' && (
-            <div className="border-b border-border bg-destructive/5 px-4 py-3">
-              <p className="text-xs text-muted-foreground">
-                🚫 Push notification diblokir. Buka settings browser untuk mengizinkan.
-              </p>
+          {/* Push Permission / Status Banner */}
+          {isPushSupported && (
+            <div className={`border-b border-border px-4 py-2.5 flex items-center justify-between text-xs ${
+              pushPermission === 'denied' ? 'bg-destructive/10 text-destructive' : 'bg-primary/5 text-foreground'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className={`size-2 rounded-full ${
+                  pushPermission === 'granted' ? 'bg-emerald-500 animate-pulse' : pushPermission === 'denied' ? 'bg-destructive' : 'bg-amber-500'
+                }`} />
+                <span className="font-medium text-xs">
+                  {pushPermission === 'granted' 
+                    ? 'Notifikasi HP: Izin Aktif 📱' 
+                    : pushPermission === 'denied' 
+                    ? 'Notifikasi HP Diblokir' 
+                    : 'Notifikasi HP Belum Aktif'}
+                </span>
+              </div>
+              {pushPermission !== 'denied' && (
+                <button
+                  onClick={requestPushPermission}
+                  className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  {pushPermission === 'granted' ? 'Hubungkan HP' : 'Aktifkan'}
+                </button>
+              )}
             </div>
           )}
 

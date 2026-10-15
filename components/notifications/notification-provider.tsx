@@ -122,14 +122,21 @@ export function NotificationProvider({
   // Request push permission
   const requestPushPermission = useCallback(async () => {
     if (!isSupported) {
-      toast.error('Browser kamu tidak support push notification')
+      toast.error('Browser kamu tidak support push notification (Wajib HTTPS atau localhost)')
       return
     }
-    const token = await subscribe()
-    if (token) {
-      toast.success('Push notification berhasil diaktifkan! 🔔')
-    } else if (Notification.permission === 'denied') {
-      toast.error('Push notification diblokir. Cek settings browser kamu.')
+    toast.loading('Menghubungkan notifikasi HP...', { id: 'push-register' })
+    try {
+      const token = await subscribe()
+      if (token) {
+        toast.success('Push notification berhasil diaktifkan untuk HP ini! 🔔', { id: 'push-register' })
+      } else if (Notification.permission === 'denied') {
+        toast.error('Push notification diblokir di browser. Buka pengaturan browser untuk mengizinkan.', { id: 'push-register' })
+      } else {
+        toast.error('Gagal mendaftarkan HP. Pastikan akses via HTTPS dan izin notifikasi aktif.', { id: 'push-register' })
+      }
+    } catch (err: any) {
+      toast.error(`Error: ${err?.message || 'Gagal mendaftarkan push'}`, { id: 'push-register' })
     }
   }, [isSupported, subscribe])
 
