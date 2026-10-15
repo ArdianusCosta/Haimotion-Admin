@@ -51,7 +51,7 @@ export function NotificationProvider({
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
 
-  const { isSupported, permission, subscribe } = usePushNotifications()
+  const { isSupported, permission, subscribe } = usePushNotifications(userId)
 
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {

@@ -7,17 +7,18 @@ import prisma from '@/lib/prisma'
 export async function POST(req: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user?.id) {
+    const { token, device, browser, userId: bodyUserId } = await req.json()
+
+    const rawUserId = session?.user?.id || bodyUserId
+    if (!rawUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { token, device, browser } = await req.json()
 
     if (!token) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 })
     }
 
-    const userId = Number(session.user.id)
+    const userId = Number(rawUserId)
 
     // Upsert: update if same user+token exists, create otherwise
     await prisma.pushSubscription.upsert({

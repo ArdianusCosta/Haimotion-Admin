@@ -10,7 +10,7 @@ interface PushNotificationState {
   isLoading: boolean
 }
 
-export function usePushNotifications() {
+export function usePushNotifications(userId?: number | string | null) {
   const [state, setState] = useState<PushNotificationState>({
     isSupported: false,
     permission: 'default',
@@ -60,6 +60,7 @@ export function usePushNotifications() {
           token,
           device: getDeviceInfo(),
           browser: getBrowserInfo(),
+          userId,
         }),
       })
 
