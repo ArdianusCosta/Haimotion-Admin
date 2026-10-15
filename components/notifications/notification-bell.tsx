@@ -30,6 +30,8 @@ export function NotificationBell() {
     isLoading,
     pushPermission,
     isPushSupported,
+    isPushSubscribed,
+    isSecureContext,
     requestPushPermission,
     markAsRead,
     markAllAsRead,
@@ -116,26 +118,56 @@ export function NotificationBell() {
           {/* Push Permission / Status Banner */}
           {isPushSupported && (
             <div className={`border-b border-border px-4 py-2.5 flex items-center justify-between text-xs ${
-              pushPermission === 'denied' ? 'bg-destructive/10 text-destructive' : 'bg-primary/5 text-foreground'
+              !isSecureContext
+                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                : pushPermission === 'denied'
+                ? 'bg-destructive/10 text-destructive'
+                : isPushSubscribed
+                ? 'bg-emerald-500/10 text-foreground'
+                : 'bg-primary/5 text-foreground'
             }`}>
               <div className="flex items-center gap-2">
                 <span className={`size-2 rounded-full ${
-                  pushPermission === 'granted' ? 'bg-emerald-500 animate-pulse' : pushPermission === 'denied' ? 'bg-destructive' : 'bg-amber-500'
+                  !isSecureContext
+                    ? 'bg-amber-500'
+                    : isPushSubscribed
+                    ? 'bg-emerald-500'
+                    : pushPermission === 'granted'
+                    ? 'bg-amber-500 animate-pulse'
+                    : pushPermission === 'denied'
+                    ? 'bg-destructive'
+                    : 'bg-amber-500'
                 }`} />
                 <span className="font-medium text-xs">
-                  {pushPermission === 'granted' 
-                    ? 'Notifikasi HP: Izin Aktif 📱' 
-                    : pushPermission === 'denied' 
-                    ? 'Notifikasi HP Diblokir' 
+                  {!isSecureContext
+                    ? 'Web Push: Butuh HTTPS 🔒'
+                    : isPushSubscribed
+                    ? 'Notifikasi HP: Terhubung 📱🔔'
+                    : pushPermission === 'granted'
+                    ? 'Izin Aktif - Belum Terhubung'
+                    : pushPermission === 'denied'
+                    ? 'Notifikasi HP Diblokir'
                     : 'Notifikasi HP Belum Aktif'}
                 </span>
               </div>
               {pushPermission !== 'denied' && (
                 <button
                   onClick={requestPushPermission}
-                  className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    !isSecureContext
+                      ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-500/30'
+                      : isPushSubscribed
+                      ? 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  }`}
                 >
-                  {pushPermission === 'granted' ? 'Hubungkan HP' : 'Aktifkan'}
+                  {!isSecureContext
+                    ? 'Info HTTPS'
+                    : isPushSubscribed
+                    ? 'Sinkron Ulang'
+                    : pushPermission === 'granted'
+                    ? 'Hubungkan HP'
+                    : 'Aktifkan'}
                 </button>
               )}
             </div>

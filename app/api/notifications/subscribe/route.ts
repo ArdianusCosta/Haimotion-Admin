@@ -20,26 +20,33 @@ export async function POST(req: NextRequest) {
 
     const userId = Number(rawUserId)
 
-    // Upsert: update if same user+token exists, create otherwise
-    await prisma.pushSubscription.upsert({
+    // Save or update subscription
+    const existing = await prisma.pushSubscription.findFirst({
       where: {
-        user_id_token: {
-          user_id: userId,
-          token: token,
-        },
-      },
-      update: {
-        device: device || null,
-        browser: browser || null,
-        updated_at: new Date(),
-      },
-      create: {
         user_id: userId,
-        token,
-        device: device || null,
-        browser: browser || null,
+        token: token,
       },
     })
+
+    if (existing) {
+      await prisma.pushSubscription.update({
+        where: { id: existing.id },
+        data: {
+          device: device || null,
+          browser: browser || null,
+          updated_at: new Date(),
+        },
+      })
+    } else {
+      await prisma.pushSubscription.create({
+        data: {
+          user_id: userId,
+          token,
+          device: device || null,
+          browser: browser || null,
+        },
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

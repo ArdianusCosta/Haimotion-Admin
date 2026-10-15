@@ -5,6 +5,7 @@ import { requestNotificationPermission, onForegroundMessage } from '@/lib/fireba
 
 interface PushNotificationState {
   isSupported: boolean
+  isSecureContext: boolean
   permission: NotificationPermission | 'default'
   token: string | null
   isLoading: boolean
@@ -13,6 +14,7 @@ interface PushNotificationState {
 export function usePushNotifications(userId?: number | string | null) {
   const [state, setState] = useState<PushNotificationState>({
     isSupported: false,
+    isSecureContext: true,
     permission: 'default',
     token: null,
     isLoading: true,
@@ -21,7 +23,8 @@ export function usePushNotifications(userId?: number | string | null) {
 
   // Check browser support
   useEffect(() => {
-    const isSupported =
+    const isSecure = typeof window !== 'undefined' ? window.isSecureContext : false
+    const hasAPIs =
       typeof window !== 'undefined' &&
       'Notification' in window &&
       'serviceWorker' in navigator &&
@@ -29,60 +32,67 @@ export function usePushNotifications(userId?: number | string | null) {
 
     setState((prev) => ({
       ...prev,
-      isSupported,
-      permission: isSupported ? Notification.permission : 'default',
+      isSecureContext: isSecure,
+      isSupported: hasAPIs,
+      permission: typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default',
       isLoading: false,
     }))
   }, [])
 
   // Subscribe to push notifications
-  const subscribe = useCallback(async () => {
-    if (!state.isSupported || subscribed.current) return null
+  const subscribe = useCallback(
+    async (force = false): Promise<string> => {
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        throw new Error('Akses dari HP wajib via HTTPS. Browser HP memblokir notifikasi di koneksi HTTP biasa.')
+      }
 
-    setState((prev) => ({ ...prev, isLoading: true }))
+      if (!state.isSupported) {
+        throw new Error('Browser di perangkat ini tidak mendukung Web Push Notification.')
+      }
 
-    try {
-      const token = await requestNotificationPermission()
-      if (!token) {
+      if (subscribed.current && state.token && !force) {
+        return state.token
+      }
+
+      setState((prev) => ({ ...prev, isLoading: true }))
+
+      try {
+        const token = await requestNotificationPermission()
+
+        // Save token to server
+        const response = await fetch('/api/notifications/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            device: getDeviceInfo(),
+            browser: getBrowserInfo(),
+            userId,
+          }),
+        })
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          throw new Error(errData.error || `Server status ${response.status}: Gagal menyimpan langganan`)
+        }
+
+        subscribed.current = true
         setState((prev) => ({
           ...prev,
-          permission: Notification.permission,
+          permission: 'granted',
+          token,
           isLoading: false,
         }))
-        return null
+
+        return token
+      } catch (error: any) {
+        console.error('Push subscription error:', error)
+        setState((prev) => ({ ...prev, isLoading: false }))
+        throw error
       }
-
-      // Save token to server
-      const response = await fetch('/api/notifications/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          device: getDeviceInfo(),
-          browser: getBrowserInfo(),
-          userId,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save subscription')
-      }
-
-      subscribed.current = true
-      setState((prev) => ({
-        ...prev,
-        permission: 'granted',
-        token,
-        isLoading: false,
-      }))
-
-      return token
-    } catch (error) {
-      console.error('Push subscription error:', error)
-      setState((prev) => ({ ...prev, isLoading: false }))
-      return null
-    }
-  }, [state.isSupported])
+    },
+    [state.isSupported, state.token, userId]
+  )
 
   // Unsubscribe from push notifications
   const unsubscribe = useCallback(async () => {

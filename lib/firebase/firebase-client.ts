@@ -32,40 +32,73 @@ async function getMessagingInstance(): Promise<Messaging | null> {
 }
 
 // Request permission and get FCM token
-export async function requestNotificationPermission(): Promise<string | null> {
+export async function requestNotificationPermission(): Promise<string> {
+  if (typeof window === 'undefined') {
+    throw new Error('Akses window tidak tersedia (SSR)')
+  }
+
+  // 1. Check secure context (HTTPS / localhost)
+  if (!window.isSecureContext) {
+    throw new Error('Push notifikasi HP WAJIB via HTTPS atau localhost. Browser HP memblokir notifikasi pada koneksi HTTP biasa (misal IP 192.168.x.x).')
+  }
+
+  // 2. Check browser API support
+  if (!('Notification' in window)) {
+    throw new Error('Browser di perangkat ini tidak mendukung Notification API.')
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    throw new Error('Browser di perangkat ini tidak mendukung Service Worker.')
+  }
+
+  // 3. Special check for iOS
+  const ua = navigator.userAgent
+  const isIOS = /iPad|iPhone|iPod/.test(ua)
+  const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches
+  if (isIOS && !isStandalone) {
+    throw new Error('Di iPhone/iPad (iOS), buka web di Safari lalu tekan tombol Share -> "Tambahkan ke Layar Utama" (Add to Home Screen) agar notifikasi bisa aktif.')
+  }
+
+  // 4. Request notification permission
+  const permission = await Notification.requestPermission()
+  if (permission === 'denied') {
+    throw new Error('Izin notifikasi diblokir di browser. Buka setelan izin situs di browser untuk mengaktifkannya.')
+  }
+  if (permission !== 'granted') {
+    throw new Error('Izin notifikasi belum diizinkan atau ditutup.')
+  }
+
+  // 5. Initialize Firebase Messaging
+  const messaging = await getMessagingInstance()
+  if (!messaging) {
+    throw new Error('Firebase Messaging tidak didukung di browser ini atau koneksi tidak aman.')
+  }
+
+  // 6. Register service worker
+  let registration: ServiceWorkerRegistration
   try {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      console.warn('Notification API not supported')
-      return null
-    }
-
-    const permission = await Notification.requestPermission()
-    if (permission !== 'granted') {
-      console.warn('Notification permission denied or dismissed')
-      return null
-    }
-
-    const messaging = await getMessagingInstance()
-    if (!messaging) {
-      console.warn('FCM messaging instance unavailable (possibly insecure HTTP or unsupported browser)')
-      return null
-    }
-
-    // Register service worker
-    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
+    registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
     await navigator.serviceWorker.ready
-    
-    const vapidKey = (process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || 'BGazwxJw7-a833dUiOTpBH5LRuEbTmjWziCNFcqP9DKsTQMw4n3GTjGiaPu-AMqScxR3qwAviGLI71WTUlQfUVA').trim()
-    
+  } catch (swErr: any) {
+    throw new Error(`Gagal mendaftarkan Service Worker: ${swErr?.message || swErr}`)
+  }
+
+  // 7. Get FCM token
+  const vapidKey = (process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || 'BGazwxJw7-a833dUiOTpBH5LRuEbTmjWziCNFcqP9DKsTQMw4n3GTjGiaPu-AMqScxR3qwAviGLI71WTUlQfUVA').trim()
+
+  try {
     const token = await getToken(messaging, {
       vapidKey,
       serviceWorkerRegistration: registration,
     })
 
+    if (!token) {
+      throw new Error('Firebase tidak mengembalikan token push notification.')
+    }
+
     return token
-  } catch (error) {
-    console.error('Error getting notification permission / token:', error)
-    return null
+  } catch (tokenErr: any) {
+    throw new Error(`Gagal mendapatkan token FCM: ${tokenErr?.message || tokenErr}`)
   }
 }
 
