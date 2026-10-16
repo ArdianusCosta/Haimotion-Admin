@@ -12,7 +12,7 @@ import { toast } from 'sonner'
  *  2. Get the FCM token and save it to the DB (POST /api/notifications/subscribe)
  *  3. Listen for foreground messages and show them as toasts
  */
-export function FirebaseInitializer() {
+export function FirebaseInitializer({ userId }: { userId?: number | string | null }) {
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export function FirebaseInitializer() {
         await fetch('/api/notifications/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, device, browser }),
+          body: JSON.stringify({ token, device, browser, userId }),
         })
 
         console.log('[FCM] Token registered successfully')

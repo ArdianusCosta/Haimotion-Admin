@@ -73,7 +73,7 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
 
   return (
     <LanguageProvider>
-      <FirebaseInitializer />
+      <FirebaseInitializer userId={activeUser?.id} />
       <HaiMotionDashboard initialSection={initialSection} user={activeUser} slug={slug} />
     </LanguageProvider>
   )

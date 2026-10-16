@@ -10,11 +10,10 @@ function getAdminApp(): App {
     return getApps()[0]
   }
 
+  // 1. Try explicit path from env
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
-  
   if (serviceAccountPath) {
     const resolvedPath = path.resolve(serviceAccountPath)
-    
     if (fs.existsSync(resolvedPath)) {
       const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'))
       adminApp = initializeApp({
@@ -24,17 +23,38 @@ function getAdminApp(): App {
     }
   }
 
-  // Fallback: try inline JSON from env
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+  // 2. Try default relative path
+  const defaultPath = path.resolve(process.cwd(), 'lib/firebase/service-account.json')
+  if (fs.existsSync(defaultPath)) {
+    const serviceAccount = JSON.parse(fs.readFileSync(defaultPath, 'utf-8'))
     adminApp = initializeApp({
       credential: cert(serviceAccount),
     })
     return adminApp
   }
 
+  // 3. Fallback: try inline JSON from env (for Vercel / Cloud deployments)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      const serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+        : process.env.FIREBASE_SERVICE_ACCOUNT
+
+      if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n')
+      }
+
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
+      })
+      return adminApp
+    } catch (e) {
+      console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT env var:', e)
+    }
+  }
+
   throw new Error(
-    'Firebase Admin: No service account found. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT env var.'
+    'Firebase Admin: No service account found. Set FIREBASE_SERVICE_ACCOUNT in env or add lib/firebase/service-account.json.'
   )
 }
 

@@ -7,38 +7,46 @@ import prisma from '@/lib/prisma'
 export async function POST(req: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user?.id) {
+    const { token, device, browser, userId: bodyUserId } = await req.json()
+
+    const rawUserId = session?.user?.id || bodyUserId
+    if (!rawUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { token, device, browser } = await req.json()
 
     if (!token) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 })
     }
 
-    const userId = Number(session.user.id)
+    const userId = Number(rawUserId)
 
-    // Upsert: update if same user+token exists, create otherwise
-    await prisma.pushSubscription.upsert({
+    // Save or update subscription
+    const existing = await prisma.pushSubscription.findFirst({
       where: {
-        user_id_token: {
-          user_id: userId,
-          token: token,
-        },
-      },
-      update: {
-        device: device || null,
-        browser: browser || null,
-        updated_at: new Date(),
-      },
-      create: {
         user_id: userId,
-        token,
-        device: device || null,
-        browser: browser || null,
+        token: token,
       },
     })
+
+    if (existing) {
+      await prisma.pushSubscription.update({
+        where: { id: existing.id },
+        data: {
+          device: device || null,
+          browser: browser || null,
+          updated_at: new Date(),
+        },
+      })
+    } else {
+      await prisma.pushSubscription.create({
+        data: {
+          user_id: userId,
+          token,
+          device: device || null,
+          browser: browser || null,
+        },
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

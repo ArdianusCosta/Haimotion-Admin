@@ -24,6 +24,8 @@ interface NotificationContextValue {
   isLoading: boolean
   pushPermission: NotificationPermission | 'default'
   isPushSupported: boolean
+  isPushSubscribed: boolean
+  isSecureContext: boolean
   requestPushPermission: () => Promise<void>
   fetchNotifications: () => Promise<void>
   markAsRead: (id: number) => Promise<void>
@@ -51,7 +53,7 @@ export function NotificationProvider({
   const [unreadCount, setUnreadCount] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
 
-  const { isSupported, permission, subscribe } = usePushNotifications()
+  const { isSupported, isSecureContext, permission, token, subscribe } = usePushNotifications(userId)
 
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
@@ -72,12 +74,14 @@ export function NotificationProvider({
     }
   }, [userId])
 
-  // Auto-subscribe to push when user is logged in
+  // Auto-subscribe to push when user is logged in and permission is already granted
   useEffect(() => {
-    if (userId && isSupported && permission === 'granted') {
-      subscribe()
+    if (userId && isSupported && isSecureContext && permission === 'granted') {
+      subscribe(false).catch((err) => {
+        console.warn('Auto push subscription skipped/failed:', err?.message)
+      })
     }
-  }, [userId, isSupported, permission, subscribe])
+  }, [userId, isSupported, isSecureContext, permission, subscribe])
 
   // Fetch notifications on mount and periodically
   useEffect(() => {
@@ -121,15 +125,33 @@ export function NotificationProvider({
 
   // Request push permission
   const requestPushPermission = useCallback(async () => {
-    if (!isSupported) {
-      toast.error('Browser kamu tidak support push notification')
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      toast.error('Browser HP memblokir push notifikasi di HTTP biasa. Wajib akses via HTTPS atau Cloudflare Tunnel/Ngrok!', {
+        id: 'push-register',
+        duration: 8000,
+      })
       return
     }
-    const token = await subscribe()
-    if (token) {
-      toast.success('Push notification berhasil diaktifkan! 🔔')
-    } else if (Notification.permission === 'denied') {
-      toast.error('Push notification diblokir. Cek settings browser kamu.')
+
+    if (!isSupported) {
+      toast.error('Browser perangkat ini tidak mendukung Web Push Notification.', { id: 'push-register' })
+      return
+    }
+
+    toast.loading('Menghubungkan notifikasi HP...', { id: 'push-register' })
+    try {
+      const pushToken = await subscribe(true)
+      if (pushToken) {
+        toast.success('Push notification berhasil diaktifkan untuk HP ini! 🔔', {
+          id: 'push-register',
+          duration: 5000,
+        })
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Gagal mendaftarkan push notifikasi.', {
+        id: 'push-register',
+        duration: 8000,
+      })
     }
   }, [isSupported, subscribe])
 
@@ -167,6 +189,8 @@ export function NotificationProvider({
         isLoading,
         pushPermission: permission,
         isPushSupported: isSupported,
+        isPushSubscribed: !!token,
+        isSecureContext,
         requestPushPermission,
         fetchNotifications,
         markAsRead,
