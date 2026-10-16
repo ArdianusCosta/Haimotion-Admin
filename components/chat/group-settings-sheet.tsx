@@ -7,6 +7,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +34,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  ShieldAlert,
+  Camera,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -49,10 +59,11 @@ interface GroupSettingsSheetProps {
   groupId: number
   groupName: string
   groupDescription?: string | null
+  groupAvatar?: string | null
   members: Member[]
   currentUserId: number
   isCurrentUserAdmin: boolean
-  onGroupUpdated: (updates: { name?: string; description?: string; members?: Member[] }) => void
+  onGroupUpdated: (updates: { name?: string; description?: string; avatar?: string | null; members?: Member[] }) => void
 }
 
 export function GroupSettingsSheet({
@@ -61,6 +72,7 @@ export function GroupSettingsSheet({
   groupId,
   groupName,
   groupDescription,
+  groupAvatar,
   members,
   currentUserId,
   isCurrentUserAdmin,
@@ -71,6 +83,11 @@ export function GroupSettingsSheet({
   const [editDesc, setEditDesc] = useState(groupDescription || '')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
 
+  // Avatar upload
+  const [currentAvatar, setCurrentAvatar] = useState<string | null>(groupAvatar || null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const avatarInputRef = React.useRef<HTMLInputElement>(null)
+
   const [showAddPanel, setShowAddPanel] = useState(false)
   const [allUsers, setAllUsers] = useState<any[]>([])
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
@@ -80,10 +97,14 @@ export function GroupSettingsSheet({
 
   const [kickingId, setKickingId] = useState<number | null>(null)
 
+  // State untuk popup konfirmasi kick
+  const [kickConfirm, setKickConfirm] = useState<{ id: number; name: string; avatar?: string | null } | null>(null)
+
   useEffect(() => {
     setEditName(groupName)
     setEditDesc(groupDescription || '')
-  }, [groupName, groupDescription])
+    setCurrentAvatar(groupAvatar || null)
+  }, [groupName, groupDescription, groupAvatar])
 
   const loadUsers = useCallback(async () => {
     setIsLoadingUsers(true)
@@ -175,12 +196,46 @@ export function GroupSettingsSheet({
     }
   }
 
-  const handleKick = async (memberId: number, memberName: string) => {
-    if (!confirm(`Keluarkan ${memberName} dari grup ini?`)) return
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('File harus berupa gambar')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ukuran foto maksimal 5MB')
+      return
+    }
     try {
-      setKickingId(memberId)
-      const newMembers = await removeGroupMember(groupId, memberId)
-      toast.success(`${memberName} telah dikeluarkan dari grup`)
+      setIsUploadingAvatar(true)
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!res.ok) throw new Error('Upload gagal')
+      const { url } = await res.json()
+      // Save to DB immediately
+      await updateChatGroup(groupId, editName || groupName, editDesc || groupDescription || undefined, url)
+      setCurrentAvatar(url)
+      onGroupUpdated({ avatar: url })
+      toast.success('Foto grup berhasil diperbarui')
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal upload foto')
+    } finally {
+      setIsUploadingAvatar(false)
+      // reset input
+      if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+  }
+
+  const handleKickConfirm = async () => {
+    if (!kickConfirm) return
+    const { id, name } = kickConfirm
+    try {
+      setKickingId(id)
+      setKickConfirm(null)
+      const newMembers = await removeGroupMember(groupId, id)
+      toast.success(`${name} telah dikeluarkan dari grup`)
       onGroupUpdated({ members: newMembers })
     } catch (err: any) {
       toast.error(err.message || 'Gagal mengeluarkan anggota')
@@ -190,6 +245,85 @@ export function GroupSettingsSheet({
   }
 
   return (
+    <>
+    {/* Popup Konfirmasi Keluarkan Anggota */}
+    <Dialog
+      open={kickConfirm !== null}
+      onOpenChange={(o) => { if (!o) setKickConfirm(null) }}
+    >
+      <DialogContent showCloseButton={false} className="max-w-sm">
+        <DialogHeader>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="flex size-11 items-center justify-center rounded-full bg-destructive/10 shrink-0">
+              <ShieldAlert className="size-5 text-destructive" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-bold text-foreground">
+                Keluarkan Anggota
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                Tindakan ini tidak dapat dibatalkan
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {kickConfirm && (
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-3 py-2.5 my-1">
+            {kickConfirm.avatar ? (
+              <img
+                src={kickConfirm.avatar}
+                alt={kickConfirm.name}
+                className="size-9 rounded-full object-cover border border-border shrink-0"
+              />
+            ) : (
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${getAvatarBg(kickConfirm.id)}`}
+              >
+                {kickConfirm.name[0]}
+              </span>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{kickConfirm.name}</p>
+              <p className="text-xs text-muted-foreground">Akan dikeluarkan dari grup ini</p>
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Apakah kamu yakin ingin mengeluarkan{' '}
+          <span className="font-semibold text-foreground">{kickConfirm?.name}</span>{' '}
+          dari grup ini? Mereka tidak akan bisa melihat percakapan grup setelah dikeluarkan.
+        </p>
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 text-xs h-9"
+            onClick={() => setKickConfirm(null)}
+            disabled={kickingId === kickConfirm?.id}
+          >
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="flex-1 text-xs h-9 gap-1.5 font-semibold"
+            onClick={handleKickConfirm}
+            disabled={kickingId === kickConfirm?.id}
+          >
+            {kickingId === kickConfirm?.id ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <UserMinus className="size-3.5" />
+            )}
+            Ya, Keluarkan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
@@ -205,8 +339,39 @@ export function GroupSettingsSheet({
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent" />
           </div>
           <div className="absolute -bottom-9 left-6">
-            <div className="flex size-[72px] items-center justify-center rounded-2xl bg-primary border-4 border-card text-primary-foreground text-xl font-bold shadow-lg ring-1 ring-border select-none">
-              <Users className="size-8" />
+            {/* Hidden file input */}
+            {isCurrentUserAdmin && (
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+            )}
+            <div
+              className={`relative flex size-[72px] items-center justify-center rounded-2xl border-4 border-card shadow-lg ring-1 ring-border overflow-hidden ${
+                isCurrentUserAdmin ? 'cursor-pointer group/avatar' : ''
+              } ${currentAvatar ? 'bg-transparent' : 'bg-primary'}`}
+              onClick={() => isCurrentUserAdmin && !isUploadingAvatar && avatarInputRef.current?.click()}
+              title={isCurrentUserAdmin ? 'Klik untuk ganti foto grup' : undefined}
+            >
+              {isUploadingAvatar ? (
+                <Loader2 className="size-8 animate-spin text-primary-foreground" />
+              ) : currentAvatar ? (
+                <img
+                  src={currentAvatar}
+                  alt={groupName}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <Users className="size-8 text-primary-foreground" />
+              )}
+              {isCurrentUserAdmin && !isUploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity rounded-[10px]">
+                  <Camera className="size-5 text-white" />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -461,7 +626,7 @@ export function GroupSettingsSheet({
 
                   {isCurrentUserAdmin && !isMe && (
                     <button
-                      onClick={() => handleKick(member.id, member.name)}
+                      onClick={() => setKickConfirm({ id: member.id, name: member.name, avatar: member.avatar })}
                       disabled={isBeingKicked}
                       title={`Keluarkan ${member.name}`}
                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
@@ -491,5 +656,6 @@ export function GroupSettingsSheet({
         )}
       </SheetContent>
     </Sheet>
+    </>
   )
 }

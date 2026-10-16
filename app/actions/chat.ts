@@ -178,7 +178,7 @@ export async function getConversations(userId: number | string) {
       type: 'group' as const,
       name: group.name,
       initials,
-      avatar: null,
+      avatar: group.avatar || null,
       preview,
       time: lastMsg?.created_at || group.last_message_at || group.date_created,
       groupId: group.id,
@@ -724,7 +724,8 @@ export async function triggerGroupTyping(groupId: number | string, senderName: s
 export async function updateChatGroup(
   groupId: number | string,
   name: string,
-  description?: string
+  description?: string,
+  avatar?: string
 ) {
   const user = await requireAuth();
   const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
@@ -741,6 +742,7 @@ export async function updateChatGroup(
     data: {
       name: name.trim(),
       description: description?.trim() || null,
+      ...(avatar !== undefined ? { avatar } : {}),
     }
   });
 
@@ -750,6 +752,7 @@ export async function updateChatGroup(
       groupId: gid,
       name: updated.name,
       description: updated.description,
+      avatar: updated.avatar,
     });
   } catch {}
 
@@ -758,11 +761,14 @@ export async function updateChatGroup(
 
 export async function addGroupMembers(
   groupId: number | string,
-  memberIds: number[]
+  memberIds: (number | string)[]
 ) {
   const user = await requireAuth();
   const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
   const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
+
+  // Force-convert all memberIds to Int to avoid "Expected Int, provided String"
+  const memberIntIds = memberIds.map((id) => (typeof id === 'string' ? parseInt(id, 10) : Number(id)));
 
   // Only admins can add members
   const membership = await prisma.group_members.findFirst({
@@ -772,11 +778,11 @@ export async function addGroupMembers(
 
   // Filter out already-existing members
   const existing = await prisma.group_members.findMany({
-    where: { group_id: gid, user_id: { in: memberIds } },
+    where: { group_id: gid, user_id: { in: memberIntIds } },
     select: { user_id: true }
   });
   const existingIds = new Set(existing.map((e) => e.user_id));
-  const newIds = memberIds.filter((id) => !existingIds.has(id));
+  const newIds = memberIntIds.filter((id) => !existingIds.has(id));
 
   if (newIds.length > 0) {
     await prisma.group_members.createMany({

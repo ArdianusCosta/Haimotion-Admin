@@ -511,8 +511,16 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                   >
                     <div className="relative shrink-0">
                       {isGroup ? (
-                        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-amber-500/20 via-orange-500/20 to-purple-500/20 text-primary border border-primary/20 shadow-xs">
-                          <Users className="size-4.5 text-primary" />
+                        <span className={`flex size-9 shrink-0 items-center justify-center rounded-full border border-primary/20 shadow-xs overflow-hidden ${
+                          item.avatar
+                            ? 'bg-transparent'
+                            : 'bg-linear-to-br from-amber-500/20 via-orange-500/20 to-purple-500/20'
+                        }`}>
+                          {item.avatar ? (
+                            <img src={item.avatar} alt={item.name} className="size-full object-cover" />
+                          ) : (
+                            <Users className="size-4.5 text-primary" />
+                          )}
                         </span>
                       ) : (
                         <span className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-primary-foreground ${getAvatarColor(item.otherUserId)}`}>
@@ -585,8 +593,16 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                       title="Lihat detail grup"
                     >
                       <div className="relative">
-                        <span className="flex size-9 items-center justify-center rounded-full bg-linear-to-br from-amber-500/20 via-orange-500/20 to-purple-500/20 text-primary border border-primary/20 shadow-xs">
-                          <Users className="size-5 text-primary" />
+                        <span className={`flex size-9 items-center justify-center rounded-full border border-primary/20 shadow-xs overflow-hidden ${
+                          activeConversation.avatar
+                            ? 'bg-transparent'
+                            : 'bg-linear-to-br from-amber-500/20 via-orange-500/20 to-purple-500/20'
+                        }`}>
+                          {activeConversation.avatar ? (
+                            <img src={activeConversation.avatar} alt={activeConversation.name} className="size-full object-cover" />
+                          ) : (
+                            <Users className="size-5 text-primary" />
+                          )}
                         </span>
                       </div>
                       <div>
@@ -990,8 +1006,16 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
 
                     <div className="border-b border-border p-4 text-center">
                       <div className="relative mx-auto w-max">
-                        <span className="flex size-14 items-center justify-center rounded-full bg-linear-to-br from-amber-500/20 via-orange-500/20 to-purple-500/20 text-primary border border-primary/20 shadow-sm">
-                          <Users className="size-7 text-primary" />
+                        <span className={`flex size-14 items-center justify-center rounded-full border border-primary/20 shadow-sm overflow-hidden ${
+                          activeConversation.avatar
+                            ? 'bg-transparent'
+                            : 'bg-linear-to-br from-amber-500/20 via-orange-500/20 to-purple-500/20'
+                        }`}>
+                          {activeConversation.avatar ? (
+                            <img src={activeConversation.avatar} alt={activeConversation.name} className="size-full object-cover" />
+                          ) : (
+                            <Users className="size-7 text-primary" />
+                          )}
                         </span>
                       </div>
                       <p className="mt-2.5 font-semibold text-sm text-foreground break-words leading-snug px-1">
@@ -1289,6 +1313,7 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
           groupId={activeConversation.groupId || activeConversation.id}
           groupName={activeConversation.name}
           groupDescription={activeConversation.description}
+          groupAvatar={activeConversation.avatar}
           members={activeConversation.members || []}
           currentUserId={currentUser?.id || 0}
           isCurrentUserAdmin={!!activeConversation.members?.find((m: any) => m.id === currentUser?.id)?.isAdmin}
@@ -1302,6 +1327,7 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                         ...c,
                         ...(updates.name !== undefined && { name: updates.name }),
                         ...(updates.description !== undefined && { description: updates.description }),
+                        ...(updates.avatar !== undefined && { avatar: updates.avatar }),
                         ...(updates.members !== undefined && {
                           members: updates.members,
                           memberCount: updates.members.length,
