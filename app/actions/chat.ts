@@ -259,45 +259,55 @@ export async function getMessages(threadId: number) {
 
 export async function sendMessage(threadId: number, senderId: number, content: string, attachment?: string, replyToId?: number) {
   const user = await requireAuth();
-  const message = await prisma.chatMessage.create({
-    data: {
-      thread_id: threadId,
-      sender_id: senderId,
-      message_content: content,
-      attachment: attachment || null,
-      reply_to_id: replyToId || null,
-      created_at: new Date()
-    },
-    include: {
-      sender: { select: { id: true, firstname: true, lastname: true, avatar: true } },
-      reply_to: { select: { id: true, message_content: true, attachment: true, sender: { select: { firstname: true, lastname: true } } } }
-    }
-  })
+  const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
 
-  await prisma.chatThread.update({
-    where: { id: threadId },
-    data: { last_message_at: new Date() }
-  })
+  // Execute message creation and thread timestamp update in parallel
+  const [message, updatedThread] = await Promise.all([
+    prisma.chatMessage.create({
+      data: {
+        thread_id: threadId,
+        sender_id: uid,
+        message_content: content,
+        attachment: attachment || null,
+        reply_to_id: replyToId || null,
+        created_at: new Date()
+      },
+      include: {
+        sender: { select: { id: true, firstname: true, lastname: true, avatar: true } },
+        reply_to: { select: { id: true, message_content: true, attachment: true, sender: { select: { firstname: true, lastname: true } } } }
+      }
+    }),
+    prisma.chatThread.update({
+      where: { id: threadId },
+      data: { last_message_at: new Date() },
+      select: { user1_id: true, user2_id: true }
+    })
+  ]);
 
-  await pusherServer.trigger(`private-thread-${threadId}`, 'message:created', message)
+  const receiverId = updatedThread.user1_id === uid ? updatedThread.user2_id : updatedThread.user1_id;
 
-  // Send FCM push notification to the receiver (fire-and-forget)
+  // Real-time delivery: broadcast to the active thread and the receiver's personal presence
+  Promise.allSettled([
+    pusherServer.trigger(`private-thread-${threadId}`, 'message:created', message),
+    pusherServer.trigger(`private-user-${receiverId}`, 'chat:message', {
+      threadId,
+      message
+    })
+  ]).catch(() => {});
+
+  // Send FCM push notification (non-blocking)
   try {
-    const thread = await prisma.chatThread.findUnique({ where: { id: threadId } })
-    if (thread) {
-      const receiverId = thread.user1_id === senderId ? thread.user2_id : thread.user1_id
-      const senderName = `${message.sender.firstname} ${message.sender.lastname || ''}`.trim()
-      const preview = attachment && !content ? '📎 Attachment' : content
-      notifyChatMessage({
-        userIds: [receiverId],
-        senderName,
-        messagePreview: preview,
-        chatLink: `/chat`,
-      }).catch(() => {}) // non-blocking
-    }
+    const senderName = `${message.sender.firstname} ${message.sender.lastname || ''}`.trim();
+    const preview = attachment && !content ? '📎 Attachment' : content;
+    notifyChatMessage({
+      userIds: [receiverId],
+      senderName,
+      messagePreview: preview,
+      chatLink: `/chat`,
+    }).catch(() => {});
   } catch (_) {}
 
-  return message
+  return message;
 }
 
 export async function createCallSession(threadId: number, callerId: number, type: 'voice' | 'video') {
@@ -577,31 +587,32 @@ export async function sendGroupMessage(groupId: number | string, senderId: numbe
   const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : Number(user.id);
   const gid = typeof groupId === 'string' ? parseInt(groupId, 10) : Number(groupId);
 
-  const msg = await prisma.groupMessage.create({
-    data: {
-      group_id: gid,
-      sender_id: uid,
-      message_content: content,
-      attachment: attachmentUrl || null,
-      created_at: new Date()
-    },
-    include: {
-      sender: {
-        select: {
-          id: true,
-          firstname: true,
-          lastname: true,
-          avatar: true,
-          role: { select: { name: true } }
+  const [msg] = await Promise.all([
+    prisma.groupMessage.create({
+      data: {
+        group_id: gid,
+        sender_id: uid,
+        message_content: content,
+        attachment: attachmentUrl || null,
+        created_at: new Date()
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            avatar: true,
+            role: { select: { name: true } }
+          }
         }
       }
-    }
-  });
-
-  await prisma.chatGroup.update({
-    where: { id: gid },
-    data: { last_message_at: new Date() }
-  });
+    }),
+    prisma.chatGroup.update({
+      where: { id: gid },
+      data: { last_message_at: new Date() }
+    })
+  ]);
 
   const { displayName, position } = parseUserInfo(msg.sender.firstname, msg.sender.lastname, msg.sender.role?.name);
 

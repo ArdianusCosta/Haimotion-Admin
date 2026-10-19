@@ -6,10 +6,13 @@ import { getKanbanTasks, updateTaskStatus, getTaskDetails, addComment, uploadAtt
 import { toast } from 'sonner'
 import { KanbanColumn, KanbanUser, KanbanTask } from '@/types/kanban'
 
+import { authClient } from '@/lib/auth/client'
+
 interface KanbanContextType {
   columns: KanbanColumn[]
   filteredColumns: KanbanColumn[]
   users: KanbanUser[]
+  currentUser: any
   loading: boolean
   
   // Dialog and Modals
@@ -38,8 +41,25 @@ interface KanbanContextType {
 
 const KanbanContext = createContext<KanbanContextType | undefined>(undefined)
 
-export function KanbanProvider({ children }: { children: React.ReactNode }) {
+export function KanbanProvider({ children, user }: { children: React.ReactNode, user?: any }) {
   const queryClient = useQueryClient()
+  const { data: session } = authClient.useSession()
+  const [currentUser, setCurrentUser] = useState<any>(user || null)
+
+  useEffect(() => {
+    if (user) {
+      setCurrentUser(user)
+    } else if (session?.user) {
+      setCurrentUser(session.user)
+    } else {
+      const stored = localStorage.getItem('auth_user')
+      if (stored) {
+        try {
+          setCurrentUser(JSON.parse(stored))
+        } catch (e) {}
+      }
+    }
+  }, [user, session])
 
   const { data, isLoading: loading } = useQuery({
     queryKey: ['kanbanTasks'],
@@ -120,14 +140,50 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
   })
 
   const addCommentMutation = useMutation({
-    mutationFn: async (payload: { taskId: number, userId: number, text: string }) => {
-      return await addComment(payload.taskId, payload.userId, payload.text)
+    mutationFn: async (payload: { taskId: number, userId?: number, text: string, tempId?: string }) => {
+      const uId = payload.userId || (currentUser?.id ? Number(currentUser.id) : 1)
+      return await addComment(payload.taskId, uId, payload.text)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['taskDetails', selectedTask?.dbId] })
+    onSuccess: (res, variables) => {
+      if (res.success && res.data) {
+        queryClient.setQueryData(['taskDetails', variables.taskId], (old: any) => {
+          if (!old) return old
+          const comments = old.comments || []
+          let replaced = false
+          const nextComments = comments.map((c: any) => {
+            if (variables.tempId && c.id === variables.tempId) {
+              replaced = true
+              return { ...res.data, is_pending: false }
+            }
+            if (c.id === res.data.id) {
+              replaced = true
+              return { ...res.data, is_pending: false }
+            }
+            return c
+          })
+          if (!replaced) {
+            nextComments.push({ ...res.data, is_pending: false })
+          }
+          return {
+            ...old,
+            comments: nextComments
+          }
+        })
+      }
       queryClient.invalidateQueries({ queryKey: ['kanbanTasks'] })
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to add comment')
+    onError: (err: any, variables) => {
+      if (variables?.tempId) {
+        queryClient.setQueryData(['taskDetails', variables.taskId], (old: any) => {
+          if (!old) return old
+          return {
+            ...old,
+            comments: (old.comments || []).filter((c: any) => c.id !== variables.tempId)
+          }
+        })
+      }
+      toast.error(err.message || 'Failed to add comment')
+    }
   })
 
   const uploadAttachmentMutation = useMutation({
@@ -155,7 +211,7 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <KanbanContext.Provider value={{
-      columns, filteredColumns, users, loading,
+      columns, filteredColumns, users, currentUser, loading,
       isDetailsDialogOpen, setIsDetailsDialogOpen,
       selectedTask, setSelectedTask,
       taskDetails, detailsLoading,

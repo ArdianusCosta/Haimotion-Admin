@@ -15,9 +15,9 @@ export function KanbanContent() {
   )
 }
 
-export function KanbanPage() {
+export function KanbanPage({ user }: { user?: any } = {}) {
   return (
-    <KanbanProvider>
+    <KanbanProvider user={user}>
       <KanbanContent />
     </KanbanProvider>
   )

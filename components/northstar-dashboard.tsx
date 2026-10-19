@@ -3,11 +3,9 @@
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { SectionPage } from '@/components/section-page'
 import { ChatPage } from '@/components/chat-page'
 
 import { GlobalSearch } from '@/components/global-search'
-import { MailPage } from '@/components/mail-page'
 import { KanbanPage } from '@/components/kanban-page'
 import { CalendarPage } from '@/components/calendar-page'
 import { SettingsPage } from '@/components/settings-page'
@@ -20,7 +18,6 @@ import { RolesPermissionsPage } from '@/components/roles-permissions-page'
 import { UsersPage } from '@/components/users-page'
 import { ActivityLogPage } from '@/components/activity-log-page'
 import { MeetingsPage } from '@/components/meetings-page'
-import { TransactionsPage } from '@/components/finance/transactions-page'
 import { MainDashboard } from '@/components/dashboard/main-dashboard'
 import { InvoicesPage } from '@/components/finance/invoices/invoices-page'
 import { FinanceOverviewPage } from '@/components/finance/finance-overview/finance-overview-page'
@@ -79,29 +76,30 @@ import {
   Activity, ArrowDownRight, ArrowUpRight, CalendarDays, Check,
   ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, Download,
   File, FileImage, FileSpreadsheet, Folder, FolderOpen, Grid2X2, LayoutDashboard,
-  List, Mail, Menu, MessageCircle, MoreHorizontal, Package, PanelLeft,
-  Plus, Search, Settings, ShoppingCart, Sparkles, Sun, Users, X, Zap, ClipboardList, LayoutTemplate, Paintbrush, ListTodo, UserCheck, Blocks, Flag, GitPullRequest, ShieldAlert, ShieldCheck, LogOut, DollarSign, Receipt,
+  List, Menu, MessageCircle, MoreHorizontal, Package, PanelLeft,
+  Plus, Search, Settings, Sparkles, Sun, Users, X, Zap, ClipboardList, LayoutTemplate, Paintbrush, ListTodo, UserCheck, Blocks, Flag, GitPullRequest, ShieldAlert, ShieldCheck, LogOut, DollarSign, Receipt,
   PieChart, CreditCard, Wallet, Banknote, TrendingDown, TrendingUp, BookOpen, Target, BarChart3, Scale, Clock, FileText, Briefcase, Video
 } from 'lucide-react'
 
-const nav = [
+type MenuItem = { label: string; icon: any; badge?: string }
+
+const nav: MenuItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard },
 ]
-const chatsMenu = [
+const chatsMenu: MenuItem[] = [
   { label: 'Messenger', icon: MessageCircle, badge: '4' },
-  { label: 'Email', icon: Mail },
 ]
-const aiMenu = [
+const aiMenu: MenuItem[] = [
   { label: 'AI Assistant', icon: Sparkles }
 ]
-const workMenu = [
+const workMenu: MenuItem[] = [
   { label: 'Project', icon: ClipboardList },
   { label: 'Kanban', icon: Check },
   { label: 'Tasks', icon: ListTodo },
   { label: 'Calendar', icon: CalendarDays },
   { label: 'Meetings', icon: Video },
 ]
-const apps = [
+const apps: MenuItem[] = [
   { label: 'Layouts', icon: LayoutTemplate }
 ]
 
@@ -245,7 +243,21 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
   // Keep state in sync with URL prop changes (e.g. browser back button)
   useEffect(() => {
     setSection(initialSection)
-  }, [initialSection])
+    if (slug && slug.length > 0 && initialSection === 'Dashboard' && slug[0].toLowerCase() !== 'dashboard') {
+      router.replace('/', { scroll: false })
+    }
+  }, [initialSection, slug, router])
+
+  // Unread Chat Count
+  const { data: unreadChatCount, refetch: refetchUnreadChatCount } = useQuery({
+    queryKey: ['unreadChatCount', user?.id],
+    queryFn: async () => {
+      const res = await getUnreadChatCount();
+      return res.count || 0;
+    },
+    enabled: !!user?.id,
+    refetchInterval: 30000
+  })
 
   // Maintain Global Pusher Presence and Personal Channel
   useEffect(() => {
@@ -275,12 +287,16 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
       })
     })
 
+    personalChannel.bind('chat:message', () => {
+      refetchUnreadChatCount()
+    })
+
     return () => {
       pusherClient.unsubscribe('presence-chat')
       personalChannel.unbind_all()
       pusherClient.unsubscribe(personalChannelName)
     }
-  }, [user?.id])
+  }, [user?.id, refetchUnreadChatCount])
 
 
   const sidebarRef = useRef<HTMLDivElement>(null)
@@ -486,17 +502,6 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
     }
     updatePreference.mutate({ [key]: value })
   }
-
-  // Unread Chat Count
-  const { data: unreadChatCount } = useQuery({
-    queryKey: ['unreadChatCount', user?.id],
-    queryFn: async () => {
-      const res = await getUnreadChatCount();
-      return res.count || 0;
-    },
-    enabled: !!user?.id,
-    refetchInterval: 3000
-  })
 
   // -------------------------
 
@@ -801,8 +806,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
             switch (section) {
               case 'Dashboard': return <MainDashboard user={user} />
               case 'Messenger': return <ChatPage onStartCall={handleStartCall} />
-              case 'Email': return <MailPage />
-              case 'Kanban': return <KanbanPage />
+              case 'Kanban': return <KanbanPage user={user} />
               case 'Calendar': return <CalendarPage />
               case 'Settings': return <SettingsPage user={user} />
               case 'Project': return <ProjectPage />
@@ -880,7 +884,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
                 </div>
               )
               case 'Meetings': return <MeetingsPage slug={slug} />
-              default: return <SectionPage section={section} />
+              default: return <MainDashboard user={user} />
             }
           })()}
         </div>

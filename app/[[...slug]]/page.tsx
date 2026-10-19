@@ -31,7 +31,8 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'employees': 'Karyawan',
         'general-ledger': 'Buku Besar'
       }
-      initialSection = financeRouteMap[subRoute] || 'Beranda'
+      const fullSubRoute = resolvedParams.slug.slice(1).join('/')
+      initialSection = financeRouteMap[fullSubRoute] || financeRouteMap[subRoute] || 'Beranda'
     } else if (resolvedParams.slug[0] === 'hr' && resolvedParams.slug.length > 1) {
       const subRoute = resolvedParams.slug[1]
       // Special mappings for hr nested routes
@@ -56,27 +57,27 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
       }
       initialSection = crmRouteMap[subRoute] || 'CRM Overview'
     } else {
-      const rawSlug = resolvedParams.slug[0]
-      initialSection = rawSlug
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ')
-        
-      if (initialSection === 'Roles And Permissions' || initialSection === 'Roles Permissions') {
-        initialSection = 'Roles & Permissions'
+      const rawSlug = resolvedParams.slug[0].toLowerCase()
+      const topLevelRouteMap: Record<string, string> = {
+        'dashboard': 'Dashboard',
+        'messenger': 'Messenger',
+        'ai-assistant': 'AI Assistant',
+        'project': 'Project',
+        'kanban': 'Kanban',
+        'tasks': 'Tasks',
+        'calendar': 'Calendar',
+        'meetings': 'Meetings',
+        'layouts': 'Layouts',
+        'settings': 'Settings',
+        'finance': 'Beranda',
+        'hr': 'HR Overview',
+        'crm': 'CRM Overview',
+        'roles-permissions': 'Roles & Permissions',
+        'user-management': 'User Management',
+        'activity-log': 'Activity Log',
+        'account-settings': 'Account Settings'
       }
-      if (rawSlug === 'ai-assistant') {
-        initialSection = 'AI Assistant'
-      }
-      if (rawSlug === 'finance') {
-        initialSection = 'Beranda'
-      }
-      if (rawSlug === 'hr') {
-        initialSection = 'HR Overview'
-      }
-      if (rawSlug === 'crm') {
-        initialSection = 'CRM Overview'
-      }
+      initialSection = topLevelRouteMap[rawSlug] || 'Dashboard'
     }
   }
 

@@ -1,5 +1,5 @@
-import { Calendar, FolderDot, Trash2, Video, Clock, LayoutList } from 'lucide-react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
+import { Calendar, FolderDot, Trash2, Video, Clock, Pencil } from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { TASK_STATUS_MAP } from '@/types/tasks'
 import { useTasks } from '../tasks-provider'
@@ -77,22 +77,36 @@ export function TaskDetailsDialog({ onEditTask }: { onEditTask: (task: Task) => 
               </div>
             </div>
             
-            <SheetFooter className="flex items-center justify-between border-t border-border/40 bg-background p-5">
+            <div className="mt-auto flex flex-row items-center justify-between border-t border-border/50 bg-background/95 backdrop-blur-xs p-4 px-6 shrink-0">
               <Button 
                 type="button" 
                 variant="ghost" 
                 size="sm"
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive font-medium px-3"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive font-medium px-3 h-9 transition-colors cursor-pointer"
                 onClick={() => confirmDeleteTask(selectedTask.dbId)}
               >
-                <Trash2 className="size-4 mr-2" /> Delete
+                <Trash2 className="size-4 mr-1.5" /> Delete
               </Button>
-              <div className="flex gap-2">
-                <Button type="button" size="sm" className="shadow-sm font-medium px-4" onClick={() => { setTaskDetailsOpen(false); onEditTask(selectedTask); }}>
-                  <LayoutList className="size-3.5 mr-2" /> Edit
+              <div className="flex items-center gap-2.5">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  className="border-border/60 hover:bg-muted font-medium px-3.5 h-9 transition-colors cursor-pointer"
+                  onClick={() => setTaskDetailsOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  className="shadow-sm font-medium px-4 h-9 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer" 
+                  onClick={() => { setTaskDetailsOpen(false); onEditTask(selectedTask); }}
+                >
+                  <Pencil className="size-3.5 mr-1.5" /> Edit
                 </Button>
               </div>
-            </SheetFooter>
+            </div>
           </>
         )}
       </SheetContent>

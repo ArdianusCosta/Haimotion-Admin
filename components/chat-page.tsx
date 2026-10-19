@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply, Download, X, Check, CheckCheck, ChevronLeft, User, Mail, FileText, ExternalLink, Copy, Shield, UserCheck, UserX, PanelRight, Users, Plus, Settings } from 'lucide-react'
+import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply, Download, X, Check, CheckCheck, Clock, ChevronLeft, User, Mail, FileText, ExternalLink, Copy, Shield, UserCheck, UserX, PanelRight, Users, Plus, Settings } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -152,80 +152,140 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
 
   // Realtime Pusher subscription
   useEffect(() => {
-    if (!activeConversation || !currentUser) return
+    if (!currentUser) return
 
-    const channelName = activeConversation.type === 'group'
-      ? `private-group-${activeConversation.id}`
-      : `private-thread-${activeConversation.id}`
-    const channel = pusherClient.subscribe(channelName)
+    const personalChannelName = `private-user-${currentUser.id}`
+    const personalChannel = pusherClient.subscribe(personalChannelName)
 
-    channel.bind('message:created', (newMessage: any) => {
-      queryClient.setQueryData(['messages', activeConversation.key], (oldData: any) => {
-        if (!oldData) return [newMessage]
-        if (oldData.find((m: any) => m.id === newMessage.id)) return oldData
-        return [...oldData, newMessage]
+    // Listen on personal channel for incoming messages from ANY thread
+    personalChannel.bind('chat:message', (data: any) => {
+      // If belongs to currently open active thread, append to messages
+      if (activeConversation && activeConversation.type === 'thread' && activeConversation.id === data.threadId) {
+        queryClient.setQueryData(['messages', activeConversation.key], (oldData: any[] = []) => {
+          if (oldData.find((m: any) => m.id === data.message.id)) return oldData
+          return [...oldData, data.message]
+        })
+        setTimeout(() => scrollToBottom(), 50)
+        markThreadAsRead(data.threadId)
+      }
+
+      // Update sidebar conversation preview and unread count in real-time
+      queryClient.setQueryData(['conversations', currentUser.id], (oldConversations: any[] = []) => {
+        return oldConversations.map((c: any) => {
+          if (c.id === data.threadId && c.type === 'thread') {
+            const isCurrentlyActive = activeConversation?.id === data.threadId && activeConversation?.type === 'thread'
+            return {
+              ...c,
+              preview: data.message?.message_content || (data.message?.attachment ? 'Sent an attachment' : 'New message'),
+              time: data.message?.created_at || new Date().toISOString(),
+              unreadCount: isCurrentlyActive ? 0 : (c.unreadCount || 0) + 1
+            }
+          }
+          return c
+        }).sort((a: any, b: any) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
       })
-      setTimeout(() => scrollToBottom(), 100)
-      
-      // If the message is from someone else, mark as read
-      if (newMessage.sender_id !== currentUser.id) {
-        if (activeConversation.type === 'group') {
-          markGroupAsRead(activeConversation.id).then(() => {
-            refetchConversations()
-          })
-        } else {
-          markThreadAsRead(activeConversation.id).then(() => {
-            refetchConversations()
-          })
+    })
+
+    let channel: any = null
+    let channelName = ''
+
+    if (activeConversation) {
+      channelName = activeConversation.type === 'group'
+        ? `private-group-${activeConversation.id}`
+        : `private-thread-${activeConversation.id}`
+      channel = pusherClient.subscribe(channelName)
+
+      channel.bind('message:created', (newMessage: any) => {
+        queryClient.setQueryData(['messages', activeConversation.key], (oldData: any[] = []) => {
+          if (oldData.find((m: any) => m.id === newMessage.id)) return oldData
+
+          // If this message was sent by current user, replace pending optimistic message
+          if (newMessage.sender_id === currentUser.id) {
+            const hasTemp = oldData.some((m: any) => typeof m.id === 'string' && m.id.startsWith('temp-'))
+            if (hasTemp) {
+              let replaced = false
+              return oldData.map((m: any) => {
+                if (!replaced && typeof m.id === 'string' && m.id.startsWith('temp-') && m.message_content === newMessage.message_content) {
+                  replaced = true
+                  return newMessage
+                }
+                return m
+              })
+            }
+          }
+          return [...oldData, newMessage]
+        })
+        setTimeout(() => scrollToBottom(), 50)
+
+        // Instant sidebar preview update without re-querying the whole database
+        queryClient.setQueryData(['conversations', currentUser.id], (oldConversations: any[] = []) => {
+          return oldConversations.map((c: any) => {
+            if (c.key === activeConversation.key || c.id === activeConversation.id) {
+              return {
+                ...c,
+                preview: newMessage.message_content || (newMessage.attachment ? 'Sent an attachment' : 'New message'),
+                time: newMessage.created_at || new Date().toISOString()
+              }
+            }
+            return c
+          }).sort((a: any, b: any) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
+        })
+        
+        // If the message is from someone else, mark as read
+        if (newMessage.sender_id !== currentUser.id) {
+          if (activeConversation.type === 'group') {
+            markGroupAsRead(activeConversation.id)
+          } else {
+            markThreadAsRead(activeConversation.id)
+          }
         }
-      }
-    })
+      })
 
-    channel.bind('typing', (data: any) => {
-      if (data.senderId !== currentUser.id) {
-        setIsTyping(true)
-        setTypingUserName(data.senderName || '')
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-        typingTimeoutRef.current = setTimeout(() => {
-          setIsTyping(false)
-          setTypingUserName('')
-        }, 3000)
-        scrollToBottom()
-      }
-    })
+      channel.bind('typing', (data: any) => {
+        if (data.senderId !== currentUser.id) {
+          setIsTyping(true)
+          setTypingUserName(data.senderName || '')
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+          typingTimeoutRef.current = setTimeout(() => {
+            setIsTyping(false)
+            setTypingUserName('')
+          }, 3000)
+          scrollToBottom()
+        }
+      })
 
-    if (activeConversation.type === 'thread') {
-      channel.bind('thread:read', (data: any) => {
-        queryClient.setQueryData(['messages', activeConversation.key], (oldData: any) => {
-          if (!oldData) return oldData
-          return oldData.map((m: any) => {
-            if (data.readerId !== currentUser.id && m.sender_id === currentUser.id) {
-              return { ...m, is_read: true }
-            }
-            if (data.readerId === currentUser.id && m.sender_id !== currentUser.id) {
-              return { ...m, is_read: true }
-            }
-            return m
+      if (activeConversation.type === 'thread') {
+        channel.bind('thread:read', (data: any) => {
+          queryClient.setQueryData(['messages', activeConversation.key], (oldData: any) => {
+            if (!oldData) return oldData
+            return oldData.map((m: any) => {
+              if (data.readerId !== currentUser.id && m.sender_id === currentUser.id) {
+                return { ...m, is_read: true }
+              }
+              if (data.readerId === currentUser.id && m.sender_id !== currentUser.id) {
+                return { ...m, is_read: true }
+              }
+              return m
+            })
           })
         })
-        refetchConversations()
-      })
 
-      markThreadAsRead(activeConversation.id).then(() => {
-        refetchConversations()
-      })
-    } else {
-      markGroupAsRead(activeConversation.id).then(() => {
-        refetchConversations()
-      })
+        markThreadAsRead(activeConversation.id)
+      } else {
+        markGroupAsRead(activeConversation.id)
+      }
     }
 
     return () => {
-      channel.unbind('message:created')
-      channel.unbind('call:incoming')
-      channel.unbind('typing')
-      channel.unbind('thread:read')
-      pusherClient.unsubscribe(channelName)
+      personalChannel.unbind('chat:message')
+      pusherClient.unsubscribe(personalChannelName)
+      if (channel && channelName) {
+        channel.unbind('message:created')
+        channel.unbind('call:incoming')
+        channel.unbind('typing')
+        channel.unbind('thread:read')
+        pusherClient.unsubscribe(channelName)
+      }
     }
   }, [activeConversation?.key, currentUser, queryClient])
 
@@ -267,22 +327,30 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
     scrollToBottom()
   }, [messages])
 
-  const sendMessageMutation = useMutation<any, Error, { text: string, attachmentUrl?: string, replyToId?: number }>({
-    mutationFn: async (data: { text: string, attachmentUrl?: string, replyToId?: number }) => {
+  const sendMessageMutation = useMutation<any, Error, { text: string, attachmentUrl?: string, replyToId?: number, tempId?: string }>({
+    mutationFn: async (data: { text: string, attachmentUrl?: string, replyToId?: number, tempId?: string }) => {
       if (!activeConversation) throw new Error("No active conversation")
       if (activeConversation.type === 'group') {
         return await sendGroupMessage(activeConversation.id, currentUser!.id, data.text, data.attachmentUrl)
       }
       return await sendMessage(activeConversation.id, currentUser!.id, data.text, data.attachmentUrl, data.replyToId)
     },
-    onSuccess: (newMessage) => {
-      queryClient.setQueryData(['messages', activeConversation?.key], (oldData: any) => {
+    onSuccess: (newMessage, variables) => {
+      queryClient.setQueryData(['messages', activeConversation?.key], (oldData: any[] = []) => {
         if (!oldData) return [newMessage]
-        if (oldData.find((m: any) => m.id === newMessage.id)) return oldData
-        return [...oldData, newMessage]
+        const exists = oldData.some((m: any) => m.id === newMessage.id)
+        if (exists) {
+          return oldData.filter((m: any) => m.id !== variables.tempId)
+        }
+        return oldData.map((m: any) => m.id === variables.tempId ? newMessage : m)
       })
-      refetchConversations()
       scrollToBottom()
+    },
+    onError: (err, variables) => {
+      queryClient.setQueryData(['messages', activeConversation?.key], (oldData: any[] = []) => {
+        return (oldData || []).filter((m: any) => m.id !== variables.tempId)
+      })
+      toast.error(err.message || "Gagal mengirim pesan")
     }
   })
 
@@ -321,17 +389,69 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
       }
     }
 
-    sendMessageMutation.mutate({ 
-      text: value || (selectedFile ? `Sent an attachment: ${selectedFile.name}` : ''), 
-      attachmentUrl: uploadedUrl,
-      replyToId: replyingToMessage?.id
+    const textContent = value || (selectedFile ? `Sent an attachment: ${selectedFile.name}` : '')
+    const tempId = `temp-${Date.now()}`
+
+    // OPTIMISTIC UPDATE: Appears in chat window INSTANTLY (0ms latency!)
+    const optimisticMessage: any = {
+      id: tempId,
+      thread_id: activeConversation.id,
+      group_id: activeConversation.id,
+      sender_id: currentUser.id,
+      message_content: textContent,
+      attachment: uploadedUrl || null,
+      reply_to_id: replyingToMessage?.id || null,
+      reply_to: replyingToMessage ? {
+        id: replyingToMessage.id,
+        message_content: replyingToMessage.message_content,
+        attachment: replyingToMessage.attachment,
+        sender: replyingToMessage.sender
+      } : null,
+      created_at: new Date().toISOString(),
+      sender: {
+        id: currentUser.id,
+        name: currentUser.name || `${cleanUserName(currentUser.firstname)} ${cleanUserName(currentUser.lastname)}`.trim(),
+        firstname: currentUser.firstname,
+        lastname: currentUser.lastname,
+        avatar: currentUser.avatar,
+        role: currentUser.role?.name || 'Staff'
+      },
+      is_pending: true,
+      is_read: false
+    }
+
+    // Immediately push to current active conversation
+    queryClient.setQueryData(['messages', activeConversation.key], (oldData: any[] = []) => {
+      return [...(oldData || []), optimisticMessage]
     })
-    
+
+    // Immediately update sidebar conversation preview
+    queryClient.setQueryData(['conversations', currentUser.id], (oldConversations: any[] = []) => {
+      return (oldConversations || []).map((c: any) => {
+        if (c.key === activeConversation.key || c.id === activeConversation.id) {
+          return {
+            ...c,
+            preview: textContent || 'Sent an attachment',
+            time: new Date().toISOString()
+          }
+        }
+        return c
+      }).sort((a: any, b: any) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
+    })
+
     setMessage('')
     setSelectedFile(null)
     setReplyingToMessage(null)
     setIsUploading(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
+    setTimeout(() => scrollToBottom(), 10)
+
+    sendMessageMutation.mutate({ 
+      text: textContent, 
+      attachmentUrl: uploadedUrl,
+      replyToId: replyingToMessage?.id,
+      tempId
+    })
   }
 
   const startCall = async (type: 'voice' | 'video') => {
@@ -759,7 +879,7 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
               return (
                 <div 
                   key={`msg-${item.id || index}`} 
-                  className={`flex gap-3 relative group ${isOwn ? 'flex-row-reverse' : ''} transition-transform duration-200`}
+                  className={`flex gap-3 relative group ${isOwn ? 'flex-row-reverse' : ''} ${item.is_pending ? 'opacity-75' : ''} transition-all duration-200`}
                 >
                   <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${isOwn ? 'bg-accent text-accent-foreground' : 'bg-primary text-primary-foreground'}`}>
                     {senderInitials}
@@ -829,7 +949,13 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                       <span className="text-[10px] text-muted-foreground">{time}</span>
                       {isOwn && (
                         <span className="flex items-center">
-                          {item.is_read ? <CheckCheck className="size-3 text-blue-500" /> : <Check className="size-3 text-muted-foreground/60" />}
+                          {item.is_pending ? (
+                            <Clock className="size-3 text-muted-foreground/60 animate-pulse" />
+                          ) : item.is_read ? (
+                            <CheckCheck className="size-3 text-blue-500" />
+                          ) : (
+                            <Check className="size-3 text-muted-foreground/60" />
+                          )}
                         </span>
                       )}
                       <button 

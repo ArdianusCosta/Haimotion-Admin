@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAuth } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
+import { pusherServer } from '@/lib/pusher'
 
 function getTagColor(tag: string | null) {
   if (!tag) return 'bg-muted text-muted-foreground'
@@ -260,19 +261,38 @@ export async function getTaskDetails(id: number) {
       orderBy: { created_at: 'asc' }
     })
     
-    const userIds = Array.from(new Set(commentsRaw.map(c => c.user_id)))
+    const userIds = Array.from(new Set(commentsRaw.map(c => Number(c.user_id)).filter(Boolean)))
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, firstname: true, lastname: true, avatar: true }
+      select: { id: true, firstname: true, lastname: true, name: true, avatar: true }
     })
     
     const comments = commentsRaw.map(c => {
-      const u = users.find(user => user.id === c.user_id)
+      const u = users.find(user => Number(user.id) === Number(c.user_id))
+      const name = u ? (u.name || `${u.firstname || ''} ${u.lastname || ''}`.trim() || `User ${c.user_id}`) : `User ${c.user_id}`
+      
+      let initials = `U${c.user_id}`
+      if (u) {
+        const cleanFirst = u.firstname?.replace(/[^a-zA-Z0-9]/g, '').trim() || ''
+        const cleanLast = u.lastname?.replace(/[^a-zA-Z0-9]/g, '').trim() || ''
+        if (cleanFirst && cleanLast) {
+          initials = `${cleanFirst[0]}${cleanLast[0]}`.toUpperCase()
+        } else {
+          const cleanName = (u.name || cleanFirst || cleanLast).replace(/[^a-zA-Z0-9\s]/g, '').trim()
+          const parts = cleanName.split(/\s+/).filter(Boolean)
+          if (parts.length >= 2) {
+            initials = `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+          } else if (cleanName) {
+            initials = cleanName.slice(0, 2).toUpperCase()
+          }
+        }
+      }
+
       return {
         ...c,
         user: {
-          name: u ? `${u.firstname} ${u.lastname}`.trim() : `User ${c.user_id}`,
-          initials: u ? `${u.firstname?.[0] || ''}${u.lastname?.[0] || ''}`.toUpperCase() : `U${c.user_id}`,
+          name,
+          initials,
           avatar: u?.avatar
         }
       }
@@ -289,17 +309,89 @@ export async function getTaskDetails(id: number) {
   }
 }
 
-export async function addComment(taskId: number, userId: number, comment: string) {
+export async function addComment(taskId: number, textOrUserId: string | number, text?: string) {
   try {
-    const newComment = await prisma.task_comments.create({
-      data: {
-        task_id: taskId,
-        user_id: userId,
-        comment
+    let commentText = ''
+    let fallbackUserId: number | undefined
+
+    if (typeof textOrUserId === 'string') {
+      commentText = textOrUserId
+    } else {
+      fallbackUserId = textOrUserId
+      commentText = text || ''
+    }
+
+    if (!commentText.trim()) {
+      return { success: false, error: 'Comment cannot be empty' }
+    }
+
+    let userId: number
+    try {
+      const user = await requireAuth()
+      userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+    } catch {
+      if (fallbackUserId) {
+        userId = fallbackUserId
+      } else {
+        throw new Error('Unauthorized')
       }
+    }
+
+    // Parallelize comment creation and user profile fetch for lightning-fast response
+    const [newComment, u] = await Promise.all([
+      prisma.task_comments.create({
+        data: {
+          task_id: taskId,
+          user_id: userId,
+          comment: commentText.trim()
+        }
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, firstname: true, lastname: true, name: true, avatar: true }
+      })
+    ])
+
+    const name = u ? (u.name || `${u.firstname || ''} ${u.lastname || ''}`.trim() || `User ${userId}`) : `User ${userId}`
+    let initials = `U${userId}`
+    if (u) {
+      const cleanFirst = u.firstname?.replace(/[^a-zA-Z0-9]/g, '').trim() || ''
+      const cleanLast = u.lastname?.replace(/[^a-zA-Z0-9]/g, '').trim() || ''
+      if (cleanFirst && cleanLast) {
+        initials = `${cleanFirst[0]}${cleanLast[0]}`.toUpperCase()
+      } else {
+        const cleanName = (u.name || cleanFirst || cleanLast).replace(/[^a-zA-Z0-9\s]/g, '').trim()
+        const parts = cleanName.split(/\s+/).filter(Boolean)
+        if (parts.length >= 2) {
+          initials = `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+        } else if (cleanName) {
+          initials = cleanName.slice(0, 2).toUpperCase()
+        }
+      }
+    }
+
+    const commentData = {
+      ...newComment,
+      user: {
+        name,
+        initials,
+        avatar: u?.avatar
+      }
+    }
+
+    // Broadcast to Pusher in real-time (non-blocking)
+    pusherServer.trigger(`private-task-${taskId}`, 'comment:created', commentData).catch((err) => {
+      console.error('Pusher comment trigger error:', err)
     })
+
+    // Log activity in background (non-blocking)
+    logActivity({
+      userId,
+      activityType: 'create',
+      description: `Added comment on task ID ${taskId} in Kanban`
+    }).catch(() => {})
     
-    return { success: true, data: newComment }
+    return { success: true, data: commentData }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

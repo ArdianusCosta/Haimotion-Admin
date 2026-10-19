@@ -89,16 +89,20 @@ export function KanbanBoard() {
                   draggable
                   onDragStart={(e) => handleDragStart(e, task.id, column.id, task.dbId)}
                   onClick={() => openTaskDetails(task)}
-                  className="group cursor-grab active:cursor-grabbing relative rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/50 hover:shadow-md"
+                  className="group cursor-grab active:cursor-grabbing relative flex flex-col justify-between rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:border-primary/50 hover:shadow-md"
                 >
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className={`rounded-md px-2 py-1 text-[10px] font-medium ${task.tagColor}`}>{task.tag}</span>
+                  <div>
+                    <div className="mb-2.5 flex items-center justify-between">
+                      <span className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${task.tagColor}`}>{task.tag}</span>
+                    </div>
+                    
+                    <h3 className="font-medium text-foreground text-sm line-clamp-2 leading-snug">{task.title}</h3>
+                    {task.description && (
+                      <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{task.description}</p>
+                    )}
                   </div>
                   
-                  <h3 className="font-medium text-foreground">{task.title}</h3>
-                  <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{task.description}</p>
-                  
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                  <div className="mt-3.5 flex items-center justify-between border-t border-border/50 pt-3">
                     <div className="flex gap-3 text-muted-foreground">
                       {task.comments > 0 && (
                         <div className="flex items-center gap-1.5 text-xs">

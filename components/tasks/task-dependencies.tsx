@@ -98,9 +98,15 @@ export function TaskDependencies({ taskId }: { taskId: number }) {
       <div className="flex items-center gap-2 mt-2">
         <Select value={selectedTask} onValueChange={setSelectedTask}>
           <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder="Add dependency..." />
+            <SelectValue placeholder="Add dependency...">
+              {(val: any) => {
+                const currentId = val || selectedTask
+                const t = allTasks?.find((item: any) => Number(item.id) === Number(currentId))
+                return t?.task || (currentId ? `Task #${currentId}` : 'Add dependency...')
+              }}
+            </SelectValue>
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-56 overflow-y-auto">
             {allTasks?.map((t: any) => (
               <SelectItem key={t.id} value={t.id.toString()}>
                 {t.task}
