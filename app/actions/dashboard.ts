@@ -4,8 +4,6 @@ import prisma from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth/authorization'
 
 export async function getDashboardData(dateRangeStr: string, projectFilter?: string) {
-  const user = await requireAuth();
-
   const now = new Date();
   let startDate = new Date(0); // Default to all time
 
@@ -59,6 +57,8 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
 
   // 1. KPIs
   try {
+  // requireAuth is inside try so DB connection errors fall through to mock data fallback
+  await requireAuth();
   const totalProjects = await prisma.project_list.count({
     where: projectWhere
   });

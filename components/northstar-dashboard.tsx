@@ -455,6 +455,8 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
   const [headerStyle, setHeaderStyle] = useState<'sticky' | 'scroll' | 'inset'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_header_style') as any) || 'sticky' : 'sticky')
   const [sidebarStyle, setSidebarStyle] = useState<'sidebar' | 'floating' | 'icon' | 'offcanvas'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_sidebar_style') as any) || 'sidebar' : 'sidebar')
   const [resolvedDark, setResolvedDark] = useState(false)
+  const [timezone, setTimezone] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Jakarta')
+  const [clockTime, setClockTime] = useState('')
 
   const [range, setRange] = useState('Last 30 days')
 
@@ -478,6 +480,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
         if (pref.content_width) { setContentWidth(pref.content_width as any); localStorage.setItem('pref_content_width', pref.content_width); }
         if (pref.header_style) { setHeaderStyle(pref.header_style as any); localStorage.setItem('pref_header_style', pref.header_style); }
         if (pref.sidebar_style) { setSidebarStyle(pref.sidebar_style as any); localStorage.setItem('pref_sidebar_style', pref.sidebar_style); }
+        if (pref.timezone) { setTimezone(pref.timezone); localStorage.setItem('pref_timezone', pref.timezone); }
       }
       return pref
     },
@@ -500,10 +503,28 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
     if (typeof window !== 'undefined') {
       localStorage.setItem(`pref_${key}`, value)
     }
-    updatePreference.mutate({ [key]: value })
+    try { updatePreference.mutate({ [key]: value }) } catch (_) {}
   }
 
   // -------------------------
+
+  // --- CLOCK ---
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date()
+      const formatted = now.toLocaleTimeString('en-US', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+      setClockTime(formatted)
+    }
+    updateClock()
+    const interval = setInterval(updateClock, 1000)
+    return () => clearInterval(interval)
+  }, [timezone])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
@@ -538,7 +559,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
   const effectiveCollapsed = isSidebarMini && !mobileMenuOpen
 
   const asideClasses = `${mobileMenuOpen ? 'flex flex-col absolute z-50' : 'hidden'} transition-all duration-300 md:flex md:relative md:flex-col bg-sidebar ${sidebarStyle === 'offcanvas' ? '!hidden' : ''} ${sidebarStyle === 'floating' ? 'm-4 rounded-xl border border-sidebar-border shadow-sm h-[calc(100vh-2rem)]' : 'border-r border-sidebar-border h-screen'} ${effectiveCollapsed && !mobileMenuOpen ? 'w-20' : 'w-64'}`
-  const headerClasses = `flex shrink-0 items-center justify-between border-border bg-card/70 px-4 backdrop-blur md:px-8 z-10 ${headerStyle === 'sticky' ? 'h-16 border-b sticky top-0' : ''} ${headerStyle === 'scroll' ? 'h-16 border-b' : ''} ${headerStyle === 'inset' ? 'h-14 mx-4 mt-4 rounded-xl border sticky top-4' : ''}`
+  const headerClasses = `relative flex shrink-0 items-center justify-between border-border bg-card/70 px-4 backdrop-blur md:px-8 z-10 ${headerStyle === 'sticky' ? 'h-16 border-b sticky top-0' : ''} ${headerStyle === 'scroll' ? 'h-16 border-b' : ''} ${headerStyle === 'inset' ? 'h-14 mx-4 mt-4 rounded-xl border sticky top-4' : ''}`
 
   const colorPresets: Record<string, string> = useMemo(() => ({
     Zinc: 'oklch(0.4 0.02 260)',
@@ -757,6 +778,17 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
             <div className="hidden h-5 w-px bg-border md:block" />
             <GlobalSearch />
           </div>
+
+          {/* Center Clock */}
+          <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center select-none pointer-events-none">
+            <span className="text-sm font-semibold tabular-nums tracking-widest text-foreground font-mono">
+              {clockTime}
+            </span>
+            <span className="text-[10px] text-muted-foreground leading-none mt-0.5">
+              {timezone.replace(/_/g, ' ')}
+            </span>
+          </div>
+
           <div className="flex items-center gap-1">
             <button onClick={() => setCustomizerOpen(true)} className="rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Preferences"><Settings className="size-4" /></button>
             <DropdownMenu>
@@ -980,6 +1012,30 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               </div>
             </div>
             <hr className="border-border" />
+            <div>
+              <h3 className="text-sm font-medium mb-3">Timezone</h3>
+              <select
+                value={timezone}
+                onChange={e => {
+                  const tz = e.target.value
+                  setTimezone(tz)
+                  localStorage.setItem('pref_timezone', tz)
+                  try { updatePreference.mutate({ timezone: tz }) } catch (_) {}
+                }}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {[
+                  'Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura',
+                  'Asia/Singapore', 'Asia/Tokyo', 'Asia/Seoul',
+                  'Asia/Shanghai', 'Asia/Kolkata', 'Asia/Dubai',
+                  'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+                  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+                  'America/Sao_Paulo', 'Africa/Cairo', 'Pacific/Auckland', 'Australia/Sydney',
+                ].map(tz => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <h3 className="text-sm font-medium mb-3">Color Preset</h3>
               <div className="grid grid-cols-3 gap-2">

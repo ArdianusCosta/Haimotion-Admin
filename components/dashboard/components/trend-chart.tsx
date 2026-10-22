@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useLanguage } from '@/components/language-provider'
+import { TrendingUp } from 'lucide-react'
 
 export function TrendChart({ data, range, setRange }: { data: any, range: string, setRange: (v: string) => void }) {
   const { t } = useLanguage()
@@ -16,14 +17,19 @@ export function TrendChart({ data, range, setRange }: { data: any, range: string
   }
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5 md:p-6 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-base">{t('Tren Performa')}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">{t('Perkembangan project dan task selama periode ini')}</p>
+    <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <TrendingUp className="size-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-base">{t('Tren Performa')}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t('Perkembangan project dan task selama periode ini')}</p>
+          </div>
         </div>
         <Select value={range} onValueChange={setRange}>
-          <SelectTrigger className="w-[150px] h-8 text-xs bg-background">
+          <SelectTrigger className="w-[160px] h-9 text-xs bg-background">
             <SelectValue placeholder="Periode" />
           </SelectTrigger>
           <SelectContent>
@@ -34,32 +40,55 @@ export function TrendChart({ data, range, setRange }: { data: any, range: string
       </div>
       
       {data.trendData.length > 0 ? (
-        <div className="mt-6 h-[250px] w-full">
+        <div className="h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="date" tick={{fontSize: 11, fill: 'var(--muted-foreground)'}} tickLine={false} axisLine={false} />
-              <YAxis tick={{fontSize: 11, fill: 'var(--muted-foreground)'}} tickLine={false} axisLine={false} />
+            <LineChart data={data.trendData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="var(--border)" opacity={0.5} />
+              <XAxis 
+                dataKey="date" 
+                tick={{fontSize: 12, fill: 'var(--muted-foreground)'}} 
+                tickLine={false} 
+                axisLine={false}
+                dy={10}
+              />
+              <YAxis 
+                tick={{fontSize: 12, fill: 'var(--muted-foreground)'}} 
+                tickLine={false} 
+                axisLine={false}
+                dx={-10}
+              />
               <RechartsTooltip 
-                contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px', fontSize: '12px' }}
-                itemStyle={{ color: 'var(--foreground)' }}
+                contentStyle={{ 
+                  backgroundColor: 'var(--card)', 
+                  borderColor: 'var(--border)', 
+                  borderRadius: '12px', 
+                  fontSize: '13px',
+                  padding: '12px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }}
+                itemStyle={{ color: 'var(--foreground)', padding: '4px 0' }}
+                labelStyle={{ color: 'var(--muted-foreground)', marginBottom: '8px' }}
               />
               <Legend 
                 verticalAlign="top" 
-                height={36} 
+                height={40} 
                 iconType="circle"
+                iconSize={10}
+                wrapperStyle={{ paddingTop: '8px' }}
                 onClick={(e: any) => toggleLine(e.dataKey)}
-                formatter={(value, entry, index) => <span className="text-xs cursor-pointer select-none hover:text-foreground text-muted-foreground transition-colors">{value}</span>}
+                formatter={(value, entry, index) => <span className="text-xs cursor-pointer select-none hover:text-foreground text-muted-foreground transition-colors px-2">{value}</span>}
               />
-              <Line hide={hiddenLines.projectsCreated} type="monotone" dataKey="projectsCreated" name="Project" stroke="var(--primary)" strokeWidth={2} dot={{r:3}} activeDot={{r: 5}} />
-              <Line hide={hiddenLines.tasksCompleted} type="monotone" dataKey="tasksCompleted" name="Task Selesai" stroke="var(--chart-1)" strokeWidth={2} dot={{r:3}} activeDot={{r: 5}} />
-              <Line hide={hiddenLines.tasksCreated} type="monotone" dataKey="tasksCreated" name="Task Dibuat" stroke="var(--chart-4)" strokeWidth={2} dot={{r:3}} activeDot={{r: 5}} />
+              <Line hide={hiddenLines.projectsCreated} type="monotone" dataKey="projectsCreated" name="Project" stroke="var(--primary)" strokeWidth={2.5} dot={{r:4}} activeDot={{r: 6, strokeWidth: 2 }} />
+              <Line hide={hiddenLines.tasksCompleted} type="monotone" dataKey="tasksCompleted" name="Task Selesai" stroke="var(--chart-1)" strokeWidth={2.5} dot={{r:4}} activeDot={{r: 6, strokeWidth: 2 }} />
+              <Line hide={hiddenLines.tasksCreated} type="monotone" dataKey="tasksCreated" name="Task Dibuat" stroke="var(--chart-4)" strokeWidth={2.5} dot={{r:4}} activeDot={{r: 6, strokeWidth: 2 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="mt-6 flex h-[250px] items-center justify-center rounded-lg border border-dashed border-border">
-          <p className="text-sm text-muted-foreground">Belum ada data trend untuk periode ini.</p>
+        <div className="flex h-[300px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30">
+          <TrendingUp className="size-8 text-muted-foreground mb-3" />
+          <p className="text-sm font-medium text-foreground">Belum ada data trend</p>
+          <p className="text-xs text-muted-foreground mt-1">Data akan muncul setelah ada aktivitas dalam periode ini</p>
         </div>
       )}
     </section>

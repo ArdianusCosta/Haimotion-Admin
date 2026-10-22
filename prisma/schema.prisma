@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("MYSQL_URL")
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
 }
 
 model User {
@@ -15,7 +15,7 @@ model User {
   notification_email      String?                  @db.VarChar(255)
   password                String                   @db.Text
   avatar                  String                   @db.Text
-  date_created            DateTime                 @default(now()) @db.DateTime(0)
+  date_created            DateTime                 @default(now()) @db.Timestamp()
   nik                     String?                  @db.VarChar(50)
   address                 String?                  @db.Text
   emailVerified           Boolean                  @default(false)
@@ -23,7 +23,6 @@ model User {
   role_id                 Int?
   updatedAt               DateTime                 @default(now()) @updatedAt
   name                    String?                  @db.VarChar(400)
-  face_descriptor         String?                  @db.Text
   files                   File[]
   files_shared_by_me      FileShare[]              @relation("SharedByUserFiles")
   files_shared_with_me    FileShare[]              @relation("SharedWithUserFiles")
@@ -66,7 +65,7 @@ model User {
   crm_activities       CrmActivity[]
   crm_notes            CrmNote[]
 
-  @@index([role_id], map: "users_role_id_fkey")
+  @@index([role_id])
   @@map("users")
 }
 
@@ -74,16 +73,15 @@ model ChatGroup {
   id                     Int                      @id @default(autoincrement())
   name                   String                   @db.VarChar(255)
   description            String?                  @db.Text
-  avatar                 String?                  @db.VarChar(500)
   created_by             Int?
-  date_created           DateTime?                @default(now()) @db.DateTime(0)
-  last_message_at        DateTime?                @default(now()) @db.DateTime(0)
+  date_created           DateTime?                @default(now()) @db.Timestamp()
+  last_message_at        DateTime?                @default(now()) @db.Timestamp()
   users                  User?                    @relation(fields: [created_by], references: [id], onUpdate: Restrict, map: "chat_groups_ibfk_1")
   group_members          group_members[]
   messages               GroupMessage[]
   user_group_read_status user_group_read_status[]
 
-  @@index([created_by], map: "created_by")
+  @@index([created_by])
   @@map("chat_groups")
 }
 
@@ -93,12 +91,12 @@ model GroupMessage {
   sender_id       Int
   message_content String    @db.Text
   attachment      String?   @db.VarChar(255)
-  created_at      DateTime? @default(now()) @db.DateTime(0)
+  created_at      DateTime? @default(now()) @db.Timestamp()
   group           ChatGroup @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "group_messages_ibfk_1")
   sender          User      @relation(fields: [sender_id], references: [id], onUpdate: Restrict, map: "group_messages_ibfk_2")
 
-  @@index([group_id], map: "group_id")
-  @@index([sender_id], map: "sender_id")
+  @@index([group_id])
+  @@index([sender_id])
   @@map("group_messages")
 }
 
@@ -106,14 +104,14 @@ model ChatThread {
   id              Int           @id @default(autoincrement())
   user1_id        Int
   user2_id        Int
-  last_message_at DateTime      @default(now()) @db.DateTime(0)
+  last_message_at DateTime      @default(now()) @db.Timestamp()
   calls           Call[]
   messages        ChatMessage[]
   user1           User          @relation("User1Threads", fields: [user1_id], references: [id], onUpdate: Restrict, map: "chat_threads_ibfk_1")
   user2           User          @relation("User2Threads", fields: [user2_id], references: [id], onUpdate: Restrict, map: "chat_threads_ibfk_2")
 
-  @@unique([user1_id, user2_id], map: "unique_thread_pair")
-  @@index([user2_id], map: "user2_id")
+  @@unique([user1_id, user2_id])
+  @@index([user2_id])
   @@map("chat_threads")
 }
 
@@ -123,7 +121,7 @@ model ChatMessage {
   sender_id       Int
   message_content String        @db.Text
   attachment      String?       @db.VarChar(255)
-  created_at      DateTime      @default(now()) @db.DateTime(0)
+  created_at      DateTime      @default(now()) @db.Timestamp()
   is_read         Boolean       @default(false)
   reply_to_id     Int?
   thread          ChatThread    @relation(fields: [thread_id], references: [id], onUpdate: Restrict, map: "chat_messages_ibfk_1")
@@ -131,9 +129,9 @@ model ChatMessage {
   reply_to        ChatMessage?  @relation("MessageReplies", fields: [reply_to_id], references: [id])
   replies         ChatMessage[] @relation("MessageReplies")
 
-  @@index([sender_id], map: "sender_id")
-  @@index([thread_id], map: "thread_id")
-  @@index([reply_to_id], map: "reply_to_id")
+  @@index([sender_id])
+  @@index([thread_id])
+  @@index([reply_to_id])
   @@map("chat_messages")
 }
 
@@ -141,16 +139,16 @@ model Call {
   id         Int        @id @default(autoincrement())
   thread_id  Int
   caller_id  Int
-  room_name  String     @unique(map: "unique_room") @db.VarChar(255)
+  room_name  String     @unique @db.VarChar(255)
   type       String     @db.VarChar(50)
   status     String     @db.VarChar(50)
-  started_at DateTime?  @db.DateTime(0)
-  ended_at   DateTime?  @db.DateTime(0)
+  started_at DateTime?  @db.Timestamp()
+  ended_at   DateTime?  @db.Timestamp()
   duration   Int?
-  created_at DateTime   @default(now()) @db.DateTime(0)
+  created_at DateTime   @default(now()) @db.Timestamp()
   thread     ChatThread @relation(fields: [thread_id], references: [id], onUpdate: Restrict, map: "calls_ibfk_1")
 
-  @@index([thread_id], map: "thread_id")
+  @@index([thread_id])
   @@map("calls")
 }
 
@@ -163,7 +161,7 @@ model activity_log {
   description   String    @db.Text
   ip_address    String?   @db.VarChar(100)
   user_agent    String?   @db.Text
-  created_at    DateTime? @default(now()) @db.DateTime(0)
+  created_at    DateTime? @default(now()) @db.Timestamp()
 }
 
 model events {
@@ -172,17 +170,17 @@ model events {
   google_calendar_id   String?   @db.VarChar(255)
   project_id           Int?
   title                String    @db.VarChar(255)
-  start_event          DateTime  @db.DateTime(0)
-  end_event            DateTime  @db.DateTime(0)
+  start_event          DateTime  @db.Timestamp()
+  end_event            DateTime  @db.Timestamp()
   color                String?   @default("bg-primary") @db.VarChar(50)
   description          String?   @db.Text
   notification_sent    Boolean?  @default(false)
-  notification_sent_at DateTime? @db.DateTime(0)
+  notification_sent_at DateTime? @db.Timestamp()
 
-  @@index([id], map: "id")
-  @@index([google_calendar_id], map: "idx_google_calendar_id")
-  @@index([ical_uid], map: "idx_ical_uid")
-  @@index([project_id], map: "idx_project")
+  @@index([id])
+  @@index([google_calendar_id])
+  @@index([ical_uid])
+  @@index([project_id])
 }
 
 model group_members {
@@ -190,12 +188,12 @@ model group_members {
   group_id    Int
   user_id     Int
   is_admin    Boolean?  @default(false)
-  date_joined DateTime? @default(now()) @db.DateTime(0)
+  date_joined DateTime? @default(now()) @db.Timestamp()
   chat_groups ChatGroup @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "group_members_ibfk_1")
   users       User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "group_members_ibfk_2")
 
-  @@unique([group_id, user_id], map: "unique_member")
-  @@index([user_id], map: "user_id")
+  @@unique([group_id, user_id])
+  @@index([user_id])
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -206,7 +204,7 @@ model notification_list {
   message      String   @db.Text
   link         String   @db.Text
   is_read      Boolean  @default(false)
-  date_created DateTime @default(now()) @db.DateTime(0)
+  date_created DateTime @default(now()) @db.Timestamp()
   task_id      String?  @db.VarChar(255)
 }
 
@@ -214,11 +212,11 @@ model project_list {
   id           Int                @id @default(autoincrement())
   name         String             @db.VarChar(200)
   description  String             @db.Text
-  status       Int                @db.TinyInt
+  status       Int                @db.SmallInt
   start_date   DateTime           @db.Date
   end_date     DateTime           @db.Date
   manager_id   Int
-  date_created DateTime           @default(now()) @db.DateTime(0)
+  date_created DateTime           @default(now()) @db.Timestamp()
   client_name  String?            @db.VarChar(200)
   is_archived  Boolean            @default(false)
   is_favorite  Boolean            @default(false)
@@ -249,15 +247,15 @@ model task_list {
   user_id           Int?
   task              String            @db.VarChar(200)
   description       String            @db.Text
-  status            Int               @db.TinyInt
+  status            Int               @db.SmallInt
   start_date        DateTime?         @db.Date
   end_date          DateTime?         @db.Date
-  date_created      DateTime          @default(now()) @db.DateTime(0)
+  date_created      DateTime          @default(now()) @db.Timestamp()
   created_by        Int?
   content_pillar    String?           @db.Text
   platform          String?           @db.Text
   reference_links   String?           @db.Text
-  date_updated      DateTime?         @db.DateTime(0)
+  date_updated      DateTime?         @db.Timestamp()
   dependencies      String?           @db.Text
   meetings          Meeting[]
   assignees         TaskAssignee[]
@@ -276,12 +274,12 @@ model user_group_read_status {
   id           Int       @id @default(autoincrement())
   group_id     Int
   user_id      Int
-  last_read_at DateTime  @default(now()) @db.DateTime(0)
+  last_read_at DateTime  @default(now()) @db.Timestamp()
   chat_groups  ChatGroup @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_group_read_status_ibfk_1")
   users        User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_group_read_status_ibfk_2")
 
-  @@unique([group_id, user_id], map: "unique_read")
-  @@index([user_id], map: "user_id")
+  @@unique([group_id, user_id])
+  @@index([user_id])
 }
 
 model user_productivity {
@@ -291,11 +289,11 @@ model user_productivity {
   comment       String   @db.Text
   subject       String   @db.VarChar(200)
   date          DateTime @db.Date
-  start_time    DateTime @db.Time(0)
-  end_time      DateTime @db.Time(0)
+  start_time    DateTime @db.Time()
+  end_time      DateTime @db.Time()
   user_id       Int
-  time_rendered Float    @db.Float
-  date_created  DateTime @default(now()) @db.DateTime(0)
+  time_rendered Float    @db.Real
+  date_created  DateTime @default(now()) @db.Timestamp()
 }
 
 model task_comments {
@@ -303,10 +301,10 @@ model task_comments {
   task_id    Int
   user_id    Int
   comment    String   @db.Text
-  created_at DateTime @default(now()) @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
   parent_id  Int?
 
-  @@index([task_id], map: "idx_task_comments_task")
+  @@index([task_id])
 }
 
 model task_attachments {
@@ -315,22 +313,22 @@ model task_attachments {
   file_url    String   @db.VarChar(500)
   file_name   String   @db.VarChar(255)
   uploaded_by Int?
-  uploaded_at DateTime @default(now()) @db.DateTime(0)
+  uploaded_at DateTime @default(now()) @db.Timestamp()
 
-  @@index([task_id], map: "idx_task_attachments_task")
+  @@index([task_id])
 }
 
 model ai_chat_thread {
   id         String            @id @default(uuid())
   user_id    Int
   title      String            @db.VarChar(255)
-  created_at DateTime          @default(now()) @db.DateTime(0)
-  updated_at DateTime          @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime          @default(now()) @db.Timestamp()
+  updated_at DateTime          @default(now()) @updatedAt @db.Timestamp()
   is_pinned  Boolean           @default(false)
   messages   ai_chat_history[]
   user       User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([user_id], map: "idx_user_ai_thread")
+  @@index([user_id])
 }
 
 model ai_chat_history {
@@ -338,13 +336,13 @@ model ai_chat_history {
   user_id    Int
   role       String         @db.VarChar(50)
   content    String         @db.Text
-  created_at DateTime       @default(now()) @db.DateTime(0)
+  created_at DateTime       @default(now()) @db.Timestamp()
   thread_id  String
   thread     ai_chat_thread @relation(fields: [thread_id], references: [id], onDelete: Cascade)
   users      User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@index([user_id], map: "idx_user_ai_chat")
-  @@index([thread_id], map: "idx_thread_ai_chat")
+  @@index([user_id])
+  @@index([thread_id])
 }
 
 model Folder {
@@ -352,17 +350,17 @@ model Folder {
   name       String        @db.VarChar(255)
   parent_id  Int?
   owner_id   Int
-  created_at DateTime      @default(now()) @db.DateTime(0)
-  updated_at DateTime      @default(now()) @updatedAt @db.DateTime(0)
-  deleted_at DateTime?     @db.DateTime(0)
+  created_at DateTime      @default(now()) @db.Timestamp()
+  updated_at DateTime      @default(now()) @updatedAt @db.Timestamp()
+  deleted_at DateTime?     @db.Timestamp()
   files      File[]
   owner      User          @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   parent     Folder?       @relation("FolderHierarchy", fields: [parent_id], references: [id])
   children   Folder[]      @relation("FolderHierarchy")
   shares     FolderShare[]
 
-  @@index([owner_id], map: "idx_folder_owner")
-  @@index([parent_id], map: "idx_folder_parent")
+  @@index([owner_id])
+  @@index([parent_id])
 }
 
 model File {
@@ -376,59 +374,59 @@ model File {
   folder_id     Int?
   owner_id      Int
   is_starred    Boolean     @default(false)
-  created_at    DateTime    @default(now()) @db.DateTime(0)
-  updated_at    DateTime    @default(now()) @updatedAt @db.DateTime(0)
-  deleted_at    DateTime?   @db.DateTime(0)
+  created_at    DateTime    @default(now()) @db.Timestamp()
+  updated_at    DateTime    @default(now()) @updatedAt @db.Timestamp()
+  deleted_at    DateTime?   @db.Timestamp()
   folder        Folder?     @relation(fields: [folder_id], references: [id])
   owner         User        @relation(fields: [owner_id], references: [id], onDelete: Cascade)
   shares        FileShare[]
 
-  @@index([owner_id], map: "idx_file_owner")
-  @@index([folder_id], map: "idx_file_folder")
+  @@index([owner_id])
+  @@index([folder_id])
 }
 
 model FileShare {
   id                  Int      @id @default(autoincrement())
   file_id             Int
   permission          String   @db.VarChar(50)
-  created_at          DateTime @default(now()) @db.DateTime(0)
+  created_at          DateTime @default(now()) @db.Timestamp()
   shared_by_user_id   Int
   shared_with_user_id Int
-  updated_at          DateTime @default(now()) @updatedAt @db.DateTime(0)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamp()
   file                File     @relation(fields: [file_id], references: [id], onDelete: Cascade)
   shared_by_user      User     @relation("SharedByUserFiles", fields: [shared_by_user_id], references: [id], onDelete: Cascade)
   shared_with_user    User     @relation("SharedWithUserFiles", fields: [shared_with_user_id], references: [id], onDelete: Cascade)
 
-  @@unique([file_id, shared_with_user_id], map: "uniq_fileshare")
-  @@index([file_id], map: "idx_fileshare_file")
-  @@index([shared_with_user_id], map: "idx_fileshare_shared_with")
-  @@index([shared_by_user_id], map: "FileShare_shared_by_user_id_fkey")
+  @@unique([file_id, shared_with_user_id])
+  @@index([file_id])
+  @@index([shared_with_user_id])
+  @@index([shared_by_user_id])
 }
 
 model FolderShare {
   id                  Int      @id @default(autoincrement())
   folder_id           Int
   permission          String   @db.VarChar(50)
-  created_at          DateTime @default(now()) @db.DateTime(0)
+  created_at          DateTime @default(now()) @db.Timestamp()
   shared_by_user_id   Int
   shared_with_user_id Int
-  updated_at          DateTime @default(now()) @updatedAt @db.DateTime(0)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamp()
   folder              Folder   @relation(fields: [folder_id], references: [id], onDelete: Cascade)
   shared_by_user      User     @relation("SharedByUserFolders", fields: [shared_by_user_id], references: [id], onDelete: Cascade)
   shared_with_user    User     @relation("SharedWithUserFolders", fields: [shared_with_user_id], references: [id], onDelete: Cascade)
 
-  @@unique([folder_id, shared_with_user_id], map: "uniq_foldershare")
-  @@index([folder_id], map: "idx_foldershare_folder")
-  @@index([shared_with_user_id], map: "idx_foldershare_shared_with")
-  @@index([shared_by_user_id], map: "FolderShare_shared_by_user_id_fkey")
+  @@unique([folder_id, shared_with_user_id])
+  @@index([folder_id])
+  @@index([shared_with_user_id])
+  @@index([shared_by_user_id])
 }
 
 model UserPreference {
   id                     Int      @id @default(autoincrement())
   user_id                Int      @unique
   file_manager_view_mode String   @default("grid") @db.VarChar(50)
-  created_at             DateTime @default(now()) @db.DateTime(0)
-  updated_at             DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at             DateTime @default(now()) @db.Timestamp()
+  updated_at             DateTime @default(now()) @updatedAt @db.Timestamp()
   content_width          String   @default("centered") @db.VarChar(50)
   header_style           String   @default("sticky") @db.VarChar(50)
   layout_style           String   @default("sidebar") @db.VarChar(50)
@@ -480,7 +478,7 @@ model Session {
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "session_userId_fkey")
+  @@index([userId])
   @@map("session")
 }
 
@@ -500,7 +498,7 @@ model Account {
   updatedAt             DateTime
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "account_userId_fkey")
+  @@index([userId])
   @@map("account")
 }
 
@@ -519,12 +517,12 @@ model ProjectMember {
   id         Int          @id @default(autoincrement())
   project_id Int
   user_id    Int
-  created_at DateTime     @default(now()) @db.DateTime(0)
+  created_at DateTime     @default(now()) @db.Timestamp()
   project    project_list @relation(fields: [project_id], references: [id], onDelete: Cascade)
   user       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([project_id, user_id])
-  @@index([user_id], map: "project_members_user_id_fkey")
+  @@index([user_id])
   @@map("project_members")
 }
 
@@ -532,12 +530,12 @@ model TaskAssignee {
   id         Int       @id @default(autoincrement())
   task_id    Int
   user_id    Int
-  created_at DateTime  @default(now()) @db.DateTime(0)
+  created_at DateTime  @default(now()) @db.Timestamp()
   task       task_list @relation(fields: [task_id], references: [id], onDelete: Cascade)
   user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([task_id, user_id])
-  @@index([user_id], map: "task_assignees_user_id_fkey")
+  @@index([user_id])
   @@map("task_assignees")
 }
 
@@ -555,7 +553,7 @@ model Passkey {
   aaguid       String?
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId], map: "passkeys_userId_fkey")
+  @@index([userId])
   @@map("passkeys")
 }
 
@@ -601,7 +599,7 @@ model FinanceInvoiceItem {
   price       Float
   invoice     FinanceInvoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
 
-  @@index([invoice_id], map: "finance_invoice_items_invoice_id_fkey")
+  @@index([invoice_id])
   @@map("finance_invoice_items")
 }
 
@@ -635,7 +633,7 @@ model FinanceTransaction {
   created_by  Int?
   account     FinanceAccount @relation(fields: [account_id], references: [id], onDelete: Cascade)
 
-  @@index([account_id], map: "finance_transactions_account_id_fkey")
+  @@index([account_id])
   @@map("finance_transactions")
 }
 
@@ -670,7 +668,7 @@ model HrAttendance {
   updated_at  DateTime @default(now()) @updatedAt
   employee    User     @relation("HrUserAttendance", fields: [employee_id], references: [id], onDelete: Cascade)
 
-  @@index([employee_id], map: "hr_attendances_employee_id_fkey")
+  @@index([employee_id])
   @@map("hr_attendances")
 }
 
@@ -697,7 +695,7 @@ model HrAttendanceSummary {
   updated_at               DateTime @default(now()) @updatedAt
   employee                 User     @relation("HrUserAttendanceSummary", fields: [employee_id], references: [id], onDelete: Cascade)
 
-  @@index([employee_id], map: "hr_attendance_summaries_employee_id_fkey")
+  @@index([employee_id])
   @@map("hr_attendance_summaries")
 }
 
@@ -713,7 +711,7 @@ model HrLeaveRequest {
   updated_at  DateTime @default(now()) @updatedAt
   employee    User     @relation("HrUserLeaves", fields: [employee_id], references: [id], onDelete: Cascade)
 
-  @@index([employee_id], map: "hr_leave_requests_employee_id_fkey")
+  @@index([employee_id])
   @@map("hr_leave_requests")
 }
 
@@ -730,7 +728,7 @@ model HrPayroll {
   updated_at   DateTime @default(now()) @updatedAt
   employee     User     @relation("HrUserPayrolls", fields: [employee_id], references: [id], onDelete: Cascade)
 
-  @@index([employee_id], map: "hr_payrolls_employee_id_fkey")
+  @@index([employee_id])
   @@map("hr_payrolls")
 }
 
@@ -754,7 +752,7 @@ model Meeting {
   description  String?              @db.Text
   organizer_id Int
   date         DateTime             @db.Date
-  start_time   DateTime             @db.Time(0)
+  start_time   DateTime             @db.Time()
   duration     Int
   status       String               @default("SCHEDULED") @db.VarChar(50)
   room_name    String?              @unique @default(uuid()) @db.VarChar(255)
@@ -771,10 +769,10 @@ model Meeting {
   project      project_list?        @relation(fields: [project_id], references: [id])
   task         task_list?           @relation(fields: [task_id], references: [id])
 
-  @@index([meeting_code], map: "meetings_meeting_code_idx")
-  @@index([organizer_id], map: "meetings_organizer_id_fkey")
-  @@index([project_id], map: "meetings_project_id_fkey")
-  @@index([task_id], map: "meetings_task_id_fkey")
+  @@index([meeting_code])
+  @@index([organizer_id])
+  @@index([project_id])
+  @@index([task_id])
   @@map("meetings")
 }
 
@@ -793,8 +791,8 @@ model MeetingParticipant {
   user        User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([meeting_id, user_id])
-  @@index([meeting_id], map: "meeting_participants_meeting_id_fkey")
-  @@index([user_id], map: "meeting_participants_user_id_fkey")
+  @@index([meeting_id])
+  @@index([user_id])
   @@map("meeting_participants")
 }
 
@@ -837,14 +835,14 @@ model CrmClient {
   status          String    @default("Active") @db.VarChar(50)
   source          String?   @db.VarChar(100)
   customer_since  DateTime? @db.Date
-  last_contact_at DateTime? @db.DateTime(0)
-  next_follow_up  DateTime? @db.DateTime(0)
+  last_contact_at DateTime? @db.Timestamp()
+  next_follow_up  DateTime? @db.Timestamp()
 
   assigned_user_id Int?
   assigned_user    User? @relation("AssignedClients", fields: [assigned_user_id], references: [id])
 
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
   contacts   CrmContact[]
   projects   project_list[]
@@ -870,8 +868,8 @@ model CrmContact {
   whatsapp   String? @db.VarChar(50)
   is_primary Boolean @default(false)
 
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
   @@index([client_id])
   @@map("crm_contacts")
@@ -888,15 +886,15 @@ model CrmLead {
   industry        String? @db.VarChar(100)
   status          String  @default("New") @db.VarChar(50)
   pipeline_stage  String? @db.VarChar(100)
-  estimated_value Float?  @db.Float
+  estimated_value Float?  @db.Real
 
   assigned_user_id Int?
   assigned_user    User? @relation("AssignedLeads", fields: [assigned_user_id], references: [id])
 
-  next_follow_up DateTime? @db.DateTime(0)
+  next_follow_up DateTime? @db.Timestamp()
 
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
   deals      CrmDeal[]
   activities CrmActivity[]
@@ -922,12 +920,12 @@ model CrmDeal {
   assigned_user    User? @relation("AssignedDeals", fields: [assigned_user_id], references: [id])
 
   stage          String    @db.VarChar(100)
-  value          Float?    @db.Float
+  value          Float?    @db.Real
   probability    Int?      @default(0)
   expected_close DateTime? @db.Date
 
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
   activities     CrmActivity[]
   follow_ups     CrmFollowUp[]
@@ -959,7 +957,7 @@ model CrmActivity {
   type        String @db.VarChar(50)
   description String @db.Text
 
-  created_at DateTime @default(now()) @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
 
   @@index([user_id])
   @@index([client_id])
@@ -985,11 +983,11 @@ model CrmFollowUp {
 
   type     String   @db.VarChar(50)
   status   String   @default("Pending") @db.VarChar(50)
-  due_date DateTime @db.DateTime(0)
+  due_date DateTime @db.Timestamp()
   notes    String?  @db.Text
 
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
   @@index([client_id])
   @@index([lead_id])
@@ -1011,8 +1009,8 @@ model CrmNote {
   lead_id Int?
   lead    CrmLead? @relation(fields: [lead_id], references: [id])
 
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
   @@index([author_id])
   @@index([client_id])
@@ -1064,10 +1062,10 @@ model CrmBroadcastCampaign {
   channel       String    @default("WhatsApp") @db.VarChar(50)
   message       String    @db.Text
   status        String    @default("Draft") @db.VarChar(50)
-  scheduled_at  DateTime? @db.DateTime(0)
+  scheduled_at  DateTime? @db.Timestamp()
 
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
 
   recipients CrmBroadcastRecipient[]
 
@@ -1086,7 +1084,7 @@ model CrmBroadcastRecipient {
   status       String  @default("Pending") @db.VarChar(50)
   error_msg    String? @db.Text
 
-  sent_at DateTime? @db.DateTime(0)
+  sent_at DateTime? @db.Timestamp()
 
   @@index([campaign_id])
   @@map("crm_broadcast_recipients")
@@ -1104,8 +1102,8 @@ model ProjectMilestone {
   description String?      @db.Text
   due_date    DateTime?    @db.Date
   status      String       @default("Pending") @db.VarChar(50)
-  created_at  DateTime     @default(now()) @db.DateTime(0)
-  updated_at  DateTime     @default(now()) @updatedAt @db.DateTime(0)
+  created_at  DateTime     @default(now()) @db.Timestamp()
+  updated_at  DateTime     @default(now()) @updatedAt @db.Timestamp()
   tasks       task_list[]
 
   @@index([project_id])
@@ -1119,8 +1117,8 @@ model TaskChecklist {
   label      String    @db.VarChar(255)
   is_done    Boolean   @default(false)
   order      Int       @default(0)
-  created_at DateTime  @default(now()) @db.DateTime(0)
-  updated_at DateTime  @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime  @default(now()) @db.Timestamp()
+  updated_at DateTime  @default(now()) @updatedAt @db.Timestamp()
 
   @@index([task_id])
   @@map("task_checklists")
@@ -1132,7 +1130,7 @@ model TaskDependency {
   task            task_list @relation("TaskDependencies", fields: [task_id], references: [id], onDelete: Cascade)
   depends_on_id   Int
   depends_on_task task_list @relation("TaskDependedBy", fields: [depends_on_id], references: [id], onDelete: Cascade)
-  created_at      DateTime  @default(now()) @db.DateTime(0)
+  created_at      DateTime  @default(now()) @db.Timestamp()
 
   @@unique([task_id, depends_on_id])
   @@index([depends_on_id])
@@ -1143,8 +1141,8 @@ model CrmPipeline {
   id         Int                @id @default(autoincrement())
   name       String             @db.VarChar(255)
   is_active  Boolean            @default(true)
-  created_at DateTime           @default(now()) @db.DateTime(0)
-  updated_at DateTime           @default(now()) @updatedAt @db.DateTime(0)
+  created_at DateTime           @default(now()) @db.Timestamp()
+  updated_at DateTime           @default(now()) @updatedAt @db.Timestamp()
   stages     CrmPipelineStage[]
   deals      CrmDeal[]
 
@@ -1158,8 +1156,8 @@ model CrmPipelineStage {
   name        String      @db.VarChar(100)
   order       Int         @default(0)
   probability Int         @default(0)
-  created_at  DateTime    @default(now()) @db.DateTime(0)
-  updated_at  DateTime    @default(now()) @updatedAt @db.DateTime(0)
+  created_at  DateTime    @default(now()) @db.Timestamp()
+  updated_at  DateTime    @default(now()) @updatedAt @db.Timestamp()
   deals       CrmDeal[]
 
   @@index([pipeline_id])
@@ -1278,8 +1276,8 @@ model CalendarEvent {
   id           Int                   @id @default(autoincrement())
   title        String                @db.VarChar(255)
   description  String?               @db.Text
-  start_date   DateTime              @db.DateTime(0)
-  end_date     DateTime              @db.DateTime(0)
+  start_date   DateTime              @db.Timestamp()
+  end_date     DateTime              @db.Timestamp()
   is_all_day   Boolean               @default(false)
   location     String?               @db.VarChar(255)
   event_type   String                @default("General") @db.VarChar(50)
@@ -1333,7 +1331,7 @@ model PushSubscription {
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
 
-  @@unique([user_id, token(length: 255)])
+  @@unique([user_id, token])
   @@index([user_id])
   @@map("push_subscriptions")
 }

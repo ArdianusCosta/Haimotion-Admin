@@ -1,9 +1,16 @@
+import { PieChart } from 'lucide-react'
+
 export function ProjectOverview({ data }: { data: any }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-5 md:p-6 shadow-sm">
-      <div className="mb-6">
-        <h2 className="font-semibold text-base">Progress Project (Overview)</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Status project saat ini</p>
+    <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="size-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+          <PieChart className="size-5 text-orange-600" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-base">Progress Project (Overview)</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Status project saat ini</p>
+        </div>
       </div>
       
       <div className="flex items-center justify-between px-2 pt-4 pb-2 overflow-x-auto gap-4">
@@ -24,26 +31,26 @@ export function ProjectOverview({ data }: { data: any }) {
           ];
         })().map((stage, idx) => (
           <div key={idx} className="flex flex-col items-center gap-3 shrink-0">
-            <div className="relative size-16">
-              <svg className="size-16 rotate-[-90deg]">
-                <circle className="text-secondary stroke-current" strokeWidth="4" cx="32" cy="32" r="28" fill="transparent"></circle>
+            <div className="relative size-20">
+              <svg className="size-20 rotate-[-90deg]">
+                <circle className="text-secondary stroke-current" strokeWidth="5" cx="40" cy="40" r="34" fill="transparent"></circle>
                 <circle 
                   className="stroke-current transition-all duration-1000 ease-in-out" 
-                  strokeWidth="4" 
-                  strokeDasharray={28 * 2 * Math.PI}
-                  strokeDashoffset={(28 * 2 * Math.PI) - ((stage.value / 100) * (28 * 2 * Math.PI))}
+                  strokeWidth="5" 
+                  strokeDasharray={34 * 2 * Math.PI}
+                  strokeDashoffset={(34 * 2 * Math.PI) - ((stage.value / 100) * (34 * 2 * Math.PI))}
                   strokeLinecap="round" 
-                  cx="32" cy="32" r="28" fill="transparent" 
+                  cx="40" cy="40" r="34" fill="transparent" 
                   style={{ color: stage.color }}
                 ></circle>
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[11px] font-bold text-foreground">{stage.value}%</span>
+                <span className="text-sm font-bold text-foreground">{stage.value}%</span>
               </div>
             </div>
             <div className="text-center">
-              <p className="text-xs font-medium text-foreground">{stage.label}</p>
-              <p className="text-[10px] text-muted-foreground">{stage.count} project</p>
+              <p className="text-sm font-medium text-foreground">{stage.label}</p>
+              <p className="text-xs text-muted-foreground">{stage.count} project</p>
             </div>
           </div>
         ))}

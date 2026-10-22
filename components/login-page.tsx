@@ -1,41 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Sparkles, ArrowRight, Command, Mail, AlertCircle, Fingerprint, Eye, EyeOff, KeyRound, ArrowLeft, Camera } from 'lucide-react'
+import { Sparkles, ArrowRight, Mail, AlertCircle, Eye, EyeOff, KeyRound, ArrowLeft } from 'lucide-react'
 import { authClient } from '@/lib/auth/client'
-import dynamic from 'next/dynamic'
-
-class FaceErrorBoundary extends React.Component<{children: React.ReactNode}, {error: any}> {
-  constructor(props: any) {
-    super(props);
-    this.state = { error: null };
-  }
-  static getDerivedStateFromError(error: any) {
-    return { error };
-  }
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6 text-white text-left break-all">
-          <div>
-            <h2 className="text-xl font-bold text-red-500 mb-4">Aplikasi Crash!</h2>
-            <p className="mb-4">Tolong screenshot layar ini dan kirimkan kepadaku:</p>
-            <pre className="bg-red-500/20 p-4 rounded text-xs overflow-auto max-h-[60vh]">
-              {String(this.state.error.stack || this.state.error.message || this.state.error)}
-            </pre>
-            <button 
-              onClick={() => this.setState({ error: null })} 
-              className="mt-6 px-4 py-2 bg-white text-black rounded font-semibold"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -46,7 +13,6 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
   const [error, setError] = useState(initialError || '')
   const [successMsg, setSuccessMsg] = useState('')
 
@@ -59,10 +25,7 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [view, setView] = useState<'login' | 'forgot-password'>('login')
   
-  const [isFaceScannerOpen, setIsFaceScannerOpen] = useState(false)
-  const [isFaceProcessing, setIsFaceProcessing] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [savedDescriptor, setSavedDescriptor] = useState<number[] | null>(null)
 
   const [workspaceLogo, setWorkspaceLogo] = useState('/logohm.jpeg')
   const [workspaceName, setWorkspaceName] = useState('Welcome back')
@@ -101,43 +64,6 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
       setError('Gagal menghubungkan ke Google OAuth. Pastikan GOOGLE_CLIENT_ID dan GOOGLE_CLIENT_SECRET sudah diisi di .env')
     } finally {
       setIsGoogleLoading(false)
-    }
-  }
-
-  const handleCameraLoginClick = () => {
-    setError('')
-    setIsFaceScannerOpen(true)
-  }
-
-  const handleFaceDetected = async (descriptor: Float32Array) => {
-    setIsFaceProcessing(true)
-    try {
-      const res = await fetch('/api/auth/face-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ descriptor: Array.from(descriptor) })
-      })
-      const data = await res.json()
-      if (res.ok && data.success) {
-        if (data.user.status === 'resign') {
-          setError('Anda sudah resign mohon hubungi admin')
-          setIsFaceScannerOpen(false)
-          return
-        }
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
-        localStorage.setItem('play_welcome_voice', 'true')
-
-        setIsFaceScannerOpen(false)
-        onLogin()
-      } else {
-        setError(data.error || 'Wajah tidak cocok dengan pengguna manapun yang terdaftar.')
-        setIsFaceScannerOpen(false)
-      }
-    } catch (e) {
-      setError('Terjadi kesalahan saat memverifikasi wajah.')
-      setIsFaceScannerOpen(false)
-    } finally {
-      setIsFaceProcessing(false)
     }
   }
 
@@ -364,74 +290,12 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button 
-              onClick={async () => {
-                setIsPasskeyLoading(true)
-                setError('')
-                try {
-                  const { data, error: authError } = await authClient.signIn.passkey()
-                  if (authError) {
-                    setError(authError.message || 'Passkey authentication failed.')
-                  } else if (data) {
-                    if ((data.user as any).status === 'resign') {
-                      await authClient.signOut()
-                      setError('Anda sudah resign mohon hubungi admin')
-                      return
-                    }
-                    localStorage.setItem('auth_user', JSON.stringify(data.user))
-                    
-                    try {
-                      const userDisplayName = (data.user as any).name || `${(data.user as any).firstname || ''} ${(data.user as any).lastname || ''}`.trim() || data.user.email;
-                      await fetch('/api/activity-log', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                          activityType: 'login', 
-                          description: `User ${userDisplayName} logged in via passkey`, 
-                          userId: (data.user as any).id 
-                        })
-                      });
-                    } catch (e) {
-                      console.error('Failed to log login activity', e);
-                    }
-
-                    onLogin()
-                  }
-                } catch (err) {
-                  setError('Network error or passkey cancelled.')
-                } finally {
-                  setIsPasskeyLoading(false)
-                }
-              }}
-              disabled={isPasskeyLoading || isLoading}
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors shadow-sm disabled:opacity-70"
-            >
-              {isPasskeyLoading ? (
-                <span className="size-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              ) : (
-                <><Fingerprint className="size-4" /> Sidik Jari</>
-              )}
-            </button>
-
+          <div className="mt-3">
             <button 
               type="button"
-              disabled={isLoading || isPasskeyLoading || isFaceProcessing}
-              onClick={handleCameraLoginClick}
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors shadow-sm disabled:opacity-70"
-            >
-              {isFaceProcessing ? (
-                <span className="size-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              ) : (
-                <><Camera className="size-4" /> Camera</>
-              )}
-            </button>
-
-            <button 
-              type="button"
-              disabled={isLoading || isPasskeyLoading || isFaceProcessing || isGoogleLoading}
+              disabled={isLoading || isGoogleLoading}
               onClick={handleGoogleLogin}
-              className="col-span-2 w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors shadow-sm disabled:opacity-70"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors shadow-sm disabled:opacity-70"
             >
               {isGoogleLoading ? (
                 <span className="size-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -452,16 +316,6 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
         )}
 
       </div>
-      
-      {isFaceScannerOpen && (
-        <FaceErrorBoundary>
-          <FaceScanner
-            onCancel={() => setIsFaceScannerOpen(false)}
-            onFaceDetected={handleFaceDetected}
-            isProcessing={isFaceProcessing}
-          />
-        </FaceErrorBoundary>
-      )}
     </div>
   )
 }

@@ -23,7 +23,6 @@ model User {
   role_id                 Int?
   updatedAt               DateTime                 @default(now()) @updatedAt
   name                    String?                  @db.VarChar(400)
-  face_descriptor         String?                  @db.Text
   files                   File[]
   files_shared_by_me      FileShare[]              @relation("SharedByUserFiles")
   files_shared_with_me    FileShare[]              @relation("SharedWithUserFiles")

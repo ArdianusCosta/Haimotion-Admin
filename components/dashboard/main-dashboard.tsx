@@ -12,6 +12,7 @@ import { TeamPerformance } from './components/team-performance'
 import { ProjectPerformance } from './components/project-performance'
 import { ProjectOverview } from './components/project-overview'
 import { RecentProjects } from './components/recent-projects'
+import { TeamKpiSection } from './components/team-kpi-section'
 
 export function MainDashboard({ user }: { user: any }) {
   const { range, setRange, projectFilter, setProjectFilter, loading, isFetching, data } = useDashboard()
@@ -66,7 +67,6 @@ export function MainDashboard({ user }: { user: any }) {
       "Give your best today, and enjoy the results tomorrow."
     ]
     
-    // Ganti quote setiap harinya berdasarkan tanggal
     const selectedQuotes = language === 'en' ? quotesEn : quotesId
     setDailyQuote(selectedQuotes[now.getDate() % selectedQuotes.length])
   }, [language])
@@ -85,25 +85,33 @@ export function MainDashboard({ user }: { user: any }) {
   if (!data) return <div>Failed to load dashboard data.</div>
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="space-y-8 pb-10">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{greeting}, {user?.firstname} 👋</h1>
-          <p className="text-muted-foreground mt-1 text-sm">{dailyQuote}</p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{greeting}, {user?.firstname} 👋</h1>
+            <p className="text-muted-foreground mt-2 text-base">{dailyQuote}</p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {isFetching && (
+              <div className="flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 px-3 py-2 rounded-lg border border-primary/20 animate-pulse">
+                <div className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span>Memperbarui...</span>
+              </div>
+            )}
+          </div>
         </div>
-        
-        <div className="flex items-center gap-3">
-          {isFetching && (
-            <div className="flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 px-3 py-2 rounded-lg border border-primary/20 animate-pulse">
-              <div className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span>Memperbarui...</span>
-            </div>
-          )}
 
+        {/* Filters Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-card/50 border border-border/50 p-4 rounded-xl">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-medium">Periode:</span>
+          </div>
           <Select value={range} onValueChange={setRange}>
-            <SelectTrigger className="w-[200px] h-10 bg-background">
+            <SelectTrigger className="w-[180px] h-9 bg-background">
               <SelectValue placeholder="Pilih Periode" />
             </SelectTrigger>
             <SelectContent>
@@ -116,8 +124,13 @@ export function MainDashboard({ user }: { user: any }) {
             </SelectContent>
           </Select>
 
+          <div className="hidden sm:block w-px h-6 bg-border" />
+
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-medium">Project:</span>
+          </div>
           <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-[180px] h-10 bg-background">
+            <SelectTrigger className="w-[200px] h-9 bg-background">
               <SelectValue placeholder="Pilih Project" />
             </SelectTrigger>
             <SelectContent>
@@ -130,20 +143,27 @@ export function MainDashboard({ user }: { user: any }) {
         </div>
       </div>
 
+      {/* 1. KPI SUMMARY CARDS */}
       <KpiCards data={data} />
 
-      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+      {/* 2. ANALYTICS SECTION - TREND & PARETO */}
+      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <TrendChart data={data} range={range} setRange={setRange} />
         <ParetoChart data={data} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      {/* 3. TEAM PRODUCTIVITY & KPI PERFORMANCE */}
+      <TeamKpiSection range={range} projectFilter={projectFilter} />
+
+      {/* 4. PRODUCTION MONITORING & PERFORMANCE WIDGETS */}
+      <div className="grid gap-6 lg:grid-cols-3">
         <ProductionMonitoring data={data} />
         <TeamPerformance data={data} />
         <ProjectPerformance data={data} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      {/* 5. PROJECT OVERVIEW & RECENT PROJECTS */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <ProjectOverview data={data} />
         <RecentProjects data={data} />
       </div>
@@ -151,3 +171,4 @@ export function MainDashboard({ user }: { user: any }) {
     </div>
   )
 }
+

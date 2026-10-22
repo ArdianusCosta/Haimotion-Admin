@@ -1,0 +1,1356 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL")
+}
+
+model User {
+  id                      Int                      @id @default(autoincrement())
+  firstname               String                   @db.VarChar(200)
+  lastname                String                   @db.VarChar(200)
+  email                   String                   @unique @db.VarChar(200)
+  notification_email      String?                  @db.VarChar(255)
+  password                String                   @db.Text
+  avatar                  String                   @db.Text
+  date_created            DateTime                 @default(now()) @db.Timestamp()
+  nik                     String?                  @db.VarChar(50)
+  address                 String?                  @db.Text
+  emailVerified           Boolean                  @default(false)
+  status                  String                   @default("active") @db.VarChar(50)
+  role_id                 Int?
+  updatedAt               DateTime                 @default(now()) @updatedAt
+  name                    String?                  @db.VarChar(400)
+  files                   File[]
+  files_shared_by_me      FileShare[]              @relation("SharedByUserFiles")
+  files_shared_with_me    FileShare[]              @relation("SharedWithUserFiles")
+  folders                 Folder[]
+  folders_shared_by_me    FolderShare[]            @relation("SharedByUserFolders")
+  folders_shared_with_me  FolderShare[]            @relation("SharedWithUserFolders")
+  user_preference         UserPreference?
+  accounts                Account[]
+  ai_chat_history         ai_chat_history[]
+  ai_chat_thread          ai_chat_thread[]
+  chat_groups             ChatGroup[]
+  chat_messages           ChatMessage[]
+  threads_as_user1        ChatThread[]             @relation("User1Threads")
+  threads_as_user2        ChatThread[]             @relation("User2Threads")
+  group_members           group_members[]
+  group_messages          GroupMessage[]
+  hr_attendance_summaries HrAttendanceSummary[]    @relation("HrUserAttendanceSummary")
+  hr_attendances          HrAttendance[]           @relation("HrUserAttendance")
+  hr_leaves               HrLeaveRequest[]         @relation("HrUserLeaves")
+  hr_payrolls             HrPayroll[]              @relation("HrUserPayrolls")
+  meeting_participations  MeetingParticipant[]
+  organized_meetings      Meeting[]                @relation("MeetingOrganizer")
+  passkeys                Passkey[]
+  project_members         ProjectMember[]
+  sessions                Session[]
+  task_assignees          TaskAssignee[]
+  user_group_read_status  user_group_read_status[]
+  role                    Role?                    @relation(fields: [role_id], references: [id])
+  department_manager      HrDepartment[]           @relation("DepartmentManager")
+  calendar_events         CalendarEvent[]
+  calendar_participants   CalendarParticipant[]
+  push_subscriptions      PushSubscription[]
+  notifications           Notification[]
+
+  // CRM Relations
+  crm_clients_assigned CrmClient[]   @relation("AssignedClients")
+  crm_leads_assigned   CrmLead[]     @relation("AssignedLeads")
+  crm_deals_assigned   CrmDeal[]     @relation("AssignedDeals")
+  crm_follow_ups       CrmFollowUp[] @relation("AssignedFollowUps")
+  crm_activities       CrmActivity[]
+  crm_notes            CrmNote[]
+
+  @@index([role_id])
+  @@map("users")
+}
+
+model ChatGroup {
+  id                     Int                      @id @default(autoincrement())
+  name                   String                   @db.VarChar(255)
+  description            String?                  @db.Text
+  created_by             Int?
+  date_created           DateTime?                @default(now()) @db.Timestamp()
+  last_message_at        DateTime?                @default(now()) @db.Timestamp()
+  users                  User?                    @relation(fields: [created_by], references: [id], onUpdate: Restrict, map: "chat_groups_ibfk_1")
+  group_members          group_members[]
+  messages               GroupMessage[]
+  user_group_read_status user_group_read_status[]
+
+  @@index([created_by])
+  @@map("chat_groups")
+}
+
+model GroupMessage {
+  id              Int       @id @default(autoincrement())
+  group_id        Int
+  sender_id       Int
+  message_content String    @db.Text
+  attachment      String?   @db.VarChar(255)
+  created_at      DateTime? @default(now()) @db.Timestamp()
+  group           ChatGroup @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "group_messages_ibfk_1")
+  sender          User      @relation(fields: [sender_id], references: [id], onUpdate: Restrict, map: "group_messages_ibfk_2")
+
+  @@index([group_id])
+  @@index([sender_id])
+  @@map("group_messages")
+}
+
+model ChatThread {
+  id              Int           @id @default(autoincrement())
+  user1_id        Int
+  user2_id        Int
+  last_message_at DateTime      @default(now()) @db.Timestamp()
+  calls           Call[]
+  messages        ChatMessage[]
+  user1           User          @relation("User1Threads", fields: [user1_id], references: [id], onUpdate: Restrict, map: "chat_threads_ibfk_1")
+  user2           User          @relation("User2Threads", fields: [user2_id], references: [id], onUpdate: Restrict, map: "chat_threads_ibfk_2")
+
+  @@unique([user1_id, user2_id])
+  @@index([user2_id])
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id              Int           @id @default(autoincrement())
+  thread_id       Int
+  sender_id       Int
+  message_content String        @db.Text
+  attachment      String?       @db.VarChar(255)
+  created_at      DateTime      @default(now()) @db.Timestamp()
+  is_read         Boolean       @default(false)
+  reply_to_id     Int?
+  thread          ChatThread    @relation(fields: [thread_id], references: [id], onUpdate: Restrict, map: "chat_messages_ibfk_1")
+  sender          User          @relation(fields: [sender_id], references: [id], onUpdate: Restrict, map: "chat_messages_ibfk_2")
+  reply_to        ChatMessage?  @relation("MessageReplies", fields: [reply_to_id], references: [id])
+  replies         ChatMessage[] @relation("MessageReplies")
+
+  @@index([sender_id])
+  @@index([thread_id])
+  @@index([reply_to_id])
+  @@map("chat_messages")
+}
+
+model Call {
+  id         Int        @id @default(autoincrement())
+  thread_id  Int
+  caller_id  Int
+  room_name  String     @unique @db.VarChar(255)
+  type       String     @db.VarChar(50)
+  status     String     @db.VarChar(50)
+  started_at DateTime?  @db.Timestamp()
+  ended_at   DateTime?  @db.Timestamp()
+  duration   Int?
+  created_at DateTime   @default(now()) @db.Timestamp()
+  thread     ChatThread @relation(fields: [thread_id], references: [id], onUpdate: Restrict, map: "calls_ibfk_1")
+
+  @@index([thread_id])
+  @@map("calls")
+}
+
+model activity_log {
+  id            Int       @id @default(autoincrement())
+  user_id       Int
+  project_id    Int?
+  task_id       Int?
+  activity_type String    @db.VarChar(50)
+  description   String    @db.Text
+  ip_address    String?   @db.VarChar(100)
+  user_agent    String?   @db.Text
+  created_at    DateTime? @default(now()) @db.Timestamp()
+}
+
+model events {
+  id                   Int       @id @default(autoincrement())
+  ical_uid             String?   @db.VarChar(255)
+  google_calendar_id   String?   @db.VarChar(255)
+  project_id           Int?
+  title                String    @db.VarChar(255)
+  start_event          DateTime  @db.Timestamp()
+  end_event            DateTime  @db.Timestamp()
+  color                String?   @default("bg-primary") @db.VarChar(50)
+  description          String?   @db.Text
+  notification_sent    Boolean?  @default(false)
+  notification_sent_at DateTime? @db.Timestamp()
+
+  @@index([id])
+  @@index([google_calendar_id])
+  @@index([ical_uid])
+  @@index([project_id])
+}
+
+model group_members {
+  id          Int       @id @default(autoincrement())
+  group_id    Int
+  user_id     Int
+  is_admin    Boolean?  @default(false)
+  date_joined DateTime? @default(now()) @db.Timestamp()
+  chat_groups ChatGroup @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "group_members_ibfk_1")
+  users       User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "group_members_ibfk_2")
+
+  @@unique([group_id, user_id])
+  @@index([user_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model notification_list {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  type         Boolean
+  message      String   @db.Text
+  link         String   @db.Text
+  is_read      Boolean  @default(false)
+  date_created DateTime @default(now()) @db.Timestamp()
+  task_id      String?  @db.VarChar(255)
+}
+
+model project_list {
+  id           Int                @id @default(autoincrement())
+  name         String             @db.VarChar(200)
+  description  String             @db.Text
+  status       Int                @db.SmallInt
+  start_date   DateTime           @db.Date
+  end_date     DateTime           @db.Date
+  manager_id   Int
+  date_created DateTime           @default(now()) @db.Timestamp()
+  client_name  String?            @db.VarChar(200)
+  is_archived  Boolean            @default(false)
+  is_favorite  Boolean            @default(false)
+  client_id    Int?
+  crm_client   CrmClient?         @relation(fields: [client_id], references: [id])
+  meetings     Meeting[]
+  members      ProjectMember[]
+  milestones   ProjectMilestone[]
+  finance_budgets FinanceBudget[]
+
+  @@index([status])
+  @@index([manager_id])
+  @@index([is_archived])
+}
+
+model system_settings {
+  id        Int    @id @default(autoincrement())
+  name      String @db.Text
+  email     String @db.VarChar(200)
+  contact   String @db.VarChar(20)
+  address   String @db.Text
+  cover_img String @db.Text
+}
+
+model task_list {
+  id                Int               @id @default(autoincrement())
+  project_id        Int
+  user_id           Int?
+  task              String            @db.VarChar(200)
+  description       String            @db.Text
+  status            Int               @db.SmallInt
+  start_date        DateTime?         @db.Date
+  end_date          DateTime?         @db.Date
+  date_created      DateTime          @default(now()) @db.Timestamp()
+  created_by        Int?
+  content_pillar    String?           @db.Text
+  platform          String?           @db.Text
+  reference_links   String?           @db.Text
+  date_updated      DateTime?         @db.Timestamp()
+  dependencies      String?           @db.Text
+  meetings          Meeting[]
+  assignees         TaskAssignee[]
+  milestone_id      Int?
+  milestone         ProjectMilestone? @relation(fields: [milestone_id], references: [id])
+  checklists        TaskChecklist[]
+  task_dependencies TaskDependency[]  @relation("TaskDependencies")
+  task_depended_by  TaskDependency[]  @relation("TaskDependedBy")
+
+  @@index([project_id])
+  @@index([status])
+  @@index([user_id])
+}
+
+model user_group_read_status {
+  id           Int       @id @default(autoincrement())
+  group_id     Int
+  user_id      Int
+  last_read_at DateTime  @default(now()) @db.Timestamp()
+  chat_groups  ChatGroup @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_group_read_status_ibfk_1")
+  users        User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "user_group_read_status_ibfk_2")
+
+  @@unique([group_id, user_id])
+  @@index([user_id])
+}
+
+model user_productivity {
+  id            Int      @id @default(autoincrement())
+  project_id    Int
+  task_id       Int
+  comment       String   @db.Text
+  subject       String   @db.VarChar(200)
+  date          DateTime @db.Date
+  start_time    DateTime @db.Time()
+  end_time      DateTime @db.Time()
+  user_id       Int
+  time_rendered Float    @db.Real
+  date_created  DateTime @default(now()) @db.Timestamp()
+}
+
+model task_comments {
+  id         Int      @id @default(autoincrement())
+  task_id    Int
+  user_id    Int
+  comment    String   @db.Text
+  created_at DateTime @default(now()) @db.Timestamp()
+  parent_id  Int?
+
+  @@index([task_id])
+}
+
+model task_attachments {
+  id          Int      @id @default(autoincrement())
+  task_id     Int
+  file_url    String   @db.VarChar(500)
+  file_name   String   @db.VarChar(255)
+  uploaded_by Int?
+  uploaded_at DateTime @default(now()) @db.Timestamp()
+
+  @@index([task_id])
+}
+
+model ai_chat_thread {
+  id         String            @id @default(uuid())
+  user_id    Int
+  title      String            @db.VarChar(255)
+  created_at DateTime          @default(now()) @db.Timestamp()
+  updated_at DateTime          @default(now()) @updatedAt @db.Timestamp()
+  is_pinned  Boolean           @default(false)
+  messages   ai_chat_history[]
+  user       User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model ai_chat_history {
+  id         Int            @id @default(autoincrement())
+  user_id    Int
+  role       String         @db.VarChar(50)
+  content    String         @db.Text
+  created_at DateTime       @default(now()) @db.Timestamp()
+  thread_id  String
+  thread     ai_chat_thread @relation(fields: [thread_id], references: [id], onDelete: Cascade)
+  users      User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([thread_id])
+}
+
+model Folder {
+  id         Int           @id @default(autoincrement())
+  name       String        @db.VarChar(255)
+  parent_id  Int?
+  owner_id   Int
+  created_at DateTime      @default(now()) @db.Timestamp()
+  updated_at DateTime      @default(now()) @updatedAt @db.Timestamp()
+  deleted_at DateTime?     @db.Timestamp()
+  files      File[]
+  owner      User          @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  parent     Folder?       @relation("FolderHierarchy", fields: [parent_id], references: [id])
+  children   Folder[]      @relation("FolderHierarchy")
+  shares     FolderShare[]
+
+  @@index([owner_id])
+  @@index([parent_id])
+}
+
+model File {
+  id            Int         @id @default(autoincrement())
+  name          String      @db.VarChar(255)
+  original_name String      @db.VarChar(255)
+  storage_key   String      @db.VarChar(500)
+  mime_type     String      @db.VarChar(100)
+  extension     String      @db.VarChar(50)
+  size          BigInt
+  folder_id     Int?
+  owner_id      Int
+  is_starred    Boolean     @default(false)
+  created_at    DateTime    @default(now()) @db.Timestamp()
+  updated_at    DateTime    @default(now()) @updatedAt @db.Timestamp()
+  deleted_at    DateTime?   @db.Timestamp()
+  folder        Folder?     @relation(fields: [folder_id], references: [id])
+  owner         User        @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  shares        FileShare[]
+
+  @@index([owner_id])
+  @@index([folder_id])
+}
+
+model FileShare {
+  id                  Int      @id @default(autoincrement())
+  file_id             Int
+  permission          String   @db.VarChar(50)
+  created_at          DateTime @default(now()) @db.Timestamp()
+  shared_by_user_id   Int
+  shared_with_user_id Int
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamp()
+  file                File     @relation(fields: [file_id], references: [id], onDelete: Cascade)
+  shared_by_user      User     @relation("SharedByUserFiles", fields: [shared_by_user_id], references: [id], onDelete: Cascade)
+  shared_with_user    User     @relation("SharedWithUserFiles", fields: [shared_with_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([file_id, shared_with_user_id])
+  @@index([file_id])
+  @@index([shared_with_user_id])
+  @@index([shared_by_user_id])
+}
+
+model FolderShare {
+  id                  Int      @id @default(autoincrement())
+  folder_id           Int
+  permission          String   @db.VarChar(50)
+  created_at          DateTime @default(now()) @db.Timestamp()
+  shared_by_user_id   Int
+  shared_with_user_id Int
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamp()
+  folder              Folder   @relation(fields: [folder_id], references: [id], onDelete: Cascade)
+  shared_by_user      User     @relation("SharedByUserFolders", fields: [shared_by_user_id], references: [id], onDelete: Cascade)
+  shared_with_user    User     @relation("SharedWithUserFolders", fields: [shared_with_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([folder_id, shared_with_user_id])
+  @@index([folder_id])
+  @@index([shared_with_user_id])
+  @@index([shared_by_user_id])
+}
+
+model UserPreference {
+  id                     Int      @id @default(autoincrement())
+  user_id                Int      @unique
+  file_manager_view_mode String   @default("grid") @db.VarChar(50)
+  created_at             DateTime @default(now()) @db.Timestamp()
+  updated_at             DateTime @default(now()) @updatedAt @db.Timestamp()
+  content_width          String   @default("centered") @db.VarChar(50)
+  header_style           String   @default("sticky") @db.VarChar(50)
+  layout_style           String   @default("sidebar") @db.VarChar(50)
+  sidebar_style          String   @default("sidebar") @db.VarChar(50)
+  theme_color            String   @default("Green") @db.VarChar(50)
+  theme_mode             String   @default("system") @db.VarChar(50)
+  theme_radius           String   @default("0.5") @db.VarChar(10)
+  font_family            String   @default("Inter") @db.VarChar(50)
+  user                   User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique @db.VarChar(100)
+  description String?          @db.Text
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  id         Int    @id @default(autoincrement())
+  role_id    Int
+  permission String @db.VarChar(100)
+  role       Role   @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@unique([role_id, permission])
+  @@map("role_permissions")
+}
+
+model SystemPermission {
+  id          String  @id @db.VarChar(100)
+  category    String  @db.VarChar(100)
+  name        String  @db.VarChar(100)
+  description String? @db.Text
+
+  @@map("system_permissions")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                Int
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model ProjectMember {
+  id         Int          @id @default(autoincrement())
+  project_id Int
+  user_id    Int
+  created_at DateTime     @default(now()) @db.Timestamp()
+  project    project_list @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, user_id])
+  @@index([user_id])
+  @@map("project_members")
+}
+
+model TaskAssignee {
+  id         Int       @id @default(autoincrement())
+  task_id    Int
+  user_id    Int
+  created_at DateTime  @default(now()) @db.Timestamp()
+  task       task_list @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, user_id])
+  @@index([user_id])
+  @@map("task_assignees")
+}
+
+model Passkey {
+  id           String    @id
+  name         String?
+  publicKey    String    @db.Text
+  userId       Int
+  credentialID String    @db.Text
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime?
+  aaguid       String?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+model FinanceAccount {
+  code           String?              @db.VarChar(50)
+  sub_type       String?              @db.VarChar(100)
+  id             Int                  @id @default(autoincrement())
+  name           String               @db.VarChar(200)
+  type           String               @db.VarChar(50)
+  balance        Float                @default(0)
+  currency       String               @default("USD") @db.VarChar(10)
+  account_number String?              @db.VarChar(100)
+  created_at     DateTime             @default(now())
+  updated_at     DateTime             @default(now()) @updatedAt
+  transactions   FinanceTransaction[]
+
+  @@map("finance_accounts")
+}
+
+model FinanceInvoice {
+  id             Int                  @id @default(autoincrement())
+  reference      String               @unique @db.VarChar(100)
+  customer_name  String               @db.VarChar(200)
+  customer_email String?              @db.VarChar(200)
+  date           DateTime             @db.Date
+  due_date       DateTime             @db.Date
+  amount         Float
+  status         String               @default("Draft") @db.VarChar(50)
+  created_at     DateTime             @default(now())
+  updated_at     DateTime             @default(now()) @updatedAt
+  created_by     Int?
+  items          FinanceInvoiceItem[]
+  payments       FinancePayment[]
+
+  @@map("finance_invoices")
+}
+
+model FinanceInvoiceItem {
+  id          Int            @id @default(autoincrement())
+  invoice_id  Int
+  description String         @db.Text
+  quantity    Int            @default(1)
+  price       Float
+  invoice     FinanceInvoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+
+  @@index([invoice_id])
+  @@map("finance_invoice_items")
+}
+
+model FinanceExpense {
+  id               Int              @id @default(autoincrement())
+  date             DateTime         @db.Date
+  description      String           @db.Text
+  category         String           @db.VarChar(100)
+  amount           Float
+  vendor           String           @db.VarChar(200)
+  status           String           @default("Pending") @db.VarChar(50)
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @default(now()) @updatedAt
+  created_by       Int?
+  category_id      Int?
+  finance_category FinanceCategory? @relation(fields: [category_id], references: [id])
+
+  @@map("finance_expenses")
+}
+
+model FinanceTransaction {
+  id          Int            @id @default(autoincrement())
+  date        DateTime       @db.Date
+  description String         @db.Text
+  type        String         @db.VarChar(50)
+  amount      Float
+  account_id  Int
+  reference   String?        @db.VarChar(200)
+  created_at  DateTime       @default(now())
+  updated_at  DateTime       @default(now()) @updatedAt
+  created_by  Int?
+  account     FinanceAccount @relation(fields: [account_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id])
+  @@map("finance_transactions")
+}
+
+model HrEmployee {
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(200)
+  email          String           @unique @db.VarChar(200)
+  role           String           @db.VarChar(100)
+  department     String           @db.VarChar(100)
+  status         String           @default("Active") @db.VarChar(50)
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @default(now()) @updatedAt
+  department_id  Int?
+  hr_department  HrDepartment?    @relation(fields: [department_id], references: [id])
+  position_id    Int?
+  hr_position    HrPosition?      @relation(fields: [position_id], references: [id])
+  work_schedules HrWorkSchedule[]
+  overtimes      HrOvertime[]
+
+  @@map("hr_employees")
+}
+
+model HrAttendance {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  date        DateTime @db.Date
+  time_in     String?  @db.VarChar(10)
+  time_out    String?  @db.VarChar(10)
+  status      String   @default("Present") @db.VarChar(50)
+  notes       String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+  employee    User     @relation("HrUserAttendance", fields: [employee_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@map("hr_attendances")
+}
+
+model HrAttendanceSummary {
+  id                       Int      @id @default(autoincrement())
+  employee_id              Int
+  period                   String   @db.VarChar(50)
+  department               String?  @db.VarChar(100)
+  work_hours_standard      Float?
+  work_hours_actual        Float?
+  late_hours               Int?
+  late_minutes             Int?
+  early_leave_hours        Int?
+  early_leave_minutes      Int?
+  overtime_normal          Float?
+  overtime_special         Float?
+  attendance_days_standard Float?
+  attendance_days_actual   Float?
+  business_trip_days       Int?
+  absent_days              Int?
+  leave_days               Int?
+  percentage               Float?
+  created_at               DateTime @default(now())
+  updated_at               DateTime @default(now()) @updatedAt
+  employee                 User     @relation("HrUserAttendanceSummary", fields: [employee_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@map("hr_attendance_summaries")
+}
+
+model HrLeaveRequest {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  type        String   @db.VarChar(100)
+  start_date  DateTime @db.Date
+  end_date    DateTime @db.Date
+  reason      String   @db.Text
+  status      String   @default("Pending") @db.VarChar(50)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+  employee    User     @relation("HrUserLeaves", fields: [employee_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@map("hr_leave_requests")
+}
+
+model HrPayroll {
+  id           Int      @id @default(autoincrement())
+  employee_id  Int
+  period       String   @db.VarChar(50)
+  basic_salary Float
+  allowance    Float    @default(0)
+  deduction    Float    @default(0)
+  net_pay      Float
+  status       String   @default("Pending") @db.VarChar(50)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now()) @updatedAt
+  employee     User     @relation("HrUserPayrolls", fields: [employee_id], references: [id], onDelete: Cascade)
+
+  @@index([employee_id])
+  @@map("hr_payrolls")
+}
+
+model HrCandidate {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(200)
+  email        String   @unique @db.VarChar(200)
+  role_applied String   @db.VarChar(100)
+  applied_date DateTime @db.Date
+  rating       Int      @default(0)
+  status       String   @default("Applied") @db.VarChar(50)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now()) @updatedAt
+
+  @@map("hr_candidates")
+}
+
+model Meeting {
+  id           Int                  @id @default(autoincrement())
+  title        String               @db.VarChar(255)
+  description  String?              @db.Text
+  organizer_id Int
+  date         DateTime             @db.Date
+  start_time   DateTime             @db.Time()
+  duration     Int
+  status       String               @default("SCHEDULED") @db.VarChar(50)
+  room_name    String?              @unique @default(uuid()) @db.VarChar(255)
+  meeting_code String?              @unique @db.VarChar(20)
+  join_policy  String               @default("PUBLIC_LINK") @db.VarChar(50)
+  waiting_room Boolean              @default(false)
+  passcode     String?              @db.VarChar(50)
+  project_id   Int?
+  task_id      Int?
+  created_at   DateTime             @default(now())
+  updated_at   DateTime             @default(now()) @updatedAt
+  participants MeetingParticipant[]
+  organizer    User                 @relation("MeetingOrganizer", fields: [organizer_id], references: [id])
+  project      project_list?        @relation(fields: [project_id], references: [id])
+  task         task_list?           @relation(fields: [task_id], references: [id])
+
+  @@index([meeting_code])
+  @@index([organizer_id])
+  @@index([project_id])
+  @@index([task_id])
+  @@map("meetings")
+}
+
+model MeetingParticipant {
+  id          Int       @id @default(autoincrement())
+  meeting_id  Int
+  user_id     Int?
+  guest_name  String?   @db.VarChar(255)
+  guest_email String?   @db.VarChar(255)
+  role        String    @default("PARTICIPANT") @db.VarChar(50)
+  status      String    @default("JOINED") @db.VarChar(50)
+  joined_at   DateTime?
+  left_at     DateTime?
+  created_at  DateTime  @default(now())
+  meeting     Meeting   @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([meeting_id, user_id])
+  @@index([meeting_id])
+  @@index([user_id])
+  @@map("meeting_participants")
+}
+
+model FinanceProductService {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(100)
+  name       String   @db.VarChar(255)
+  type       String   @db.VarChar(50)
+  unit       String   @db.VarChar(50)
+  brand      String?  @db.VarChar(100)
+  price      Float    @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("finance_products_services")
+}
+
+model FinanceContact {
+  id         Int      @id @default(autoincrement())
+  type       String   @db.VarChar(50)
+  name       String   @db.VarChar(255)
+  email      String?  @db.VarChar(255)
+  phone      String?  @db.VarChar(50)
+  address    String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("finance_contacts")
+}
+
+model CrmClient {
+  id              Int       @id @default(autoincrement())
+  company_name    String    @db.VarChar(255)
+  industry        String?   @db.VarChar(100)
+  website         String?   @db.VarChar(255)
+  address         String?   @db.Text
+  city            String?   @db.VarChar(100)
+  province        String?   @db.VarChar(100)
+  country         String?   @db.VarChar(100)
+  status          String    @default("Active") @db.VarChar(50)
+  source          String?   @db.VarChar(100)
+  customer_since  DateTime? @db.Date
+  last_contact_at DateTime? @db.Timestamp()
+  next_follow_up  DateTime? @db.Timestamp()
+
+  assigned_user_id Int?
+  assigned_user    User? @relation("AssignedClients", fields: [assigned_user_id], references: [id])
+
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  contacts   CrmContact[]
+  projects   project_list[]
+  deals      CrmDeal[]
+  activities CrmActivity[]
+  follow_ups CrmFollowUp[]
+  notes      CrmNote[]
+  tags       CrmClientTag[]
+
+  @@index([assigned_user_id])
+  @@map("crm_clients")
+}
+
+model CrmContact {
+  id        Int       @id @default(autoincrement())
+  client_id Int
+  client    CrmClient @relation(fields: [client_id], references: [id], onDelete: Cascade)
+
+  name       String  @db.VarChar(255)
+  position   String? @db.VarChar(100)
+  email      String? @db.VarChar(255)
+  phone      String? @db.VarChar(50)
+  whatsapp   String? @db.VarChar(50)
+  is_primary Boolean @default(false)
+
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  @@index([client_id])
+  @@map("crm_contacts")
+}
+
+model CrmLead {
+  id              Int     @id @default(autoincrement())
+  name            String  @db.VarChar(255)
+  company         String? @db.VarChar(255)
+  email           String? @db.VarChar(255)
+  phone           String? @db.VarChar(50)
+  whatsapp        String? @db.VarChar(50)
+  source          String? @db.VarChar(100)
+  industry        String? @db.VarChar(100)
+  status          String  @default("New") @db.VarChar(50)
+  pipeline_stage  String? @db.VarChar(100)
+  estimated_value Float?  @db.Real
+
+  assigned_user_id Int?
+  assigned_user    User? @relation("AssignedLeads", fields: [assigned_user_id], references: [id])
+
+  next_follow_up DateTime? @db.Timestamp()
+
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  deals      CrmDeal[]
+  activities CrmActivity[]
+  follow_ups CrmFollowUp[]
+  notes      CrmNote[]
+  tags       CrmLeadTag[]
+
+  @@index([assigned_user_id])
+  @@map("crm_leads")
+}
+
+model CrmDeal {
+  id    Int    @id @default(autoincrement())
+  title String @db.VarChar(255)
+
+  client_id Int?
+  client    CrmClient? @relation(fields: [client_id], references: [id])
+
+  lead_id Int?
+  lead    CrmLead? @relation(fields: [lead_id], references: [id])
+
+  assigned_user_id Int?
+  assigned_user    User? @relation("AssignedDeals", fields: [assigned_user_id], references: [id])
+
+  stage          String    @db.VarChar(100)
+  value          Float?    @db.Real
+  probability    Int?      @default(0)
+  expected_close DateTime? @db.Date
+
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  activities     CrmActivity[]
+  follow_ups     CrmFollowUp[]
+  pipeline_id    Int?
+  pipeline       CrmPipeline?      @relation(fields: [pipeline_id], references: [id])
+  stage_id       Int?
+  pipeline_stage CrmPipelineStage? @relation(fields: [stage_id], references: [id])
+
+  @@index([client_id])
+  @@index([lead_id])
+  @@index([assigned_user_id])
+  @@map("crm_deals")
+}
+
+model CrmActivity {
+  id      Int  @id @default(autoincrement())
+  user_id Int
+  user    User @relation(fields: [user_id], references: [id])
+
+  client_id Int?
+  client    CrmClient? @relation(fields: [client_id], references: [id])
+
+  lead_id Int?
+  lead    CrmLead? @relation(fields: [lead_id], references: [id])
+
+  deal_id Int?
+  deal    CrmDeal? @relation(fields: [deal_id], references: [id])
+
+  type        String @db.VarChar(50)
+  description String @db.Text
+
+  created_at DateTime @default(now()) @db.Timestamp()
+
+  @@index([user_id])
+  @@index([client_id])
+  @@index([lead_id])
+  @@index([deal_id])
+  @@map("crm_activities")
+}
+
+model CrmFollowUp {
+  id Int @id @default(autoincrement())
+
+  client_id Int?
+  client    CrmClient? @relation(fields: [client_id], references: [id])
+
+  lead_id Int?
+  lead    CrmLead? @relation(fields: [lead_id], references: [id])
+
+  deal_id Int?
+  deal    CrmDeal? @relation(fields: [deal_id], references: [id])
+
+  assigned_user_id Int?
+  assigned_user    User? @relation("AssignedFollowUps", fields: [assigned_user_id], references: [id])
+
+  type     String   @db.VarChar(50)
+  status   String   @default("Pending") @db.VarChar(50)
+  due_date DateTime @db.Timestamp()
+  notes    String?  @db.Text
+
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  @@index([client_id])
+  @@index([lead_id])
+  @@index([deal_id])
+  @@index([assigned_user_id])
+  @@map("crm_follow_ups")
+}
+
+model CrmNote {
+  id      Int    @id @default(autoincrement())
+  content String @db.Text
+
+  author_id Int
+  author    User @relation(fields: [author_id], references: [id])
+
+  client_id Int?
+  client    CrmClient? @relation(fields: [client_id], references: [id])
+
+  lead_id Int?
+  lead    CrmLead? @relation(fields: [lead_id], references: [id])
+
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  @@index([author_id])
+  @@index([client_id])
+  @@index([lead_id])
+  @@map("crm_notes")
+}
+
+model CrmTag {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique @db.VarChar(50)
+  color String? @db.VarChar(20)
+
+  clients CrmClientTag[]
+  leads   CrmLeadTag[]
+
+  @@map("crm_tags")
+}
+
+model CrmClientTag {
+  client_id Int
+  tag_id    Int
+
+  client CrmClient @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  tag    CrmTag    @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([client_id, tag_id])
+  @@index([client_id])
+  @@index([tag_id])
+  @@map("crm_client_tags")
+}
+
+model CrmLeadTag {
+  lead_id Int
+  tag_id  Int
+
+  lead CrmLead @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  tag  CrmTag  @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([lead_id, tag_id])
+  @@index([lead_id])
+  @@index([tag_id])
+  @@map("crm_lead_tags")
+}
+
+model CrmBroadcastCampaign {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(255)
+  audience_type String    @db.VarChar(100)
+  channel       String    @default("WhatsApp") @db.VarChar(50)
+  message       String    @db.Text
+  status        String    @default("Draft") @db.VarChar(50)
+  scheduled_at  DateTime? @db.Timestamp()
+
+  created_at DateTime @default(now()) @db.Timestamp()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamp()
+
+  recipients CrmBroadcastRecipient[]
+
+  @@map("crm_broadcast_campaigns")
+}
+
+model CrmBroadcastRecipient {
+  id          Int                  @id @default(autoincrement())
+  campaign_id Int
+  campaign    CrmBroadcastCampaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+
+  client_id Int?
+  lead_id   Int?
+
+  contact_info String  @db.VarChar(255)
+  status       String  @default("Pending") @db.VarChar(50)
+  error_msg    String? @db.Text
+
+  sent_at DateTime? @db.Timestamp()
+
+  @@index([campaign_id])
+  @@map("crm_broadcast_recipients")
+}
+
+// -------------------------------------------------------------
+// PHASE 1 MODELS (Master Prompt Requirement)
+// -------------------------------------------------------------
+
+model ProjectMilestone {
+  id          Int          @id @default(autoincrement())
+  project_id  Int
+  project     project_list @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  title       String       @db.VarChar(255)
+  description String?      @db.Text
+  due_date    DateTime?    @db.Date
+  status      String       @default("Pending") @db.VarChar(50)
+  created_at  DateTime     @default(now()) @db.Timestamp()
+  updated_at  DateTime     @default(now()) @updatedAt @db.Timestamp()
+  tasks       task_list[]
+
+  @@index([project_id])
+  @@map("project_milestones")
+}
+
+model TaskChecklist {
+  id         Int       @id @default(autoincrement())
+  task_id    Int
+  task       task_list @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  label      String    @db.VarChar(255)
+  is_done    Boolean   @default(false)
+  order      Int       @default(0)
+  created_at DateTime  @default(now()) @db.Timestamp()
+  updated_at DateTime  @default(now()) @updatedAt @db.Timestamp()
+
+  @@index([task_id])
+  @@map("task_checklists")
+}
+
+model TaskDependency {
+  id              Int       @id @default(autoincrement())
+  task_id         Int
+  task            task_list @relation("TaskDependencies", fields: [task_id], references: [id], onDelete: Cascade)
+  depends_on_id   Int
+  depends_on_task task_list @relation("TaskDependedBy", fields: [depends_on_id], references: [id], onDelete: Cascade)
+  created_at      DateTime  @default(now()) @db.Timestamp()
+
+  @@unique([task_id, depends_on_id])
+  @@index([depends_on_id])
+  @@map("task_dependencies")
+}
+
+model CrmPipeline {
+  id         Int                @id @default(autoincrement())
+  name       String             @db.VarChar(255)
+  is_active  Boolean            @default(true)
+  created_at DateTime           @default(now()) @db.Timestamp()
+  updated_at DateTime           @default(now()) @updatedAt @db.Timestamp()
+  stages     CrmPipelineStage[]
+  deals      CrmDeal[]
+
+  @@map("crm_pipelines")
+}
+
+model CrmPipelineStage {
+  id          Int         @id @default(autoincrement())
+  pipeline_id Int
+  pipeline    CrmPipeline @relation(fields: [pipeline_id], references: [id], onDelete: Cascade)
+  name        String      @db.VarChar(100)
+  order       Int         @default(0)
+  probability Int         @default(0)
+  created_at  DateTime    @default(now()) @db.Timestamp()
+  updated_at  DateTime    @default(now()) @updatedAt @db.Timestamp()
+  deals       CrmDeal[]
+
+  @@index([pipeline_id])
+  @@map("crm_pipeline_stages")
+}
+
+model FinanceCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  type        String   @db.VarChar(50)
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  expenses FinanceExpense[]
+  budgets  FinanceBudget[]
+
+  @@map("finance_categories")
+}
+
+model FinancePayment {
+  id             Int            @id @default(autoincrement())
+  invoice_id     Int
+  invoice        FinanceInvoice @relation(fields: [invoice_id], references: [id], onDelete: Cascade)
+  amount         Float
+  payment_date   DateTime       @db.Date
+  payment_method String         @db.VarChar(100)
+  reference      String?        @db.VarChar(255)
+  notes          String?        @db.Text
+  created_at     DateTime       @default(now())
+  updated_at     DateTime       @default(now()) @updatedAt
+
+  @@index([invoice_id])
+  @@map("finance_payments")
+}
+
+model FinanceBudget {
+  id          Int              @id @default(autoincrement())
+  name        String           @db.VarChar(255)
+  amount      Float
+  period      String?          @db.VarChar(50)
+  spent       Float            @default(0)
+  start_date  DateTime         @db.Date
+  end_date    DateTime         @db.Date
+  category_id Int?
+  category    FinanceCategory? @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  project_id  Int?
+  project     project_list?    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @default(now()) @updatedAt
+
+  @@index([category_id])
+  @@index([project_id])
+  @@map("finance_budgets")
+}
+
+model HrDepartment {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(255)
+  description String?      @db.Text
+  manager_id  Int?
+  manager     User?        @relation("DepartmentManager", fields: [manager_id], references: [id])
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @default(now()) @updatedAt
+  employees   HrEmployee[]
+  HrPosition  HrPosition[]
+
+  @@index([manager_id])
+  @@map("hr_departments")
+}
+
+model HrPosition {
+  id            Int           @id @default(autoincrement())
+  title         String        @db.VarChar(255)
+  department_id Int?
+  department    HrDepartment? @relation(fields: [department_id], references: [id], onDelete: SetNull)
+  created_at    DateTime      @default(now())
+  updated_at    DateTime      @default(now()) @updatedAt
+  employees     HrEmployee[]
+
+  @@index([department_id])
+  @@map("hr_positions")
+}
+
+model HrWorkSchedule {
+  id          Int        @id @default(autoincrement())
+  employee_id Int
+  employee    HrEmployee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  day_of_week Int
+  start_time  String     @db.VarChar(10)
+  end_time    String     @db.VarChar(10)
+  is_active   Boolean    @default(true)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @default(now()) @updatedAt
+
+  @@index([employee_id])
+  @@map("hr_work_schedules")
+}
+
+model HrOvertime {
+  id          Int        @id @default(autoincrement())
+  employee_id Int
+  employee    HrEmployee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+  date        DateTime   @db.Date
+  hours       Float
+  reason      String     @db.Text
+  status      String     @default("Pending") @db.VarChar(50)
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @default(now()) @updatedAt
+
+  @@index([employee_id])
+  @@map("hr_overtimes")
+}
+
+model CalendarEvent {
+  id           Int                   @id @default(autoincrement())
+  title        String                @db.VarChar(255)
+  description  String?               @db.Text
+  start_date   DateTime              @db.Timestamp()
+  end_date     DateTime              @db.Timestamp()
+  is_all_day   Boolean               @default(false)
+  location     String?               @db.VarChar(255)
+  event_type   String                @default("General") @db.VarChar(50)
+  color        String?               @db.VarChar(50)
+  organizer_id Int?
+  organizer    User?                 @relation(fields: [organizer_id], references: [id])
+  created_at   DateTime              @default(now())
+  updated_at   DateTime              @default(now()) @updatedAt
+  participants CalendarParticipant[]
+  reminders    CalendarReminder[]
+
+  @@index([organizer_id])
+  @@map("calendar_events")
+}
+
+model CalendarParticipant {
+  id         Int           @id @default(autoincrement())
+  event_id   Int
+  event      CalendarEvent @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  user_id    Int
+  user       User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  status     String        @default("Pending") @db.VarChar(50)
+  created_at DateTime      @default(now())
+
+  @@unique([event_id, user_id])
+  @@index([user_id])
+  @@map("calendar_participants")
+}
+
+model CalendarReminder {
+  id             Int           @id @default(autoincrement())
+  event_id       Int
+  event          CalendarEvent @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  minutes_before Int
+  method         String        @default("Notification") @db.VarChar(50)
+  created_at     DateTime      @default(now())
+
+  @@index([event_id])
+  @@map("calendar_reminders")
+}
+
+// ============ PUSH NOTIFICATIONS ============
+
+model PushSubscription {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token      String   @db.Text
+  device     String?  @db.VarChar(255)
+  browser    String?  @db.VarChar(100)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@unique([user_id, token])
+  @@index([user_id])
+  @@map("push_subscriptions")
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  title      String   @db.VarChar(255)
+  body       String   @db.Text
+  icon       String?  @db.VarChar(500)
+  link       String?  @db.VarChar(500)
+  type       String   @default("general") @db.VarChar(50)
+  data       String?  @db.Text
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+  read_at    DateTime?
+
+  @@index([user_id])
+  @@index([user_id, is_read])
+  @@map("notifications")
+}
