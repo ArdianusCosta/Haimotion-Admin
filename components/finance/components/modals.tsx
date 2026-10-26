@@ -9,36 +9,61 @@ import { AlertTriangle } from 'lucide-react'
 interface ConfirmDeleteModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   title?: string
   description?: string
+  confirmText?: string
+  cancelText?: string
+  isLoading?: boolean
 }
 
 export function ConfirmDeleteModal({ 
   open, 
   onOpenChange, 
   onConfirm, 
-  title = "Are you sure?", 
-  description = "This action cannot be undone. This will permanently delete the record." 
+  title = "Apakah Anda yakin?", 
+  description = "Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.",
+  confirmText = "Hapus",
+  cancelText = "Batal",
+  isLoading = false
 }: ConfirmDeleteModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-full bg-rose-500/10">
-              <AlertTriangle className="size-5 text-rose-500" />
-            </div>
-            <DialogTitle className="text-rose-500">{title}</DialogTitle>
+      <DialogContent className="!w-[92vw] !max-w-[440px] p-6 rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-destructive/10 text-destructive border border-destructive/20 shrink-0">
+            <AlertTriangle className="h-5 w-5" />
           </div>
-          <DialogDescription className="pt-3">
-            {description}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="mt-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" variant="destructive" onClick={() => { onConfirm(); onOpenChange(false); }}>Delete</Button>
-        </DialogFooter>
+          <div className="flex-1">
+            <DialogTitle className="text-lg font-bold text-foreground">{title}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+              {description}
+            </DialogDescription>
+          </div>
+        </div>
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 mt-6 pt-4 border-t border-border">
+          <Button 
+            type="button" 
+            variant="outline" 
+            disabled={isLoading}
+            onClick={() => onOpenChange(false)}
+            className="h-10 px-4 cursor-pointer"
+          >
+            {cancelText}
+          </Button>
+          <Button 
+            type="button" 
+            variant="destructive" 
+            disabled={isLoading}
+            onClick={async () => { 
+              await onConfirm(); 
+              onOpenChange(false); 
+            }}
+            className="h-10 px-5 font-semibold bg-destructive hover:bg-destructive/90 text-white cursor-pointer"
+          >
+            {isLoading ? 'Menghapus...' : confirmText}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )

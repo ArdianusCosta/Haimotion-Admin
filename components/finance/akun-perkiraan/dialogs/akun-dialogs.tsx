@@ -25,11 +25,9 @@ type AkunDialogProps = {
 export function AkunDialog({ isOpen, setIsOpen, editingId, formData, setFormData, resetForm, handleSave, t }: AkunDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(val) => { setIsOpen(val); if (!val) resetForm(); }}>
-      <DialogTrigger asChild>
-        <Button className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          <span>{t('Add')}</span>
-        </Button>
+      <DialogTrigger render={<Button className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2" />}>
+        <Plus className="w-4 h-4" />
+        <span>{t('Add')}</span>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none bg-card">
         <div className="bg-primary px-6 py-4">
@@ -71,8 +69,8 @@ export function AkunDialog({ isOpen, setIsOpen, editingId, formData, setFormData
           </div>
 
           <div className="flex justify-end gap-3 mt-8">
-            <DialogClose asChild>
-              <Button variant="outline">Batal</Button>
+            <DialogClose render={<Button variant="outline" />}>
+              Batal
             </DialogClose>
             <Button onClick={handleSave} disabled={!formData.name || !formData.code} className="bg-primary hover:bg-primary/90 text-white">{t('Save')}</Button>
           </div>

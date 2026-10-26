@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog'
 
 const stageColors: Record<string, string> = {
   'New Lead': 'bg-sky-500/10 text-sky-600 border-sky-500/20',
@@ -36,6 +37,8 @@ export function CrmLeadsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [leadToDelete, setLeadToDelete] = useState<{ id: number; name: string } | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     company: '',
@@ -286,11 +289,10 @@ export function CrmLeadsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
+                          className="text-destructive focus:text-destructive cursor-pointer"
                           onClick={() => {
-                            if (confirm('Are you sure you want to delete this lead?')) {
-                              deleteMutation.mutate(lead.id)
-                            }
+                            setLeadToDelete({ id: lead.id, name: lead.name })
+                            setDeleteModalOpen(true)
                           }}
                         >
                           <Trash className="mr-2 h-4 w-4" />
@@ -365,6 +367,20 @@ export function CrmLeadsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog 
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={async () => {
+          if (leadToDelete) {
+            await deleteMutation.mutateAsync(leadToDelete.id)
+            setLeadToDelete(null)
+          }
+        }}
+        title={`Hapus Prospek ${leadToDelete ? `"${leadToDelete.name}"` : ''}`}
+        description="Apakah Anda yakin ingin menghapus data prospek ini? Tindakan ini tidak dapat dibatalkan."
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   )
 }

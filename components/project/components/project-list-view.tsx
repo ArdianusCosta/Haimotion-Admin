@@ -25,7 +25,8 @@ export function ProjectListView({
   searchQuery, setSearchQuery,
   setIsFormOpen, isFormOpen,
   isLoading, filteredProjects,
-  setSelectedProjectId, users
+  setSelectedProjectId, users,
+  onNewProject
 }: any) {
   return (
     <div className="flex h-[calc(100vh-140px)] min-h-[600px] flex-col gap-6 overflow-hidden">
@@ -48,7 +49,7 @@ export function ProjectListView({
               <DropdownMenuCheckboxItem checked={statusFilter === 5} onCheckedChange={() => setStatusFilter(5)}>Completed</DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" className="h-9 gap-2" onClick={() => setIsFormOpen(true)}>
+          <Button size="sm" className="h-9 gap-2 shadow-xs font-medium" onClick={onNewProject || (() => setIsFormOpen(true))}>
             <Plus className="size-4" /> New Project
           </Button>
         </div>
@@ -95,10 +96,15 @@ export function ProjectListView({
             ))}
           </div>
         ) : filteredProjects.length === 0 ? (
-          <div className="flex h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border text-center">
-            <ClipboardList className="mb-2 size-8 text-muted-foreground/50" />
-            <p className="text-sm font-medium">No projects found</p>
-            <p className="text-xs text-muted-foreground">Try adjusting your search or create a new project.</p>
+          <div className="flex h-52 flex-col items-center justify-center rounded-xl border border-dashed border-border text-center p-6">
+            <ClipboardList className="mb-2 size-9 text-muted-foreground/40" />
+            <p className="text-sm font-medium text-foreground">No projects found</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+              {searchQuery ? 'No projects match your current filter or search criteria.' : 'Get started by creating your first project.'}
+            </p>
+            <Button size="sm" className="mt-4 gap-1.5" onClick={onNewProject || (() => setIsFormOpen(true))}>
+              <Plus className="size-3.5" /> Create Project
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

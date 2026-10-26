@@ -25,7 +25,8 @@ export async function getProjects() {
         firstname: true,
         lastname: true,
         avatar: true,
-        email: true
+        email: true,
+        status: true
       }
     })
     
@@ -110,7 +111,8 @@ export async function getProjectById(id: number) {
         firstname: true,
         lastname: true,
         avatar: true,
-        email: true
+        email: true,
+        status: true
       }
     })
     

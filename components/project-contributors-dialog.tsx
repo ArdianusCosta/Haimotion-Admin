@@ -3,11 +3,18 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, UserPlus, X, Crown } from 'lucide-react'
 
 import { updateProjectMembers } from '@/app/actions/projects'
+
+function getAvatarUrl(avatar: string | null | undefined) {
+  if (!avatar) return ''
+  if (avatar.startsWith('http') || avatar.startsWith('/')) return avatar
+  return `/avatars/${avatar}`
+}
 
 export function ProjectContributorsDialog({ 
   open, 
@@ -137,9 +144,12 @@ export function ProjectContributorsDialog({
                     className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {user.firstname?.[0]}{user.lastname?.[0]}
-                      </div>
+                      <Avatar className="size-8 ring-1 ring-border shrink-0 overflow-hidden">
+                        <AvatarImage src={getAvatarUrl(user.avatar)} alt={user.firstname || 'User'} className="object-cover size-full" />
+                        <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                          {user.firstname?.[0]}{user.lastname?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
                       <div>
                         <p className="text-sm font-medium">{user.firstname} {user.lastname}</p>
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">

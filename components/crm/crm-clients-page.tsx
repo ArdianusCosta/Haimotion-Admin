@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog'
 
 const STATUS_STYLES: Record<string, string> = {
   'Active': 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20',
@@ -42,6 +43,8 @@ export function CrmClientsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [clientToDelete, setClientToDelete] = useState<{ id: number; name: string } | null>(null)
   const [formData, setFormData] = useState({
     company_name: '',
     industry: '',
@@ -255,11 +258,10 @@ export function CrmClientsPage() {
                         <DropdownMenuItem>Edit</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
+                          className="text-destructive focus:text-destructive cursor-pointer"
                           onClick={() => {
-                            if (confirm('Are you sure you want to delete this client?')) {
-                              deleteMutation.mutate(client.id)
-                            }
+                            setClientToDelete({ id: client.id, name: client.company_name })
+                            setDeleteModalOpen(true)
                           }}
                         >
                           <Trash className="mr-2 h-4 w-4" />
@@ -350,6 +352,20 @@ export function CrmClientsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog 
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={async () => {
+          if (clientToDelete) {
+            await deleteMutation.mutateAsync(clientToDelete.id)
+            setClientToDelete(null)
+          }
+        }}
+        title={`Hapus Klien ${clientToDelete ? `"${clientToDelete.name}"` : ''}`}
+        description="Apakah Anda yakin ingin menghapus data klien ini? Tindakan ini tidak dapat dibatalkan."
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   )
 }

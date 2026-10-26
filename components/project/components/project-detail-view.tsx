@@ -7,12 +7,26 @@ import {
   ChevronLeft, Lock, X 
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
+function getAvatarUrl(avatar: string | null | undefined) {
+  if (!avatar) return ''
+  if (avatar.startsWith('http') || avatar.startsWith('/')) return avatar
+  return `/avatars/${avatar}`
+}
+
+function getInitials(firstname?: string | null, lastname?: string | null) {
+  const f = firstname?.replace(/\[RESIGN\]\s*/i, '').replace(/\s*\([^)]*\).*/g, '').trim() || ''
+  const l = lastname?.replace(/\s*\([^)]*\).*/g, '').trim() || ''
+  if (!f && !l) return 'U'
+  return `${f.charAt(0)}${l ? l.charAt(0) : ''}`.toUpperCase()
+}
 import {
   Dialog,
   DialogContent,
@@ -41,7 +55,8 @@ export function ProjectDetailView({
   isKpiDialogOpen, setIsKpiDialogOpen,
   isContributorsOpen, setIsContributorsOpen,
   isFormOpen, isDeleteDialogOpen, deleteMutation,
-  isArchiveDialogOpen, archiveMutation, users
+  isArchiveDialogOpen, archiveMutation, users,
+  onEditProject
 }: any) {
   const router = useRouter()
 
@@ -72,7 +87,8 @@ export function ProjectDetailView({
             </button>
             <button 
               className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-              onClick={() => setIsFormOpen(true)}
+              onClick={() => onEditProject ? onEditProject() : setIsFormOpen(true)}
+              title="Edit Project"
             >
               <Edit className="size-4" />
             </button>
@@ -283,12 +299,18 @@ export function ProjectDetailView({
           <div className="mt-4 space-y-4 max-h-[300px] overflow-y-auto pr-2">
             {selectedProject.manager && (
               <div className="flex items-center gap-3">
-                <div className="relative flex size-9 items-center justify-center rounded-full bg-muted font-medium text-foreground">
-                  {selectedProject.manager.firstname?.charAt(0)}
-                  <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background bg-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{selectedProject.manager.firstname} {selectedProject.manager.lastname}</p>
+                <Avatar className="size-9 ring-1 ring-border shrink-0 overflow-hidden">
+                  <AvatarImage
+                    src={getAvatarUrl(selectedProject.manager.avatar)}
+                    alt={selectedProject.manager.firstname || 'Manager'}
+                    className="object-cover size-full"
+                  />
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                    {getInitials(selectedProject.manager.firstname, selectedProject.manager.lastname)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1 truncate">
+                  <p className="text-sm font-medium truncate">{selectedProject.manager.firstname} {selectedProject.manager.lastname}</p>
                   <p className="text-xs text-primary font-medium">Project Manager</p>
                 </div>
               </div>
@@ -296,11 +318,18 @@ export function ProjectDetailView({
             
             {selectedProject.members?.map((member: any) => (
               <div key={member.id} className="flex items-center gap-3">
-                <div className="relative flex size-9 items-center justify-center rounded-full bg-muted font-medium text-foreground">
-                  {member.firstname?.charAt(0)}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{member.firstname} {member.lastname}</p>
+                <Avatar className="size-9 ring-1 ring-border shrink-0 overflow-hidden">
+                  <AvatarImage
+                    src={getAvatarUrl(member.avatar)}
+                    alt={member.firstname || 'Member'}
+                    className="object-cover size-full"
+                  />
+                  <AvatarFallback className="bg-muted text-foreground text-xs font-bold">
+                    {getInitials(member.firstname, member.lastname)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1 truncate">
+                  <p className="text-sm font-medium truncate">{member.firstname} {member.lastname}</p>
                   <p className="text-xs text-muted-foreground">Member</p>
                 </div>
               </div>

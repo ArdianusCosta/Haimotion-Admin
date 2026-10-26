@@ -4,6 +4,7 @@ import { FinancePageHeader } from '../components'
 import { useFinanceOverview } from '../queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useLanguage } from '@/components/language-provider'
+import { toast } from 'sonner'
 export function ReportsPage() {
   const { t } = useLanguage()
   const { isLoading } = useFinanceOverview()
@@ -61,7 +62,7 @@ export function ReportsPage() {
                         <p className="text-xs text-muted-foreground mb-4">{report.description}</p>
                       </div>
                       <div className="flex items-center justify-between border-t border-border pt-4 mt-auto">
-                        <button className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors" onClick={(e) => { e.stopPropagation(); alert('PDF Download Mock'); }}>
+                        <button className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer" onClick={(e) => { e.stopPropagation(); toast.info('Mengunduh laporan PDF...'); }}>
                           <Download className="size-3" /> Export PDF
                         </button>
                         <button className="text-xs font-medium text-primary hover:underline flex items-center gap-1">

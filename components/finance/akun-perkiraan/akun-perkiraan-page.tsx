@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAkunPerkiraan } from './hooks/use-akun-perkiraan'
 import { AkunDialog } from './dialogs/akun-dialogs'
+import { ConfirmDeleteModal } from '@/components/finance/components/modals'
+import { toast } from 'sonner'
 
 export function AkunPerkiraanPage() {
   const { t } = useLanguage()
@@ -18,6 +20,10 @@ export function AkunPerkiraanPage() {
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   
   const [formData, setFormData] = useState({
     code: '', name: '', type: 'Asset', subType: '', balance: 0
@@ -29,9 +35,24 @@ export function AkunPerkiraanPage() {
     resetForm()
   }
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this account?')) {
-      await removeAccount(id)
+  const handleDelete = (id: number) => {
+    setItemToDelete(id)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (itemToDelete !== null) {
+      setIsDeleting(true)
+      try {
+        await removeAccount(itemToDelete)
+        toast.success('Akun perkiraan berhasil dihapus')
+        setItemToDelete(null)
+      } catch (err) {
+        console.error(err)
+        toast.error('Gagal menghapus akun perkiraan')
+      } finally {
+        setIsDeleting(false)
+      }
     }
   }
 
@@ -137,10 +158,8 @@ export function AkunPerkiraanPage() {
                   <td className="px-6 py-4 text-muted-foreground">Rp {row.balance.toLocaleString('id-ID')}</td>
                   <td className="px-6 py-4 text-center">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="p-1 hover:bg-muted rounded-full text-muted-foreground">
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
+                      <DropdownMenuTrigger className="p-1 hover:bg-muted rounded-full text-muted-foreground transition-colors cursor-pointer">
+                        <MoreVertical className="w-4 h-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEdit(row)} className="flex items-center gap-2 cursor-pointer">
@@ -158,6 +177,15 @@ export function AkunPerkiraanPage() {
           </table>
         </div>
       </Card>
+
+      <ConfirmDeleteModal 
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={confirmDelete}
+        title="Hapus Akun Perkiraan"
+        description="Apakah Anda yakin ingin menghapus akun perkiraan ini? Tindakan ini tidak dapat dibatalkan."
+        isLoading={isDeleting}
+      />
     </div>
   )
 }

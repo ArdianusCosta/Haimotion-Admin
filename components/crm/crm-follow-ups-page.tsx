@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog'
 
 const isToday = (date: Date) => {
   const today = new Date()
@@ -57,6 +58,8 @@ export function CrmFollowUpsPage() {
   const [search, setSearch] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [filter, setFilter] = useState('All')
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<{ id: number; name: string } | null>(null)
 
   const [formData, setFormData] = useState({
     type: 'WhatsApp',
@@ -311,11 +314,11 @@ export function CrmFollowUpsPage() {
                           )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
+                            className="text-destructive focus:text-destructive cursor-pointer"
                             onClick={() => {
-                              if (confirm('Are you sure you want to delete this follow-up?')) {
-                                deleteMutation.mutate(item.id)
-                              }
+                              const title = item.notes || item.type || 'tindak lanjut'
+                              setItemToDelete({ id: item.id, name: title })
+                              setDeleteModalOpen(true)
                             }}
                           >
                             <Trash className="mr-2 h-4 w-4" />
@@ -376,6 +379,20 @@ export function CrmFollowUpsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog 
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={async () => {
+          if (itemToDelete) {
+            await deleteMutation.mutateAsync(itemToDelete.id)
+            setItemToDelete(null)
+          }
+        }}
+        title={`Hapus Tindak Lanjut ${itemToDelete ? `"${itemToDelete.name}"` : ''}`}
+        description="Apakah Anda yakin ingin menghapus jadwal tindak lanjut ini? Tindakan ini tidak dapat dibatalkan."
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   )
 }

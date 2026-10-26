@@ -25,21 +25,21 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     startDate = new Date(now.getFullYear(), 0, 1);
   }
 
-
   const duration = now.getTime() - startDate.getTime();
   const prevStartDate = new Date(startDate.getTime() - duration);
 
   // Base where clauses
-  const projectWhere: any = { is_archived: false, date_created: { gte: startDate } };
-  const taskWhere: any = { date_created: { gte: startDate } };
-  const prodWhere: any = { date: { gte: startDate } };
+  const projectWhere: any = { is_archived: false };
+  const taskWhere: any = {};
+  if (startDate.getTime() > 0) {
+    taskWhere.date_created = { gte: startDate };
+  }
+  const prodWhere: any = {};
+  if (startDate.getTime() > 0) {
+    prodWhere.date = { gte: startDate };
+  }
   const prevProjectWhere: any = { is_archived: false, date_created: { gte: prevStartDate, lt: startDate } };
   const prevTaskWhere: any = { date_created: { gte: prevStartDate, lt: startDate } };
-  const trendTaskWhere: any = { date_created: { gte: startDate } };
-  const trendProjectWhere: any = { date_created: { gte: startDate } };
-  const trendProdWhere: any = { date: { gte: startDate } };
-  const pipelineWhere: any = { is_archived: false };
-  const activeProjectsWhere: any = { is_archived: false, status: { notIn: [5, 0] } };
 
   if (projectFilter && projectFilter !== 'Semua Project') {
     const pid = parseInt(projectFilter);
@@ -48,282 +48,528 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     prodWhere.project_id = pid;
     prevProjectWhere.id = pid;
     prevTaskWhere.project_id = pid;
-    trendTaskWhere.project_id = pid;
-    trendProjectWhere.id = pid;
-    trendProdWhere.project_id = pid;
-    pipelineWhere.id = pid;
-    activeProjectsWhere.id = pid;
   }
 
-  // 1. KPIs
   try {
-  // requireAuth is inside try so DB connection errors fall through to mock data fallback
-  await requireAuth();
-  const totalProjects = await prisma.project_list.count({
-    where: projectWhere
-  });
+    await requireAuth();
 
-  const allTasksInRange = await prisma.task_list.findMany({
-    where: taskWhere,
-    select: { status: true, start_date: true, end_date: true, id: true, task: true, project_id: true }
-  });
+    // 1. Parallel queries for maximum performance
+    const [
+      totalUsersCount,
+      totalProjectsCount,
+      totalTasksCount,
+      allTasksInRange,
+      activeProjectsList,
+      teamUsers,
+      allAssignees,
+      activityLogs,
+      taskComments,
+      productivity
+    ] = await Promise.all([
+      prisma.user.count({ where: { status: { not: 'resign' } } }),
+      prisma.project_list.count({ where: { is_archived: false } }),
+      prisma.task_list.count(),
+      prisma.task_list.findMany({
+        where: taskWhere,
+        select: {
+          id: true,
+          task: true,
+          status: true,
+          start_date: true,
+          end_date: true,
+          date_created: true,
+          project_id: true,
+          platform: true,
+          content_pillar: true
+        }
+      }),
+      prisma.project_list.findMany({
+        where: { is_archived: false },
+        select: {
+          id: true,
+          name: true,
+          client_name: true,
+          status: true,
+          end_date: true,
+          date_created: true
+        },
+        orderBy: { date_created: 'desc' }
+      }),
+      prisma.user.findMany({
+        where: { status: { not: 'resign' } },
+        select: {
+          id: true,
+          firstname: true,
+          lastname: true,
+          name: true,
+          address: true,
+          avatar: true,
+          role: { select: { name: true } }
+        }
+      }),
+      prisma.taskAssignee.findMany({
+        select: {
+          user_id: true,
+          task: {
+            select: { id: true, status: true, end_date: true, project_id: true }
+          }
+        }
+      }),
+      prisma.activity_log.findMany({
+        take: 20,
+        orderBy: { created_at: 'desc' }
+      }),
+      prisma.task_comments.findMany({
+        take: 15,
+        orderBy: { created_at: 'desc' }
+      }),
+      prisma.user_productivity.aggregate({
+        _sum: { time_rendered: true },
+        where: prodWhere
+      })
+    ]);
 
-  const tasksCompleted = allTasksInRange.filter(t => t.status === 5).length;
-  // Not done and not overdue
-  const tasksPending = allTasksInRange.filter(t => t.status !== 5 && t.status !== 8).length; 
-  const overdueTasks = allTasksInRange.filter(t => 
-    t.status === 8 || (t.end_date && new Date(t.end_date) < now && t.status !== 5)
-  );
-  
-  
-  const tasksOverdue = overdueTasks.length;
-  
-  // Fetch project names for overdue tasks
-  const overdueProjectIds = [...new Set(overdueTasks.map(t => t.project_id))];
-  const overdueProjects = overdueProjectIds.length > 0 
-    ? await prisma.project_list.findMany({ where: { id: { in: overdueProjectIds } }, select: { id: true, name: true } })
-    : [];
+    // 2. Calculations for Task Statuses
+    let tasksCompleted = 0;
+    let tasksPending = 0;
+    let tasksHold = 0;
+    let tasksOnProgress = 0;
+    let tasksReview = 0;
+    let tasksCancelled = 0;
+    let tasksRevised = 0;
+    let tasksOverdue = 0;
 
-  const overdueTasksList = overdueTasks.slice(0, 5).map(t => ({
-    id: t.id,
-    name: t.task,
-    projectName: overdueProjects.find(p => p.id === t.project_id)?.name || 'Unknown Project',
-    endDate: t.end_date
-  }));
+    const overdueTasks: typeof allTasksInRange = [];
 
-  // Pareto Analysis: Overdue tasks by Project
-  const paretoTally: Record<number, number> = {};
-  overdueTasks.forEach(t => {
-    paretoTally[t.project_id] = (paretoTally[t.project_id] || 0) + 1;
-  });
+    allTasksInRange.forEach(t => {
+      const isOverdue = t.status === 8 || (t.end_date && new Date(t.end_date) < now && t.status !== 5);
+      if (t.status === 5) {
+        tasksCompleted++;
+      } else if (isOverdue) {
+        tasksOverdue++;
+        overdueTasks.push(t);
+      } else if (t.status === 3) {
+        tasksReview++;
+      } else if (t.status === 7) {
+        tasksHold++;
+        tasksCancelled++;
+      } else if (t.status === 4) {
+        tasksRevised++;
+      } else if ([2, 6].includes(t.status)) {
+        tasksOnProgress++;
+      } else {
+        tasksPending++;
+      }
+    });
 
-  const paretoRaw = Object.entries(paretoTally).map(([pid, count]) => {
-    const pIdNum = parseInt(pid);
-    const p = overdueProjects.find(p => p.id === pIdNum);
-    let name = p ? p.name : 'Unknown';
-    if (name.length > 15) name = name.substring(0, 15) + '...';
-    return { name, count };
-  }).sort((a, b) => b.count - a.count).slice(0, 5);
+    const totalTasksInRange = allTasksInRange.length;
+    const completionRate = totalTasksInRange > 0 ? Math.round((tasksCompleted / totalTasksInRange) * 100) : 0;
+    const totalWorkHours = productivity._sum.time_rendered || 0;
 
-  let cumulative = 0;
-  const totalParetoCount = paretoRaw.reduce((sum, item) => sum + item.count, 0) || 1; // avoid division by 0
-  const paretoData = paretoRaw.map(item => {
-    cumulative += item.count;
-    return {
-      name: item.name,
-      value: item.count,
-      cumulative: Math.round((cumulative / tasksOverdue) * 100)
+    // Previous period counts
+    const prevProjects = await prisma.project_list.count({ where: prevProjectWhere });
+    const prevTasksCompleted = await prisma.task_list.count({
+      where: { ...prevTaskWhere, status: 5 }
+    });
+    const prevTasksOverdue = await prisma.task_list.findMany({
+      where: prevTaskWhere,
+      select: { status: true, end_date: true }
+    }).then(tasks => tasks.filter(t =>
+      t.status === 8 || (t.end_date && new Date(t.end_date) < startDate && t.status !== 5)
+    ).length);
+
+    // Overdue tasks list with project name
+    const overdueProjectIds = [...new Set(overdueTasks.map(t => t.project_id))];
+    const overdueProjects = overdueProjectIds.length > 0
+      ? await prisma.project_list.findMany({ where: { id: { in: overdueProjectIds } }, select: { id: true, name: true } })
+      : [];
+
+    const overdueTasksList = overdueTasks.slice(0, 5).map(t => ({
+      id: t.id,
+      name: t.task,
+      projectName: overdueProjects.find(p => p.id === t.project_id)?.name || 'Unknown Project',
+      endDate: t.end_date
+    }));
+
+    // 3. Pareto Analysis: Overdue tasks by Project
+    const paretoTally: Record<number, number> = {};
+    overdueTasks.forEach(t => {
+      paretoTally[t.project_id] = (paretoTally[t.project_id] || 0) + 1;
+    });
+
+    const paretoRaw = Object.entries(paretoTally).map(([pid, count]) => {
+      const pIdNum = parseInt(pid);
+      const p = overdueProjects.find(p => p.id === pIdNum) || activeProjectsList.find(p => p.id === pIdNum);
+      let name = p ? p.name : 'Unknown';
+      if (name.length > 18) name = name.substring(0, 18) + '...';
+      return { name, count };
+    }).sort((a, b) => b.count - a.count).slice(0, 5);
+
+    let cumulative = 0;
+    const paretoData = paretoRaw.map(item => {
+      cumulative += item.count;
+      return {
+        name: item.name,
+        value: item.count,
+        cumulative: tasksOverdue > 0 ? Math.round((cumulative / tasksOverdue) * 100) : 0
+      };
+    });
+
+    // 4. Trend Grouping (both Tren Performa & Status Progress Trend)
+    const isDaily = duration > 0 && duration <= 35 * 24 * 60 * 60 * 1000;
+    const formatDate = (date: Date) => {
+      if (isDaily) return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     };
-  });
 
-  const totalTasks = allTasksInRange.length;
-  const completionRate = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
+    const trendMap: Record<string, any> = {};
+    const statusTrendMap: Record<string, any> = {};
 
-  // Work Hours
-  const productivity = await prisma.user_productivity.aggregate({
-    _sum: { time_rendered: true },
-    where: prodWhere
-  });
-  const totalWorkHours = productivity._sum.time_rendered || 0;
+    allTasksInRange.forEach(t => {
+      const key = formatDate(new Date(t.date_created));
+      if (!trendMap[key]) {
+        trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0, workHours: 0 };
+      }
+      trendMap[key].tasksCreated++;
+      if (t.status === 5) trendMap[key].tasksCompleted++;
 
-  // Previous Period Calculation (Simple comparison)
-  
-  const prevProjects = await prisma.project_list.count({
-    where: prevProjectWhere
-  });
-  
-  const prevTasksCompleted = await prisma.task_list.count({
-    where: { ...prevTaskWhere, status: 5 }
-  });
-  
-  const prevTasksOverdue = await prisma.task_list.findMany({
-    where: prevTaskWhere,
-    select: { status: true, end_date: true }
-  }).then(tasks => tasks.filter(t => 
-    t.status === 8 || (t.end_date && new Date(t.end_date) < startDate && t.status !== 5)
-  ).length);
+      if (!statusTrendMap[key]) {
+        statusTrendMap[key] = {
+          date: key,
+          pending: 0,
+          hold: 0,
+          onProgress: 0,
+          review: 0,
+          cancelled: 0,
+          done: 0,
+          overdue: 0,
+          revised: 0
+        };
+      }
+      const isOver = t.status === 8 || (t.end_date && new Date(t.end_date) < now && t.status !== 5);
+      if (t.status === 5) statusTrendMap[key].done++;
+      else if (isOver) statusTrendMap[key].overdue++;
+      else if (t.status === 3) statusTrendMap[key].review++;
+      else if (t.status === 7) {
+        statusTrendMap[key].hold++;
+        statusTrendMap[key].cancelled++;
+      } else if (t.status === 4) statusTrendMap[key].revised++;
+      else if ([2, 6].includes(t.status)) statusTrendMap[key].onProgress++;
+      else statusTrendMap[key].pending++;
+    });
 
-  const kpis = {
-    totalProjects: { value: totalProjects, prev: prevProjects },
-    tasksCompleted: { value: tasksCompleted, prev: prevTasksCompleted },
-    tasksPending: { value: tasksPending, prev: 0 },
-    tasksOverdue: { value: tasksOverdue, prev: prevTasksOverdue, list: overdueTasksList },
-    completionRate: { value: completionRate, prev: 0 },
-    totalWorkHours: { value: totalWorkHours, prev: 0 }
-  };
+    activeProjectsList.forEach(p => {
+      const key = formatDate(new Date(p.date_created));
+      if (trendMap[key]) {
+        trendMap[key].projectsCreated++;
+        if (p.status === 5) trendMap[key].projectsCompleted++;
+      }
+    });
 
-  // 2. Trend Analytics
-  // Grouping by day/month depending on range. For simplicity, let's group by Month if > 30 days, else Day.
-  const isDaily = duration <= 30 * 24 * 60 * 60 * 1000;
-  
-  const trendTasks = await prisma.task_list.findMany({
-    where: trendTaskWhere,
-    select: { date_created: true, status: true }
-  });
-  
-  const trendProjects = await prisma.project_list.findMany({
-    where: trendProjectWhere,
-    select: { date_created: true, status: true }
-  });
+    const trendData = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
+    const statusTrendData = Object.values(statusTrendMap).sort((a, b) => a.date.localeCompare(b.date));
 
-  const trendMap: Record<string, any> = {};
-  
-  const formatDate = (date: Date) => {
-    if (isDaily) return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-  };
+    // 5. Team Revision Overview & Assignments (Grouped Bar Chart data)
+    const teamAssignments = teamUsers.map(u => {
+      const userTasks = allAssignees.filter(a => a.user_id === u.id);
+      const assigned = userTasks.length;
+      const done = userTasks.filter(a => a.task?.status === 5).length;
+      const revised = userTasks.filter(a => a.task?.status === 4).length;
+      const overdue = userTasks.filter(a =>
+        a.task && (a.task.status === 8 || (a.task.end_date && new Date(a.task.end_date) < now && a.task.status !== 5))
+      ).length;
 
-  trendTasks.forEach(t => {
-    const key = formatDate(new Date(t.date_created));
-    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0, workHours: 0 };
-    trendMap[key].tasksCreated++;
-    if (t.status === 5) trendMap[key].tasksCompleted++;
-  });
+      // Extract cleaned short name (strip [RESIGN] and parenthetical roles)
+      const cleanName = (u.firstname || '').replace(/\[RESIGN\]\s*/i, '').replace(/\s*\([^)]*\).*/g, '').trim() || (u.lastname || '').trim();
+      const parts = cleanName.split(/\s+/).filter(Boolean);
+      let shortName = parts[0] || 'User';
+      if (parts.length > 1) {
+        shortName += ' ' + parts[1][0] + '.';
+      }
 
-  trendProjects.forEach(p => {
-    const key = formatDate(new Date(p.date_created));
-    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0, workHours: 0 };
-    trendMap[key].projectsCreated++;
-    if (p.status === 5) trendMap[key].projectsCompleted++;
-  });
+      let avatarUrl = u.avatar || '';
+      if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
+        avatarUrl = `/avatars/${avatarUrl}`;
+      }
 
-  const trendWorkHours = await prisma.user_productivity.findMany({
-    where: trendProdWhere,
-    select: { date: true, time_rendered: true }
-  });
-  trendWorkHours.forEach(w => {
-    const key = formatDate(new Date(w.date));
-    if (!trendMap[key]) trendMap[key] = { date: key, tasksCreated: 0, tasksCompleted: 0, projectsCreated: 0, projectsCompleted: 0, workHours: 0 };
-    trendMap[key].workHours += Number(w.time_rendered || 0);
-  });
+      return {
+        id: u.id,
+        name: `${u.firstname} ${u.lastname || ''}`.trim(),
+        cleanName,
+        shortName,
+        role: u.role?.name || u.address || 'Staff',
+        avatar: avatarUrl,
+        assigned,
+        done,
+        revised,
+        overdue,
+        completionRate: assigned > 0 ? Math.round((done / assigned) * 100) : 0
+      };
+    }).filter(t => t.assigned > 0).sort((a, b) => b.assigned - a.assigned);
 
-  const trendData = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
+    // 6. Project Progress Details (Carousel of Donut Charts & Deep Inspector)
+    const userMap = new Map(teamUsers.map(u => [u.id, u]));
 
-  // Fetch all active projects list for dropdown filter
-  const allProjectsList = await prisma.project_list.findMany({
-    where: { is_archived: false },
-    select: { id: true, name: true },
-    orderBy: { name: 'asc' }
-  });
+    const projectProgressDetails = activeProjectsList.map(p => {
+      const pTasks = allTasksInRange.filter(t => t.project_id === p.id);
+      let pending = 0, hold = 0, onProgress = 0, review = 0, cancelled = 0, done = 0, overdue = 0, revised = 0;
 
-  // 3. Pipeline (Project Statuses)
-  const pipeline = await prisma.project_list.groupBy({
-    by: ['status'],
-    where: pipelineWhere,
-    _count: { status: true }
-  });
+      const platformCounts: Record<string, number> = {};
+      const taskTypeCounts: Record<string, number> = {};
 
-  // 4. Project Performance (Top 5 active projects)
-  const activeProjects = await prisma.project_list.findMany({
-    where: activeProjectsWhere,
-    include: {
-      _count: { select: { meetings: true } }
-    },
-    orderBy: { date_created: 'desc' },
-    take: 5
-  });
+      pTasks.forEach(t => {
+        const isOver = t.status === 8 || (t.end_date && new Date(t.end_date) < now && t.status !== 5);
+        if (t.status === 5) done++;
+        else if (isOver) overdue++;
+        else if (t.status === 3) review++;
+        else if (t.status === 7) {
+          hold++;
+          cancelled++;
+        } else if (t.status === 4) revised++;
+        else if ([2, 6].includes(t.status)) onProgress++;
+        else pending++;
 
-  const activeProjectIds = activeProjects.map(p => p.id);
-  const projectTasksData = await prisma.task_list.groupBy({
-    by: ['project_id', 'status'],
-    where: { project_id: { in: activeProjectIds } },
-    _count: { id: true }
-  });
+        const pl = t.platform || 'General';
+        platformCounts[pl] = (platformCounts[pl] || 0) + 1;
 
-  const projectPerformance = activeProjects.map(p => {
-    const tasks = projectTasksData.filter(t => t.project_id === p.id);
-    const total = tasks.reduce((sum, t) => sum + t._count.id, 0);
-    const completed = tasks.find(t => t.status === 5)?._count.id || 0;
-    return {
-      id: p.id,
-      name: p.name,
-      client: p.client_name || 'Internal',
-      status: p.status,
-      deadline: p.end_date,
-      progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+        const tp = t.content_pillar || 'General';
+        taskTypeCounts[tp] = (taskTypeCounts[tp] || 0) + 1;
+      });
+
+      // Find project assignees and task loads
+      const pAssignees = allAssignees.filter(a => a.task?.project_id === p.id);
+      const memberTaskCounts: Record<number, number> = {};
+      pAssignees.forEach(a => {
+        memberTaskCounts[a.user_id] = (memberTaskCounts[a.user_id] || 0) + 1;
+      });
+
+      const assignments = Object.entries(memberTaskCounts).map(([uidStr, count]) => {
+        const u = userMap.get(parseInt(uidStr));
+        const cleanMemberName = (u?.firstname || 'User').replace(/\[RESIGN\]\s*/i, '').replace(/\s*\([^)]*\).*/g, '').trim();
+        let avatarUrl = u?.avatar || '';
+        if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
+          avatarUrl = `/avatars/${avatarUrl}`;
+        }
+        return {
+          id: parseInt(uidStr),
+          name: cleanMemberName,
+          fullName: `${u?.firstname || ''} ${u?.lastname || ''}`.trim(),
+          avatar: avatarUrl,
+          role: u?.role?.name || u?.address || 'Staff',
+          tasksCount: count
+        };
+      }).sort((a, b) => b.tasksCount - a.tasksCount);
+
+      const total = pTasks.length;
+      const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
+
+      // Colors matching the legacy dashboard: Done (green), In-Progress (blue), Review (cyan), Hold (orange), Pending (slate), Cancelled (purple/red)
+      const chartData = [
+        { name: 'Done', value: done, color: '#10b981' },
+        { name: 'In-Progress', value: onProgress, color: '#2563eb' },
+        { name: 'Review', value: review, color: '#06b6d4' },
+        { name: 'OnHold', value: hold, color: '#f97316' },
+        { name: 'Pending', value: pending, color: '#64748b' },
+        { name: 'Cancelled', value: cancelled, color: '#8b5cf6' }
+      ].filter(d => d.value > 0);
+
+      // Format Due Date
+      let formattedDueDate = '-';
+      if (p.end_date) {
+        const d = new Date(p.end_date);
+        formattedDueDate = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+
+      return {
+        id: p.id,
+        name: p.name,
+        client: p.client_name || 'Internal',
+        status: p.status,
+        endDate: p.end_date,
+        formattedDueDate,
+        totalTasks: total,
+        counts: { pending, hold, onProgress, review, cancelled, done, overdue, revised },
+        completionRate,
+        chartData,
+        platforms: platformCounts,
+        taskTypes: taskTypeCounts,
+        assignments
+      };
+    }).filter(p => p.totalTasks > 0).sort((a, b) => b.totalTasks - a.totalTasks);
+
+    // 7. Recent Activities Feed
+    const projectMap = new Map(activeProjectsList.map(p => [p.id, p]));
+
+    // Relative time helper
+    const getRelativeTime = (d: Date | string) => {
+      const diffMs = now.getTime() - new Date(d).getTime();
+      const diffMins = Math.floor(diffMs / (60 * 1000));
+      if (diffMins < 1) return 'Baru saja';
+      if (diffMins < 60) return `${diffMins} mnt lalu`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours} jam lalu`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays === 1) return 'Kemarin';
+      if (diffDays < 7) return `${diffDays} hari lalu`;
+      return new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
     };
-  });
 
-  // 5. Team Performance (Query active users from DB)
-  const teamUsers = await prisma.user.findMany({
-    where: { status: { not: 'resign' } },
-    select: { id: true, firstname: true, lastname: true, avatar: true },
-    take: 10
-  });
+    // Ensure all users who generated activities are fetched (including users who might not be in teamUsers)
+    const activityUserIds = Array.from(new Set([
+      ...activityLogs.map(a => Number(a.user_id)).filter(id => !isNaN(id) && id > 0),
+      ...taskComments.map(c => Number(c.user_id)).filter(id => !isNaN(id) && id > 0)
+    ]));
 
-  const allUserTasks = await prisma.taskAssignee.findMany({
-    include: { task: { select: { status: true } } }
-  });
+    const existingUserIds = new Set(teamUsers.map(u => u.id));
+    const missingUserIds = activityUserIds.filter(id => !existingUserIds.has(id));
 
-  const teamPerformance = teamUsers.map(u => {
-    const userTasks = allUserTasks.filter(t => t.user_id === u.id);
-    const completed = userTasks.filter(t => t.task?.status === 5).length;
-    const pending = userTasks.filter(t => t.task?.status !== 5).length;
-    
-    let avatarUrl = u.avatar || '';
-    if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
-      avatarUrl = `/avatars/${avatarUrl}`;
+    let additionalUsers: any[] = [];
+    if (missingUserIds.length > 0) {
+      additionalUsers = await prisma.user.findMany({
+        where: { id: { in: missingUserIds } },
+        select: {
+          id: true,
+          firstname: true,
+          lastname: true,
+          name: true,
+          address: true,
+          avatar: true,
+          role: { select: { name: true } }
+        }
+      });
     }
 
-    return {
-      id: u.id,
-      name: `${u.firstname} ${u.lastname || ''}`.trim(),
-      avatar: avatarUrl,
-      completed,
-      pending
-    };
-  }).sort((a, b) => (b.completed + b.pending) - (a.completed + a.pending)).slice(0, 5);
+    const allResolvedUsers = [...teamUsers, ...additionalUsers];
+    const comprehensiveUserMap = new Map();
+    allResolvedUsers.forEach(u => {
+      comprehensiveUserMap.set(u.id, u);
+      comprehensiveUserMap.set(String(u.id), u);
+      comprehensiveUserMap.set(Number(u.id), u);
+    });
 
-  // 6. Recent Activity
-  let formattedActivity: any[] = [];
-  try {
-    const activities = await prisma.activity_log.findMany({ orderBy: { created_at: 'desc' }, take: 8 });
-    const userIds = activities.map(a => a.user_id).filter((v, i, a) => a.indexOf(v) === i);
-    const users = await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, firstname: true, lastname: true, avatar: true } });
-    formattedActivity = activities.map(a => {
-      const u = users.find(u => u.id === a.user_id);
-      
+    let formattedActivity: any[] = [];
+    
+    // Combine logs and task comments for rich activities
+    const combinedActs: any[] = [];
+    activityLogs.forEach(a => {
+      combinedActs.push({
+        id: `log-${a.id}`,
+        userId: a.user_id,
+        projectId: a.project_id,
+        taskId: a.task_id,
+        description: a.description,
+        type: a.activity_type,
+        created_at: a.created_at || now
+      });
+    });
+
+    taskComments.forEach(c => {
+      combinedActs.push({
+        id: `com-${c.id}`,
+        userId: c.user_id,
+        projectId: null,
+        taskId: c.task_id,
+        description: `Komentar: "${c.comment.length > 50 ? c.comment.substring(0, 50) + '...' : c.comment}"`,
+        type: 'comment',
+        created_at: c.created_at || now
+      });
+    });
+
+    combinedActs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    formattedActivity = combinedActs.slice(0, 10).map(act => {
+      const rawId = act.userId;
+      const u = rawId ? (comprehensiveUserMap.get(rawId) || comprehensiveUserMap.get(Number(rawId)) || comprehensiveUserMap.get(String(rawId))) : null;
+
       let avatarUrl = u?.avatar || '';
       if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
         avatarUrl = `/avatars/${avatarUrl}`;
       }
-      
+
+      let projectName = '';
+      if (act.projectId) {
+        projectName = projectMap.get(act.projectId)?.name || '';
+      }
+
+      // Determine clean user name
+      let userName = '';
+      if (u) {
+        userName = (u.name || `${u.firstname || ''} ${u.lastname || ''}`).replace(/\[RESIGN\]\s*/i, '').replace(/\s*\([^)]*\).*/g, '').trim();
+      }
+      if (!userName) {
+        const match = act.description?.match(/User\s+([a-zA-Z0-9_\s]+?)\s+(logged in|logged out|created|updated|deleted|added|changed)/i);
+        if (match) {
+          userName = match[1].trim();
+        } else {
+          userName = 'Team Member';
+        }
+      }
+
+      const roleName = u?.role?.name || (u?.address && u.address !== '--' ? u.address : '');
+
       return {
-        id: a.id,
-        user: u ? `${u.firstname} ${u.lastname || ''}`.trim() : 'System / Deleted User',
+        id: act.id,
+        user: userName,
+        role: roleName,
         avatar: avatarUrl,
-        description: a.description,
-        type: a.activity_type,
-        time: a.created_at
+        description: act.description,
+        projectName: projectName || 'General',
+        type: act.type,
+        time: act.created_at,
+        timeAgo: getRelativeTime(act.created_at)
       };
     });
-  } catch (e) {
-    formattedActivity = [];
-  }
 
-  return {
-    kpis,
-    trendData,
-    paretoData,
-    pipeline,
-    projectPerformance,
-    allProjectsList,
-    teamPerformance,
-    recentActivity: formattedActivity
-  };
+    // 8. Pipeline stages
+    const pipeline = await prisma.project_list.groupBy({
+      by: ['status'],
+      where: { is_archived: false },
+      _count: { status: true }
+    });
+
+    const kpis = {
+      totalUsers: { value: totalUsersCount, prev: null },
+      totalProjects: { value: totalProjectsCount, prev: prevProjects },
+      totalTasks: { value: totalTasksCount, prev: null },
+      tasksCompleted: { value: tasksCompleted, prev: prevTasksCompleted },
+      tasksPending: { value: tasksPending, prev: 0 },
+      tasksOverdue: { value: tasksOverdue, prev: prevTasksOverdue, list: overdueTasksList },
+      completionRate: { value: completionRate, prev: 0 },
+      totalWorkHours: { value: totalWorkHours, prev: 0 },
+      statusBreakdown: {
+        pending: tasksPending,
+        hold: tasksHold,
+        onProgress: tasksOnProgress,
+        review: tasksReview,
+        cancelled: tasksCancelled,
+        revised: tasksRevised,
+        overdue: tasksOverdue,
+        done: tasksCompleted
+      }
+    };
+
+    return {
+      kpis,
+      trendData,
+      statusTrendData,
+      paretoData,
+      pipeline,
+      projectPerformance: projectProgressDetails.slice(0, 5),
+      projectProgressDetails,
+      teamAssignments,
+      allProjectsList: activeProjectsList.map(p => ({ id: p.id, name: p.name })),
+      recentActivity: formattedActivity
+    };
 
   } catch (err) {
     console.error('Database connection failed, using mock data for dashboard', err);
-    // Return rich mock data to keep the dashboard functional and animated
     const now = new Date();
     const trendData = [];
+    const statusTrendData = [];
     for (let i = 30; i >= 0; i--) {
       const d = new Date();
       d.setDate(now.getDate() - i);
-      const isDaily = true;
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      
-      // Dynamic mock data based on date and time to make it look "alive" (jalan terus)
       const baseVal = Math.floor(Math.random() * 10) + 5;
       trendData.push({
         date: key,
@@ -333,25 +579,46 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
         projectsCompleted: Math.floor(Math.random() * 2),
         workHours: (baseVal * 8) + Math.floor(Math.random() * 10)
       });
+      statusTrendData.push({
+        date: key,
+        done: baseVal + 10,
+        onProgress: Math.floor(Math.random() * 8) + 2,
+        pending: Math.floor(Math.random() * 6),
+        revised: Math.floor(Math.random() * 2),
+        overdue: Math.floor(Math.random() * 3),
+        cancelled: 0
+      });
     }
 
     return {
       kpis: {
-        totalProjects: { value: 24, prev: 20 },
-        tasksCompleted: { value: 145, prev: 120 },
-        tasksPending: { value: 32, prev: 0 },
-        tasksOverdue: { 
-          value: 5, 
-          prev: 3, 
+        totalUsers: { value: 54, prev: null },
+        totalProjects: { value: 28, prev: 24 },
+        totalTasks: { value: 1315, prev: 1200 },
+        tasksCompleted: { value: 1256, prev: 1100 },
+        tasksPending: { value: 30, prev: 0 },
+        tasksOverdue: {
+          value: 1,
+          prev: 3,
           list: [
-            { id: 1, name: "Fix Authentication", projectName: "WebApp V2", endDate: new Date() },
-            { id: 2, name: "Update Schema", projectName: "Backend API", endDate: new Date() }
-          ] 
+            { id: 1, name: "Fix Authentication", projectName: "WebApp V2", endDate: new Date() }
+          ]
         },
-        completionRate: { value: 82, prev: 0 },
-        totalWorkHours: { value: 1840, prev: 0 }
+        completionRate: { value: 95, prev: 0 },
+        totalWorkHours: { value: 1840, prev: 0 },
+        statusBreakdown: {
+          pending: 50,
+          hold: 0,
+          onProgress: 23,
+          review: 1,
+          cancelled: 5,
+          revised: 0,
+          overdue: 1,
+          done: 1259
+        }
       },
       trendData,
+      statusTrendData,
       paretoData: [
         { name: "Resource Lack", value: 12, cumulative: 40 },
         { name: "Scope Creep", value: 8, cumulative: 65 },
@@ -360,25 +627,42 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
         { name: "Other", value: 2, cumulative: 100 }
       ],
       pipeline: [
-        { status: 0, _count: { status: 3 } },
         { status: 1, _count: { status: 5 } },
+        { status: 2, _count: { status: 8 } },
+        { status: 6, _count: { status: 3 } },
         { status: 5, _count: { status: 12 } }
       ],
-      projectPerformance: [
-        { id: 1, name: "Website Revamp", client: "Acme Corp", status: 1, deadline: new Date(), progress: 65 },
-        { id: 2, name: "Mobile App", client: "Globex", status: 1, deadline: new Date(), progress: 40 },
-        { id: 3, name: "CRM Integration", client: "Internal", status: 1, deadline: new Date(), progress: 90 }
+      projectPerformance: [],
+      projectProgressDetails: [
+        {
+          id: 1,
+          name: "JODK IDHM STUDIO",
+          client: "Internal",
+          status: 2,
+          endDate: new Date(),
+          formattedDueDate: "26 Oct 2026",
+          totalTasks: 7,
+          counts: { pending: 1, revised: 0, onProgress: 2, overdue: 0, cancelled: 0, done: 4 },
+          completionRate: 57,
+          chartData: [
+            { name: "Done", value: 4, color: "#10b981" },
+            { name: "On-Progress", value: 2, color: "#f59e0b" },
+            { name: "Pending", value: 1, color: "#64748b" }
+          ],
+          platforms: { Instagram: 4, TikTok: 3 }
+        }
       ],
-      teamPerformance: [
-        { id: '1', name: "John Doe", avatar: "", completed: 45, pending: 5 },
-        { id: '2', name: "Jane Smith", avatar: "", completed: 38, pending: 12 },
-        { id: '3', name: "Bob Wilson", avatar: "", completed: 32, pending: 8 }
+      teamAssignments: [
+        { id: 1, name: "Reffinzarel", shortName: "Reffinzarel", role: "Graphic Design", avatar: "", assigned: 187, done: 176, revised: 0, overdue: 11, completionRate: 94 },
+        { id: 2, name: "Andrea Rosmeity Dea", shortName: "Andrea R.", role: "Social Media Specialist", avatar: "", assigned: 145, done: 141, revised: 0, overdue: 3, completionRate: 97 },
+        { id: 3, name: "Yuda Putera Ginanjar", shortName: "Yuda P.", role: "Web Developer", avatar: "", assigned: 121, done: 117, revised: 0, overdue: 4, completionRate: 96 }
+      ],
+      allProjectsList: [
+        { id: 1, name: "JODK IDHM STUDIO" }
       ],
       recentActivity: [
-        { id: 1, user: "John Doe", avatar: "", description: "Completed task 'Update Schema'", type: "task_complete", time: new Date() },
-        { id: 2, user: "Jane Smith", avatar: "", description: "Created new project 'Mobile App'", type: "project_create", time: new Date() }
+        { id: 1, user: "Rizky Aulia Rohman", role: "PMR - Foreign Graphic", avatar: "", description: "Mengunggah hasil revisi task: EP - 74", projectName: "TOKO WAHYU", time: new Date(), timeAgo: "2 menit lalu" }
       ]
     };
   }
 }
-

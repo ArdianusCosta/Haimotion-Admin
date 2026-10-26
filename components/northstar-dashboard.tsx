@@ -243,6 +243,11 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
   // Keep state in sync with URL prop changes (e.g. browser back button)
   useEffect(() => {
     setSection(initialSection)
+    // Auto-buka grup parent jika initialSection adalah sub-item finance
+    const parentGroup = financeMenu.find(item => item.subItems?.some(s => s.label === initialSection))
+    if (parentGroup) {
+      setOpenGroups(prev => ({ ...prev, [parentGroup.label]: true }))
+    }
     if (slug && slug.length > 0 && initialSection === 'Dashboard' && slug[0].toLowerCase() !== 'dashboard') {
       router.replace('/', { scroll: false })
     }
@@ -320,23 +325,45 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
     // Custom routing for finance module
     const financeRouteMap: Record<string, string> = {
       'Beranda': 'finance/overview',
+      'Finance Overview': 'finance/overview',
+      'Finance Dashboard': 'finance/overview',
       'Kas & Bank': 'finance/cash-bank',
+      'Cash & Bank': 'finance/cash-bank',
       'Akun Perkiraan': 'finance/chart-of-accounts',
+      'Chart of Accounts': 'finance/chart-of-accounts',
       'Penjualan': 'finance/sales',
+      'Sales': 'finance/sales',
       'Penawaran Penjualan': 'finance/sales/penawaran',
+      'Sales Quote': 'finance/sales/penawaran',
       'Uang Muka Penjualan': 'finance/sales/uang-muka',
+      'Sales Down Payment': 'finance/sales/uang-muka',
       'Faktur Penjualan': 'finance/sales/faktur',
+      'Sales Invoice': 'finance/sales/faktur',
       'Penerimaan Penjualan': 'finance/sales/penerimaan',
+      'Sales Receipt': 'finance/sales/penerimaan',
       'Pelanggan': 'finance/sales/pelanggan',
+      'Customers': 'finance/sales/pelanggan',
       'Pembelian': 'finance/purchases',
+      'Purchases': 'finance/purchases',
       'Pesanan Pembelian': 'finance/purchases/pesanan',
+      'Purchase Order': 'finance/purchases/pesanan',
       'Faktur Pembelian': 'finance/purchases/faktur',
+      'Purchase Invoice': 'finance/purchases/faktur',
       'Uang Muka Pembelian': 'finance/purchases/uang-muka',
+      'Purchase Down Payment': 'finance/purchases/uang-muka',
       'Pembayaran Pembelian': 'finance/purchases/pembayaran',
+      'Purchase Payment': 'finance/purchases/pembayaran',
       'Pemasok': 'finance/purchases/pemasok',
+      'Suppliers': 'finance/purchases/pemasok',
       'Barang & Jasa': 'finance/products-services',
+      'Products & Services': 'finance/products-services',
       'Karyawan': 'finance/employees',
-      'Buku Besar': 'finance/general-ledger'
+      'Employees': 'finance/employees',
+      'Buku Besar': 'finance/general-ledger',
+      'General Ledger': 'finance/general-ledger',
+      'Invoices': 'finance/invoices',
+      'Expenses': 'finance/expenses',
+      'Reports': 'finance/reports'
     }
 
     // Custom routing for HR module
@@ -841,7 +868,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Kanban': return <KanbanPage user={user} />
               case 'Calendar': return <CalendarPage />
               case 'Settings': return <SettingsPage user={user} />
-              case 'Project': return <ProjectPage />
+              case 'Project': return <ProjectPage slug={slug} />
               case 'Tasks': return <TasksPage />
               case 'AI Assistant': return <AiPage />
               case 'Layouts': return <LayoutsPage layoutStyle={layoutStyle} setLayoutStyle={(val) => handlePrefChange('layout_style', val, setLayoutStyle)} />
@@ -849,30 +876,43 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Finance Overview': return <FinanceOverviewPage user={user} />
               case 'Beranda': return <FinanceOverviewPage user={user} />
               case 'Kas & Bank': return <CashBankPage />
+              case 'Cash & Bank': return <CashBankPage />
               case 'Akun Perkiraan': return <AkunPerkiraanPage />
+              case 'Chart of Accounts': return <AkunPerkiraanPage />
 
               case 'Penjualan': return <PenawaranPenjualanPage />
+              case 'Sales': return <PenawaranPenjualanPage />
               case 'Penawaran Penjualan': return <PenawaranPenjualanPage />
+              case 'Sales Quote': return <PenawaranPenjualanPage />
               case 'Uang Muka Penjualan': return <UangMukaPenjualanPage />
+              case 'Sales Down Payment': return <UangMukaPenjualanPage />
               case 'Faktur Penjualan': return <FakturPenjualanPage />
+              case 'Sales Invoice': return <FakturPenjualanPage />
               case 'Penerimaan Penjualan': return <PenerimaanPenjualanPage />
+              case 'Sales Receipt': return <PenerimaanPenjualanPage />
               case 'Pelanggan': return <PelangganPage />
+              case 'Customers': return <PelangganPage />
 
               case 'Pembelian': return <PesananPembelianPage />
+              case 'Purchases': return <PesananPembelianPage />
               case 'Pesanan Pembelian': return <PesananPembelianPage />
+              case 'Purchase Order': return <PesananPembelianPage />
               case 'Faktur Pembelian': return <FakturPembelianPage />
+              case 'Purchase Invoice': return <FakturPembelianPage />
               case 'Uang Muka Pembelian': return <UangMukaPembelianPage />
+              case 'Purchase Down Payment': return <UangMukaPembelianPage />
               case 'Pembayaran Pembelian': return <PembayaranPembelianPage />
+              case 'Purchase Payment': return <PembayaranPembelianPage />
               case 'Pemasok': return <PemasokPage />
+              case 'Suppliers': return <PemasokPage />
 
               case 'Barang & Jasa': return <BarangJasaPage />
+              case 'Products & Services': return <BarangJasaPage />
               case 'Buku Besar': return <BukuBesarPage />
-
-
+              case 'General Ledger': return <BukuBesarPage />
 
               case 'Invoices': return <InvoicesPage />
               case 'Expenses': return <ExpensesPage />
-              case 'Cash & Bank': return <CashBankPage />
               case 'Reports': return <ReportsPage />
               case 'HR Overview': return <HROverviewPage />
               case 'Employees': return <EmployeesPage />

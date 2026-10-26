@@ -8,10 +8,13 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Plus, CheckCircle2, Clock, Trash2, Calendar } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog'
 
 export function ProjectMilestones({ projectId }: { projectId: number }) {
   const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [milestoneToDelete, setMilestoneToDelete] = useState<{ id: number; title: string } | null>(null)
   const [formData, setFormData] = useState({ title: '', description: '', due_date: new Date().toISOString().split('T')[0] })
 
   const { data: milestones, isLoading } = useQuery({
@@ -97,8 +100,9 @@ export function ProjectMilestones({ projectId }: { projectId: number }) {
                   </div>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => {
-                if(confirm('Delete milestone?')) deleteMutation.mutate(m.id)
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer" onClick={() => {
+                setMilestoneToDelete({ id: m.id, title: m.title })
+                setDeleteModalOpen(true)
               }}>
                 <Trash2 className="size-3.5" />
               </Button>
@@ -132,6 +136,20 @@ export function ProjectMilestones({ projectId }: { projectId: number }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDeleteDialog 
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={async () => {
+          if (milestoneToDelete) {
+            await deleteMutation.mutateAsync(milestoneToDelete.id)
+            setMilestoneToDelete(null)
+          }
+        }}
+        title={`Hapus Milestone ${milestoneToDelete ? `"${milestoneToDelete.title}"` : ''}`}
+        description="Apakah Anda yakin ingin menghapus milestone proyek ini? Tindakan ini tidak dapat dibatalkan."
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   )
 }

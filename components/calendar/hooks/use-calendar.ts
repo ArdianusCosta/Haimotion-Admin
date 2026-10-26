@@ -19,6 +19,9 @@ export function useCalendar() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
+  const [selectedEventDetail, setSelectedEventDetail] = useState<any | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -53,8 +56,9 @@ export function useCalendar() {
   const openEventDialog = (event?: any, dateStr?: string) => {
     if (event) {
       if (event.source && event.source !== 'calendar') {
-        toast.info(`This is a ${event.source} event. Please edit it in the respective module.`);
-        return;
+        setSelectedEventDetail(event)
+        setIsDetailOpen(true)
+        return
       }
       const start = new Date(event.start_event)
       const end = new Date(event.end_event)
@@ -80,11 +84,12 @@ export function useCalendar() {
       })
       setSelectedEventId(null)
     } else {
+      const defaultDateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`
       setFormData({
         title: '',
-        start_date: '',
+        start_date: defaultDateStr,
         start_time: '09:00',
-        end_date: '',
+        end_date: defaultDateStr,
         end_time: '10:00',
         color: 'bg-primary text-primary-foreground',
         description: ''
@@ -164,39 +169,10 @@ export function useCalendar() {
 
   const exportAllEvents = () => {
     if (events.length === 0) {
-      toast.error('No events to export')
+      toast.error('Tidak ada agenda untuk diekspor')
       return
     }
-    
-    let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//HaiMotion//Admin//EN\n"
-    
-    events.forEach((event: any) => {
-      const start = new Date(event.start_event).toISOString().replace(/-|:|\.\d\d\d/g, '')
-      const end = new Date(event.end_event).toISOString().replace(/-|:|\.\d\d\d/g, '')
-      
-      icsContent += "BEGIN:VEVENT\n"
-      icsContent += `UID:${event.id}@haimotion\n`
-      icsContent += `DTSTAMP:${new Date().toISOString().replace(/-|:|\.\d\d\d/g, '')}\n`
-      icsContent += `DTSTART:${start}\n`
-      icsContent += `DTEND:${end}\n`
-      icsContent += `SUMMARY:${event.title}\n`
-      if (event.description) icsContent += `DESCRIPTION:${event.description}\n`
-      icsContent += "END:VEVENT\n"
-    })
-    
-    icsContent += "END:VCALENDAR"
-    
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'haimotion-events.ics'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    
-    toast.success('Calendar exported successfully!')
+    setIsExportDialogOpen(true)
   }
 
   const handleDragStart = (e: React.DragEvent, eventId: number | string) => {
@@ -307,6 +283,12 @@ export function useCalendar() {
     setIsDeleteDialogOpen,
     isSubmitting,
     selectedEventId,
+    selectedEventDetail,
+    setSelectedEventDetail,
+    isDetailOpen,
+    setIsDetailOpen,
+    isExportDialogOpen,
+    setIsExportDialogOpen,
     formData,
     setFormData,
     handlePrevious,

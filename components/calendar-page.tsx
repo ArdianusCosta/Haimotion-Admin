@@ -4,14 +4,18 @@ import React from 'react'
 import { useCalendar } from './calendar/hooks/use-calendar'
 import { CalendarHeader } from './calendar/components/calendar-header'
 import { EventDialog } from './calendar/dialogs/event-dialog'
+import { EventDetailDialog } from './calendar/dialogs/event-detail-dialog'
 import { CalendarSidebar } from './calendar/components/calendar-sidebar'
 import { CalendarGrid } from './calendar/components/calendar-grid'
+import { CalendarExportDialog } from './calendar/dialogs/calendar-export-dialog'
 
 export function CalendarPage() {
   const {
     view, setView, events, loading, currentDate,
     isDialogOpen, setIsDialogOpen, isDeleteDialogOpen, setIsDeleteDialogOpen,
-    isSubmitting, selectedEventId, formData, setFormData,
+    isSubmitting, selectedEventId, selectedEventDetail, isDetailOpen, setIsDetailOpen,
+    isExportDialogOpen, setIsExportDialogOpen,
+    formData, setFormData,
     handlePrevious, handleNext, handleToday, openEventDialog,
     handleSaveEvent, handleDeleteEvent, exportAllEvents,
     handleDragStart, handleDragOver, handleDrop, getGoogleCalendarUrl
@@ -114,6 +118,19 @@ export function CalendarPage() {
         handleSaveEvent={handleSaveEvent}
         handleDeleteEvent={handleDeleteEvent}
         getGoogleCalendarUrl={getGoogleCalendarUrl}
+      />
+
+      <EventDetailDialog
+        isOpen={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        event={selectedEventDetail}
+      />
+
+      <CalendarExportDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        events={events}
+        currentDate={currentDate}
       />
 
       <div className="flex flex-1 flex-col gap-6 lg:flex-row">

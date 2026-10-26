@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useLanguage } from '@/components/language-provider'
-import { Search, Download, Plus, MoreVertical, ArrowUp, Edit, Trash2 } from 'lucide-react'
+import { Search, Download, Plus, MoreVertical, ArrowUp, Edit, Trash2, UserCheck } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,6 +13,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getContacts, createContact, updateContact, deleteContact } from '@/app/actions/finance'
+import { ConfirmDeleteModal } from '@/components/finance/components/modals'
+import { toast } from 'sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +29,10 @@ export function PelangganPage() {
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<number | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', address: ''
@@ -63,10 +69,25 @@ export function PelangganPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this customer?')) {
-      await deleteContact(id)
-      fetchData()
+  const handleDelete = (id: number) => {
+    setItemToDelete(id)
+    setDeleteModalOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (itemToDelete !== null) {
+      setIsDeleting(true)
+      try {
+        await deleteContact(itemToDelete)
+        toast.success('Pelanggan berhasil dihapus')
+        fetchData()
+        setItemToDelete(null)
+      } catch (err) {
+        console.error(err)
+        toast.error('Gagal menghapus pelanggan')
+      } finally {
+        setIsDeleting(false)
+      }
     }
   }
 
@@ -107,39 +128,70 @@ export function PelangganPage() {
               <Plus className="w-4 h-4" />
               <span>{t('Add')}</span>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none bg-card">
+            <DialogContent className="!w-[92vw] !max-w-[560px] p-0 overflow-hidden border border-border bg-card shadow-2xl rounded-2xl">
               <div className="bg-primary px-6 py-4">
-                <DialogTitle className="text-xl font-medium text-white">{editingId ? t('Edit Data') : t('New Data')}</DialogTitle>
+                <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                  <UserCheck className="w-5 h-5" />
+                  {editingId ? 'Edit Data Pelanggan' : 'Tambah Pelanggan Baru'}
+                </DialogTitle>
+                <p className="text-xs text-primary-foreground/80 mt-0.5">
+                  Lengkapi data profil kontak pelanggan
+                </p>
               </div>
               
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Nama Pelanggan<span className="text-red-500">*</span></Label>
-                    <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="PT / Nama" className="bg-background" />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Nomor Telepon</Label>
-                    <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="08..." className="bg-background" />
-                  </div>
-                  
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-sm font-medium">Email</Label>
-                    <Input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} type="email" placeholder="email@contoh.com" className="bg-background" />
-                  </div>
-                  
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-sm font-medium">Informasi Tambahan / Alamat</Label>
-                    <Input value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Tuliskan keterangan..." className="bg-background" />
-                  </div>
+              <div className="p-6 space-y-4">
+                <div className="space-y-1.5 w-full">
+                  <Label className="text-sm font-semibold">Nama Pelanggan <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={formData.name} 
+                    onChange={e => setFormData({...formData, name: e.target.value})} 
+                    placeholder="PT / CV / Nama Pelanggan" 
+                    className="w-full bg-background h-10" 
+                  />
+                </div>
+                
+                <div className="space-y-1.5 w-full">
+                  <Label className="text-sm font-semibold">Nomor Telepon</Label>
+                  <Input 
+                    value={formData.phone} 
+                    onChange={e => setFormData({...formData, phone: e.target.value})} 
+                    placeholder="Contoh: 08123456789" 
+                    className="w-full bg-background h-10" 
+                  />
+                </div>
+                
+                <div className="space-y-1.5 w-full">
+                  <Label className="text-sm font-semibold">Email</Label>
+                  <Input 
+                    value={formData.email} 
+                    onChange={e => setFormData({...formData, email: e.target.value})} 
+                    type="email" 
+                    placeholder="email@perusahaan.com" 
+                    className="w-full bg-background h-10" 
+                  />
+                </div>
+                
+                <div className="space-y-1.5 w-full">
+                  <Label className="text-sm font-semibold">Informasi Tambahan / Alamat</Label>
+                  <Input 
+                    value={formData.address} 
+                    onChange={e => setFormData({...formData, address: e.target.value})} 
+                    placeholder="Alamat kantor, PIC, atau catatan khusus..." 
+                    className="w-full bg-background h-10" 
+                  />
                 </div>
 
-                <div className="flex justify-end gap-3 mt-8">
-                  <DialogClose render={<Button variant="outline" />}>
+                <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
+                  <DialogClose render={<Button variant="outline" className="h-10 px-4" />}>
                     Batal
                   </DialogClose>
-                  <Button onClick={handleSave} disabled={!formData.name} className="bg-primary hover:bg-primary/90 text-white">{t('Save')}</Button>
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={!formData.name} 
+                    className="bg-primary hover:bg-primary/90 text-white h-10 px-5 font-semibold cursor-pointer"
+                  >
+                    {t('Save')}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
@@ -219,6 +271,15 @@ export function PelangganPage() {
           </table>
         </div>
       </Card>
+
+      <ConfirmDeleteModal 
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={confirmDelete}
+        title="Hapus Pelanggan"
+        description="Apakah Anda yakin ingin menghapus pelanggan ini? Tindakan ini tidak dapat dibatalkan."
+        isLoading={isDeleting}
+      />
     </div>
   )
 }
