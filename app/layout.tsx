@@ -49,8 +49,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} ${outfit.variable} ${roboto.variable} ${playfair.variable} ${firaCode.variable} ${oswald.variable} antialiased font-sans`}>
+    <html lang="en" translate="no" className="notranslate" suppressHydrationWarning>
+      <body className={`${inter.variable} ${outfit.variable} ${roboto.variable} ${playfair.variable} ${firaCode.variable} ${oswald.variable} antialiased font-sans`} suppressHydrationWarning>
         <QueryProvider>
           {children}
           {process.env.NODE_ENV === 'production' && <Analytics />}

@@ -59,6 +59,16 @@ export function requirePermission(user: any, permissionName: string) {
   }
 }
 
+export function requireCrmPermission(user: any, action: 'view' | 'create' | 'update' | 'delete') {
+  if (user.role_id === 1 || user.role?.name?.toLowerCase() === 'admin' || user.type === 1) return;
+  if (user.role?.permissions?.some((p: any) => p.permission === `crm.${action}`)) return;
+  const roleName = user.role?.name?.toLowerCase() || '';
+  if ((roleName === 'staff' || roleName === 'developer' || roleName === 'project manager') && action !== 'delete') {
+    return;
+  }
+  throw new Error(`Forbidden: You do not have permission to ${action} CRM records.`);
+}
+
 export async function canAccessProject(user: any, projectId: number, accessLevel: 'viewer' | 'editor' | 'manager' = 'viewer'): Promise<boolean> {
   const project = await prisma.project_list.findUnique({ 
     where: { id: projectId },

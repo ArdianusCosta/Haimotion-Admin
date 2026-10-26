@@ -88,9 +88,17 @@ function buildPeriodDates(dateRangeStr: string): { startDate: Date; endDate: Dat
       startDate = new Date(now.getFullYear(), 0, 1)
       label = `Tahun ${now.getFullYear()}`
       break
-    default: // Last 6 months
-      startDate = new Date(now); startDate.setMonth(now.getMonth() - 6)
-      label = '6 Bulan Terakhir'
+    case 'All time':
+    case 'All Time':
+    case 'Semua Periode':
+    case 'Semua Waktu':
+    case 'Semua Waktu (All Time)':
+      startDate = new Date(0)
+      label = 'Semua Waktu (All Time)'
+      break
+    default:
+      startDate = new Date(0)
+      label = 'Semua Waktu (All Time)'
   }
 
   return { startDate, endDate: now, label }
@@ -136,8 +144,9 @@ export async function getKpiPerformanceData(
     : null
 
   // ─── 1. Fetch tasks within period ───────────────────────────────────────────
-  const taskWhere: any = {
-    date_created: { gte: startDate, lte: endDate }
+  const taskWhere: any = {}
+  if (startDate.getTime() > 0) {
+    taskWhere.date_created = { gte: startDate, lte: endDate }
   }
   if (projectIdFilter) taskWhere.project_id = projectIdFilter
 
@@ -164,10 +173,9 @@ export async function getKpiPerformanceData(
     select: { task_id: true, user_id: true }
   })
 
-  // ─── 3. Fetch all active users ──────────────────────────────────────────────
+  // ─── 3. Fetch all users ─────────────────────────────────────────────────────
   const users = await prisma.user.findMany({
-    where: { status: { not: 'resign' } },
-    select: { id: true, firstname: true, lastname: true, avatar: true },
+    select: { id: true, firstname: true, lastname: true, name: true, avatar: true },
     orderBy: { firstname: 'asc' }
   })
 
@@ -183,7 +191,7 @@ export async function getKpiPerformanceData(
 
   // ─── 5. Build lookup maps ───────────────────────────────────────────────────
   const taskMap = new Map(tasks.map(t => [t.id, t]))
-  const userMap = new Map(users.map(u => [u.id, u]))
+  const userMap = new Map(users.map(u => [Number(u.id), u]))
 
   // assigneesByUser: userId -> Set<taskId>
   const assigneesByUser = new Map<number, Set<number>>()
@@ -191,14 +199,15 @@ export async function getKpiPerformanceData(
   const assigneesByTask = new Map<number, number[]>()
 
   for (const a of assignees) {
+    const uId = Number(a.user_id)
     // By user
-    const byUser = assigneesByUser.get(a.user_id) || new Set<number>()
+    const byUser = assigneesByUser.get(uId) || new Set<number>()
     byUser.add(a.task_id)
-    assigneesByUser.set(a.user_id, byUser)
+    assigneesByUser.set(uId, byUser)
 
     // By task
     const byTask = assigneesByTask.get(a.task_id) || []
-    byTask.push(a.user_id)
+    byTask.push(uId)
     assigneesByTask.set(a.task_id, byTask)
   }
 
@@ -216,7 +225,8 @@ export async function getKpiPerformanceData(
   const memberKpisRaw: Omit<MemberKpi, 'rank'>[] = []
 
   for (const user of users) {
-    const userTaskIdSet = assigneesByUser.get(user.id)
+    const uIdNum = Number(user.id)
+    const userTaskIdSet = assigneesByUser.get(uIdNum)
     if (!userTaskIdSet || userTaskIdSet.size === 0) continue
 
     const userTasks = [...userTaskIdSet]
@@ -254,7 +264,7 @@ export async function getKpiPerformanceData(
     }
 
     memberKpisRaw.push({
-      id: user.id,
+      id: uIdNum,
       name: `${user.firstname} ${user.lastname || ''}`.trim(),
       avatar: avatarUrl,
       totalAssigned,
@@ -355,7 +365,7 @@ export async function getKpiPerformanceData(
     globalKpi: { totalTasks, completedTasks, inProgressTasks, overdueTasks, completionRate },
     memberKpis,
     projectBreakdowns,
-    allUsers: users.map(u => ({ id: u.id, name: `${u.firstname} ${u.lastname || ''}`.trim() })),
+    allUsers: users.map(u => ({ id: Number(u.id), name: `${u.firstname} ${u.lastname || ''}`.trim() })),
     allProjects: projects.map(p => ({ id: p.id, name: p.name }))
   }
 }

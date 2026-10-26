@@ -42,6 +42,10 @@ const defaultPermissions = [
   { id: 'roles.update', category: 'Roles & Permissions', name: 'Update Roles', description: 'Can edit roles' },
   { id: 'roles.delete', category: 'Roles & Permissions', name: 'Delete Roles', description: 'Can delete roles' },
   { id: 'roles.manage_permissions', category: 'Roles & Permissions', name: 'Manage Permissions', description: 'Can modify permissions assigned to roles' },
+  { id: 'crm.view', category: 'CRM', name: 'View CRM', description: 'Can view CRM leads, clients, deals, and reports' },
+  { id: 'crm.create', category: 'CRM', name: 'Create CRM Records', description: 'Can create new leads, clients, deals, and follow-ups' },
+  { id: 'crm.update', category: 'CRM', name: 'Update CRM Records', description: 'Can edit CRM records, stages, and status' },
+  { id: 'crm.delete', category: 'CRM', name: 'Delete CRM Records', description: 'Can delete CRM leads, clients, deals, and follow-ups' },
 ];
 
 export async function GET() {

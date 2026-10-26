@@ -97,10 +97,10 @@ const workMenu: MenuItem[] = [
   { label: 'Kanban', icon: Check },
   { label: 'Tasks', icon: ListTodo },
   { label: 'Calendar', icon: CalendarDays },
-  { label: 'Meetings', icon: Video },
 ]
 const apps: MenuItem[] = [
-  { label: 'Layouts', icon: LayoutTemplate }
+  { label: 'Layouts', icon: LayoutTemplate },
+  { label: 'Meetings', icon: Video },
 ]
 
 const financeMenu = [

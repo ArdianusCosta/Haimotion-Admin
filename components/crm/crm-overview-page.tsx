@@ -1,13 +1,27 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Activity, Users, Target, GitPullRequest, TrendingUp, TrendingDown, ArrowUpRight, Zap, Star, ChevronRight } from 'lucide-react'
+import { Activity, Users, Target, GitPullRequest, TrendingUp, ArrowUpRight, Zap, Star, ChevronRight, Calendar, Briefcase, Phone, MessageCircle } from 'lucide-react'
 import { getCrmOverviewStats } from '@/app/actions/crm'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 
+const formatDistanceToNow = (date: Date) => {
+  const now = new Date()
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+  if (diffInSeconds < 60) return `${diffInSeconds}s ago`
+  const diffInMinutes = Math.floor(diffInSeconds / 60)
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+  const diffInHours = Math.floor(diffInMinutes / 60)
+  if (diffInHours < 24) return `${diffInHours}h ago`
+  const diffInDays = Math.floor(diffInHours / 24)
+  return `${diffInDays}d ago`
+}
+
 export function CrmOverviewPage() {
+  const router = useRouter()
   const { data: statsData, isLoading } = useQuery({
     queryKey: ['crmStats'],
     queryFn: async () => {
@@ -26,8 +40,6 @@ export function CrmOverviewPage() {
       gradient: 'from-violet-500 to-purple-600',
       bg: 'bg-violet-500/10',
       color: 'text-violet-500',
-      change: '+12%',
-      up: true,
     },
     {
       label: 'Active Leads',
@@ -37,8 +49,6 @@ export function CrmOverviewPage() {
       gradient: 'from-sky-500 to-blue-600',
       bg: 'bg-sky-500/10',
       color: 'text-sky-500',
-      change: '+8%',
-      up: true,
     },
     {
       label: 'Open Deals',
@@ -48,8 +58,6 @@ export function CrmOverviewPage() {
       gradient: 'from-amber-500 to-orange-600',
       bg: 'bg-amber-500/10',
       color: 'text-amber-500',
-      change: '-2%',
-      up: false,
     },
     {
       label: 'Follow-ups Today',
@@ -59,10 +67,11 @@ export function CrmOverviewPage() {
       gradient: 'from-rose-500 to-pink-600',
       bg: 'bg-rose-500/10',
       color: 'text-rose-500',
-      change: '+5%',
-      up: true,
     },
   ]
+
+  const recentActivities = statsData?.recentActivities || []
+  const upcomingTasks = statsData?.upcomingTasks || []
 
   return (
     <div className="flex-1 space-y-8 p-4 md:p-8 pt-6">
@@ -84,7 +93,7 @@ export function CrmOverviewPage() {
             <div className="hidden md:flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
               <Star className="h-4 w-4 text-yellow-300" />
               <span className="text-sm font-medium">Performance Score</span>
-              <span className="text-lg font-bold">87%</span>
+              <span className="text-lg font-bold">{isLoading ? '--' : `${statsData?.performanceScore ?? 80}%`}</span>
             </div>
           </div>
         </div>
@@ -111,9 +120,8 @@ export function CrmOverviewPage() {
                 )}
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-xs text-muted-foreground">{stat.subtitle}</p>
-                  <div className={`flex items-center gap-0.5 text-xs font-semibold ${stat.up ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {stat.up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {stat.change}
+                  <div className="flex items-center gap-0.5 text-xs font-semibold text-emerald-500">
+                    <TrendingUp className="h-3 w-3" /> Real-time
                   </div>
                 </div>
               </CardContent>
@@ -130,20 +138,54 @@ export function CrmOverviewPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Latest actions in your CRM</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Latest actions across leads, clients & deals</p>
               </div>
-              <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs text-muted-foreground hover:text-primary"
+                onClick={() => router.push('/crm/activities')}
+              >
                 View All <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center h-32 gap-3">
-              <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
-                <Activity className="h-5 w-5 text-muted-foreground/50" />
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                ))}
               </div>
-              <p className="text-sm text-muted-foreground">No recent CRM activities yet.</p>
-            </div>
+            ) : recentActivities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Activity className="h-5 w-5 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm text-muted-foreground">No recent CRM activities recorded yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentActivities.map((act: any) => (
+                  <div key={act.id} className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-muted/30 transition-colors border border-border/30">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                        {act.user?.firstname?.[0] || 'U'}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground leading-tight">{act.description}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          by {act.user?.firstname} {act.user?.lastname}
+                        </p>
+                      </div>
+                    </div>
+                    <span suppressHydrationWarning className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+                      {formatDistanceToNow(new Date(act.created_at))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -155,18 +197,55 @@ export function CrmOverviewPage() {
                 <CardTitle className="text-base font-semibold">Upcoming Tasks</CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">Your scheduled follow-ups</p>
               </div>
-              <Button variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs text-muted-foreground hover:text-primary"
+                onClick={() => router.push('/crm/follow-ups')}
+              >
                 View All <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center h-32 gap-3">
-              <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
-                <ArrowUpRight className="h-5 w-5 text-muted-foreground/50" />
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                ))}
               </div>
-              <p className="text-sm text-muted-foreground">You have no upcoming follow-ups.</p>
-            </div>
+            ) : upcomingTasks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3">
+                <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
+                  <ArrowUpRight className="h-5 w-5 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm text-muted-foreground">You have no upcoming follow-ups scheduled.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingTasks.map((task: any) => (
+                  <div key={task.id} className="p-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-primary" />
+                        {task.type}
+                      </span>
+                      <span suppressHydrationWarning className="text-[11px] font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                        {new Date(task.due_date).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    {task.notes && (
+                      <p className="text-xs text-muted-foreground line-clamp-1 mb-1">{task.notes}</p>
+                    )}
+                    <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
+                      {task.client && <span>📂 {task.client.company_name}</span>}
+                      {task.lead && <span>🎯 {task.lead.name}</span>}
+                      {task.deal && <span>💼 {task.deal.title}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

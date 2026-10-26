@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Calendar, Briefcase, SlidersHorizontal, RotateCcw } from 'lucide-react'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { useLanguage } from '@/components/language-provider'
 import { KpiSummaryCards } from './components/kpi-summary-cards'
@@ -77,66 +79,73 @@ export function MainDashboard({ user }: { user: any }) {
 
   return (
     <div className="space-y-6 pb-12 max-w-full">
-      {/* 1. HEADER SECTION (Greeting, Quote, and Filter Controls) */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-              Hi, <span className="text-primary">{userName}</span>{' '}
-              <span className="text-sm sm:text-base font-medium text-muted-foreground">
-                ({userRoleOrDivision})
-              </span>{' '}
-              👋
-            </h1>
-            <p className="text-muted-foreground mt-1 text-xs sm:text-sm">{dailyQuote}</p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {isFetching && (
-              <div className="flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20 animate-pulse">
-                <div className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <span>Sinkronisasi data...</span>
-              </div>
-            )}
-          </div>
+      {/* 1. HEADER SECTION (Greeting on left, Filter Controls on Far Right) */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+            Hi, <span className="text-primary">{userName}</span>{' '}
+            <span className="text-sm sm:text-base font-medium text-muted-foreground">
+              ({userRoleOrDivision})
+            </span>{' '}
+            👋
+          </h1>
+          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">{dailyQuote}</p>
         </div>
 
-        {/* Filter Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-card border border-border p-3.5 rounded-xl shadow-2xs">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Periode:</span>
+        {/* Filter Controls Pinned to Far Right */}
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-center bg-card/70 backdrop-blur-md border border-border/70 p-1.5 px-2.5 rounded-2xl shadow-xs">
+          {/* Periode Capsule */}
+          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5">
+            <Calendar className="size-3.5 text-muted-foreground shrink-0" />
+            <span className="text-[11px] font-medium text-muted-foreground select-none">Periode:</span>
+            <Select value={range} onValueChange={setRange}>
+              <SelectTrigger className="h-7 w-[135px] sm:w-[145px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors">
+                <SelectValue placeholder="Pilih Periode" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="Today">Hari Ini</SelectItem>
+                <SelectItem value="Last 7 days">7 Hari Terakhir</SelectItem>
+                <SelectItem value="Last 30 days">30 Hari Terakhir</SelectItem>
+                <SelectItem value="Last 3 months">3 Bulan Terakhir</SelectItem>
+                <SelectItem value="Last 6 months">6 Bulan Terakhir</SelectItem>
+                <SelectItem value="This year">Tahun Ini</SelectItem>
+                <SelectItem value="All time">Semua Periode</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={range} onValueChange={setRange}>
-            <SelectTrigger className="w-full sm:w-[170px] h-8 text-xs bg-background">
-              <SelectValue placeholder="Pilih Periode" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Today">Hari Ini</SelectItem>
-              <SelectItem value="Last 7 days">7 Hari Terakhir</SelectItem>
-              <SelectItem value="Last 30 days">30 Hari Terakhir</SelectItem>
-              <SelectItem value="Last 3 months">3 Bulan Terakhir</SelectItem>
-              <SelectItem value="Last 6 months">6 Bulan Terakhir</SelectItem>
-              <SelectItem value="This year">Tahun Ini</SelectItem>
-              <SelectItem value="All time">Semua Periode</SelectItem>
-            </SelectContent>
-          </Select>
 
-          <div className="hidden sm:block w-px h-5 bg-border" />
-
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Project:</span>
+          {/* Project Capsule */}
+          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5">
+            <Briefcase className="size-3.5 text-muted-foreground shrink-0" />
+            <span className="text-[11px] font-medium text-muted-foreground select-none">Project:</span>
+            <Select value={projectFilter} onValueChange={setProjectFilter}>
+              <SelectTrigger className="h-7 w-[150px] sm:w-[185px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
+                <SelectValue placeholder="Pilih Project" />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="Semua Project">Semua Project</SelectItem>
+                {(data?.allProjectsList || data?.projectPerformance || []).map((p: any) => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="w-full sm:w-[220px] h-8 text-xs bg-background">
-              <SelectValue placeholder="Pilih Project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Semua Project">Semua Project</SelectItem>
-              {(data.allProjectsList || data.projectPerformance || []).map((p: any) => (
-                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+          {/* Reset Button (only shown when filtered) */}
+          {(range !== 'All time' || projectFilter !== 'Semua Project') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setRange('All time')
+                setProjectFilter('Semua Project')
+              }}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1 rounded-xl hover:bg-muted/60"
+            >
+              <RotateCcw className="size-3" />
+              <span>Reset</span>
+            </Button>
+          )}
         </div>
       </div>
 

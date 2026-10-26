@@ -2,10 +2,20 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCrmFollowUps, createCrmFollowUp, updateCrmFollowUpStatus, deleteCrmFollowUp } from '@/app/actions/crm'
+import {
+  getCrmFollowUps,
+  createCrmFollowUp,
+  updateCrmFollowUp,
+  updateCrmFollowUpStatus,
+  deleteCrmFollowUp,
+  getCrmClients,
+  getCrmLeads,
+  getCrmDeals,
+  getCrmUsers
+} from '@/app/actions/crm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Search, MoreHorizontal, Trash, Calendar, Phone, Mail, CheckCircle2, Clock, Filter, AlertTriangle, MessageCircle } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, Trash, Calendar, Phone, Mail, CheckCircle2, Clock, AlertTriangle, MessageCircle, Edit } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
@@ -31,7 +41,7 @@ const isPast = (date: Date) => {
 }
 
 const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
+  return new Intl.DateTimeFormat('id-ID', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
 }
 
 const TYPES = ['WhatsApp', 'Phone Call', 'Email', 'Meeting', 'Proposal', 'Other']
@@ -56,17 +66,39 @@ const FILTERS = ['All', 'Today', 'Pending', 'Overdue', 'Completed']
 export function CrmFollowUpsPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [filter, setFilter] = useState('All')
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [itemToDelete, setItemToDelete] = useState<{ id: number; name: string } | null>(null)
 
+  // Create Modal
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [formData, setFormData] = useState({
     type: 'WhatsApp',
     due_date: new Date().toISOString().split('T')[0],
     notes: '',
+    client_id: '',
+    lead_id: '',
+    deal_id: '',
+    assigned_user_id: ''
   })
 
+  // Edit Modal
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    id: 0,
+    type: 'WhatsApp',
+    due_date: '',
+    notes: '',
+    status: 'Pending',
+    client_id: '',
+    lead_id: '',
+    deal_id: '',
+    assigned_user_id: ''
+  })
+
+  // Delete Modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<{ id: number; name: string } | null>(null)
+
+  // Queries
   const { data: followUps, isLoading } = useQuery({
     queryKey: ['crmFollowUps'],
     queryFn: async () => {
@@ -76,12 +108,50 @@ export function CrmFollowUpsPage() {
     }
   })
 
+  const { data: clients } = useQuery({
+    queryKey: ['crmClients'],
+    queryFn: async () => {
+      const res = await getCrmClients()
+      if (!res.success) return []
+      return res.data || []
+    }
+  })
+
+  const { data: leads } = useQuery({
+    queryKey: ['crmLeads'],
+    queryFn: async () => {
+      const res = await getCrmLeads()
+      if (!res.success) return []
+      return res.data || []
+    }
+  })
+
+  const { data: deals } = useQuery({
+    queryKey: ['crmDeals'],
+    queryFn: async () => {
+      const res = await getCrmDeals()
+      if (!res.success) return []
+      return res.data || []
+    }
+  })
+
+  const { data: users } = useQuery({
+    queryKey: ['crmUsers'],
+    queryFn: async () => {
+      const res = await getCrmUsers()
+      if (!res.success) return []
+      return res.data || []
+    }
+  })
+
+  // Mutations
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number, status: string }) => updateCrmFollowUpStatus(id, status),
     onSuccess: (res) => {
       if (res.success) {
         toast.success(`Follow-up marked as ${res.data.status}`)
         queryClient.invalidateQueries({ queryKey: ['crmFollowUps'] })
+        queryClient.invalidateQueries({ queryKey: ['crmStats'] })
       } else {
         toast.error(res.error || 'Failed to update status')
       }
@@ -94,10 +164,26 @@ export function CrmFollowUpsPage() {
       if (res.success) {
         toast.success('Follow-up scheduled successfully')
         setIsCreateOpen(false)
-        setFormData({ type: 'WhatsApp', due_date: new Date().toISOString().split('T')[0], notes: '' })
+        setFormData({ type: 'WhatsApp', due_date: new Date().toISOString().split('T')[0], notes: '', client_id: '', lead_id: '', deal_id: '', assigned_user_id: '' })
         queryClient.invalidateQueries({ queryKey: ['crmFollowUps'] })
+        queryClient.invalidateQueries({ queryKey: ['crmStats'] })
       } else {
         toast.error(res.error || 'Failed to schedule follow-up')
+      }
+    },
+    onError: (error: any) => toast.error(error.message)
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateCrmFollowUp(id, data),
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success('Follow-up updated successfully')
+        setIsEditOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['crmFollowUps'] })
+        queryClient.invalidateQueries({ queryKey: ['crmStats'] })
+      } else {
+        toast.error(res.error || 'Failed to update follow-up')
       }
     },
     onError: (error: any) => toast.error(error.message)
@@ -109,6 +195,7 @@ export function CrmFollowUpsPage() {
       if (res.success) {
         toast.success('Follow-up deleted successfully')
         queryClient.invalidateQueries({ queryKey: ['crmFollowUps'] })
+        queryClient.invalidateQueries({ queryKey: ['crmStats'] })
       } else {
         toast.error(res.error || 'Failed to delete follow-up')
       }
@@ -135,6 +222,27 @@ export function CrmFollowUpsPage() {
     createMutation.mutate(formData)
   }
 
+  const handleOpenEdit = (item: any) => {
+    setEditFormData({
+      id: item.id,
+      type: item.type || 'WhatsApp',
+      due_date: item.due_date ? new Date(item.due_date).toISOString().split('T')[0] : '',
+      notes: item.notes || '',
+      status: item.status || 'Pending',
+      client_id: item.client_id ? String(item.client_id) : '',
+      lead_id: item.lead_id ? String(item.lead_id) : '',
+      deal_id: item.deal_id ? String(item.deal_id) : '',
+      assigned_user_id: item.assigned_user_id ? String(item.assigned_user_id) : ''
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editFormData.due_date) return toast.error('Due date is required')
+    updateMutation.mutate({ id: editFormData.id, data: editFormData })
+  }
+
   const todayCount = followUps?.filter((f: any) => isToday(new Date(f.due_date)) && f.status !== 'Completed').length || 0
   const overdueCount = followUps?.filter((f: any) => isPast(new Date(f.due_date)) && !isToday(new Date(f.due_date)) && f.status !== 'Completed').length || 0
   const completedCount = followUps?.filter((f: any) => f.status === 'Completed').length || 0
@@ -145,7 +253,7 @@ export function CrmFollowUpsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Follow Ups</h1>
-          <p className="text-muted-foreground text-sm mt-1">Schedule and track all your follow-up activities.</p>
+          <p className="text-muted-foreground text-sm mt-1">Schedule and track all customer touchpoints and upcoming tasks.</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
           <Plus className="h-4 w-4" /> Schedule Follow Up
@@ -178,8 +286,8 @@ export function CrmFollowUpsPage() {
       </div>
 
       {/* Search & Filter */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search follow-ups..."
@@ -240,7 +348,7 @@ export function CrmFollowUpsPage() {
                     </div>
                     <div>
                       <p className="font-medium">No follow-ups found</p>
-                      <p className="text-sm text-muted-foreground">Schedule your first follow-up to stay on track.</p>
+                      <p className="text-sm text-muted-foreground">Schedule your first touchpoint to stay on track.</p>
                     </div>
                   </div>
                 </TableCell>
@@ -278,11 +386,11 @@ export function CrmFollowUpsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        {item.client && <span className="text-sm font-medium text-violet-600">📂 {item.client.company_name}</span>}
-                        {item.lead && <span className="text-sm font-medium text-sky-600">🎯 {item.lead.name}</span>}
-                        {item.deal && <span className="text-xs text-muted-foreground">Deal: {item.deal.title}</span>}
-                        {!item.client && !item.lead && !item.deal && <span className="text-muted-foreground text-sm">—</span>}
+                      <div className="flex flex-col gap-0.5 text-xs">
+                        {item.client && <span className="font-semibold text-violet-600">🏢 {item.client.company_name}</span>}
+                        {item.lead && <span className="font-medium text-sky-600">🎯 {item.lead.name}</span>}
+                        {item.deal && <span className="text-muted-foreground">💼 {item.deal.title}</span>}
+                        {!item.client && !item.lead && !item.deal && <span className="text-muted-foreground italic">—</span>}
                       </div>
                     </TableCell>
                     <TableCell className="max-w-[200px]">
@@ -302,13 +410,17 @@ export function CrmFollowUpsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
                           {item.status !== 'Completed' && (
-                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: item.id, status: 'Completed' })}>
+                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: item.id, status: 'Completed' })} className="cursor-pointer">
                               <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-500" />
                               Mark as Completed
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuItem onClick={() => handleOpenEdit(item)} className="cursor-pointer">
+                            <Edit className="mr-2 h-4 w-4 text-violet-500" />
+                            Edit Follow-Up
+                          </DropdownMenuItem>
                           {item.status !== 'Cancelled' && (
-                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: item.id, status: 'Cancelled' })}>
+                            <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: item.id, status: 'Cancelled' })} className="cursor-pointer">
                               Cancel Follow-up
                             </DropdownMenuItem>
                           )}
@@ -337,7 +449,7 @@ export function CrmFollowUpsPage() {
 
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[440px]">
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-1">
               <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
@@ -345,31 +457,63 @@ export function CrmFollowUpsPage() {
               </div>
               <div>
                 <DialogTitle className="text-lg">Schedule Follow Up</DialogTitle>
-                <DialogDescription className="text-xs mt-0.5">Plan your next touchpoint with a lead or client.</DialogDescription>
+                <DialogDescription className="text-xs mt-0.5">Plan your next touchpoint with a client, lead, or deal.</DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type *</Label>
+                <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Due Date *</Label>
+                <Input type="date" value={formData.due_date} onChange={e => setFormData({ ...formData, due_date: e.target.value })} required />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type *</Label>
-              <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v })}>
-                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Attach to Client</Label>
+              <Select value={formData.client_id} onValueChange={v => setFormData({ ...formData, client_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Select client (optional)" /></SelectTrigger>
                 <SelectContent>
-                  {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {clients?.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.company_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Or Attach to Lead</Label>
+                <Select value={formData.lead_id} onValueChange={v => setFormData({ ...formData, lead_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select lead (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    {leads?.map((l: any) => <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Or Attach to Deal</Label>
+                <Select value={formData.deal_id} onValueChange={v => setFormData({ ...formData, deal_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select deal (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    {deals?.map((d: any) => <SelectItem key={d.id} value={d.id.toString()}>{d.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Due Date *</Label>
-              <Input type="date" value={formData.due_date} onChange={e => setFormData({ ...formData, due_date: e.target.value })} required />
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes / Description</Label>
+              <Input value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="e.g. Call to discuss proposal revision" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes</Label>
-              <Input value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="e.g. Call to discuss pricing" />
-            </div>
-            <div className="rounded-xl bg-muted/50 border border-border/50 p-3 text-xs text-muted-foreground">
-              💡 <strong>Tip:</strong> To link this to a specific Lead or Client, do it from their detail page.
-            </div>
+
             <DialogFooter className="gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending} className="gap-2">
@@ -380,6 +524,75 @@ export function CrmFollowUpsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                <Edit className="h-5 w-5 text-violet-500" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">Edit Follow Up</DialogTitle>
+                <DialogDescription className="text-xs mt-0.5">Modify date, status, or related account.</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type *</Label>
+                <Select value={editFormData.type} onValueChange={v => setEditFormData({ ...editFormData, type: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Due Date *</Label>
+                <Input type="date" value={editFormData.due_date} onChange={e => setEditFormData({ ...editFormData, due_date: e.target.value })} required />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</Label>
+              <Select value={editFormData.status} onValueChange={v => setEditFormData({ ...editFormData, status: v })}>
+                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectItem value="Cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Attach Client</Label>
+              <Select value={editFormData.client_id} onValueChange={v => setEditFormData({ ...editFormData, client_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                <SelectContent>
+                  {clients?.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.company_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes</Label>
+              <Input value={editFormData.notes} onChange={e => setEditFormData({ ...editFormData, notes: e.target.value })} />
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={updateMutation.isPending} className="gap-2">
+                {updateMutation.isPending ? 'Updating...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
       <ConfirmDeleteDialog 
         open={deleteModalOpen}
         onOpenChange={setDeleteModalOpen}

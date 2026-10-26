@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { getDashboardData } from '@/app/actions/dashboard'
 
 export function useDashboard() {
-  const [range, setRange] = useState('Last 6 months')
+  const [range, setRange] = useState('All time')
   const [projectFilter, setProjectFilter] = useState('Semua Project')
   const [loading, setLoading] = useState(true)
   const [isFetching, setIsFetching] = useState(false)

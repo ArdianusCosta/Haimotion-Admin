@@ -203,10 +203,27 @@ export async function createProject(data: {
   manager_id: number
   user_ids: number[]
   client_name?: string
+  client_id?: number
 }) {
   try {
     const user = await requireAuth();
     requirePermission(user, "projects.create");
+
+    let resolvedClientId = data.client_id ? Number(data.client_id) : undefined;
+    let resolvedClientName = data.client_name;
+
+    // If client_id is given but client_name is empty, get company_name
+    if (resolvedClientId && !resolvedClientName) {
+      const crmClient = await prisma.crmClient.findUnique({ where: { id: resolvedClientId } });
+      if (crmClient) resolvedClientName = crmClient.company_name;
+    } else if (!resolvedClientId && resolvedClientName) {
+      // If client_name is given, check if matches an existing CRM client
+      const matchedClient = await prisma.crmClient.findFirst({
+        where: { company_name: { equals: resolvedClientName, mode: 'insensitive' } }
+      });
+      if (matchedClient) resolvedClientId = matchedClient.id;
+    }
+
     const project = await prisma.project_list.create({
       data: {
         name: data.name,
@@ -215,7 +232,8 @@ export async function createProject(data: {
         start_date: new Date(data.start_date),
         end_date: new Date(data.end_date),
         manager_id: data.manager_id,
-        client_name: data.client_name,
+        client_name: resolvedClientName,
+        client_id: resolvedClientId || null,
         members: {
           create: data.user_ids.map(uid => ({
             user_id: Number(uid)
@@ -246,30 +264,45 @@ export async function updateProject(id: number, data: {
   manager_id: number
   user_ids: number[]
   client_name?: string
+  client_id?: number
 }) {
   try {
     const user = await requireAuth();
     const hasAccess = await canAccessProject(user, id, 'editor');
     if (!hasAccess) return { success: false, error: 'Unauthorized' };
 
+    let resolvedClientId = data.client_id !== undefined ? (data.client_id ? Number(data.client_id) : null) : undefined;
+    let resolvedClientName = data.client_name;
+
+    if (resolvedClientId && !resolvedClientName) {
+      const crmClient = await prisma.crmClient.findUnique({ where: { id: resolvedClientId } });
+      if (crmClient) resolvedClientName = crmClient.company_name;
+    }
+
     // Update project details and reset members
     const project = await prisma.$transaction(async (tx) => {
       await tx.projectMember.deleteMany({ where: { project_id: id } });
       
+      const updateData: any = {
+        name: data.name,
+        description: data.description,
+        status: data.status,
+        start_date: new Date(data.start_date),
+        end_date: new Date(data.end_date),
+        manager_id: data.manager_id,
+        client_name: resolvedClientName,
+        members: {
+          create: data.user_ids.map(uid => ({ user_id: Number(uid) }))
+        }
+      };
+
+      if (resolvedClientId !== undefined) {
+        updateData.client_id = resolvedClientId;
+      }
+
       return tx.project_list.update({
         where: { id },
-        data: {
-          name: data.name,
-          description: data.description,
-          status: data.status,
-          start_date: new Date(data.start_date),
-          end_date: new Date(data.end_date),
-          manager_id: data.manager_id,
-          client_name: data.client_name,
-          members: {
-            create: data.user_ids.map(uid => ({ user_id: Number(uid) }))
-          }
-        }
+        data: updateData
       });
     });
     

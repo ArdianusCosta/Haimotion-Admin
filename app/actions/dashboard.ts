@@ -23,6 +23,8 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     startDate.setMonth(now.getMonth() - 6);
   } else if (dateRangeStr === 'This year') {
     startDate = new Date(now.getFullYear(), 0, 1);
+  } else if (dateRangeStr === 'All time' || dateRangeStr === 'All Time' || dateRangeStr === 'Semua Periode' || dateRangeStr === 'Semua Waktu (All Time)') {
+    startDate = new Date(0);
   }
 
   const duration = now.getTime() - startDate.getTime();
@@ -96,22 +98,33 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
         orderBy: { date_created: 'desc' }
       }),
       prisma.user.findMany({
-        where: { status: { not: 'resign' } },
         select: {
           id: true,
           firstname: true,
           lastname: true,
           name: true,
+          email: true,
           address: true,
           avatar: true,
+          status: true,
           role: { select: { name: true } }
         }
       }),
       prisma.taskAssignee.findMany({
         select: {
           user_id: true,
+          task_id: true,
           task: {
-            select: { id: true, status: true, end_date: true, project_id: true }
+            select: {
+              id: true,
+              task: true,
+              status: true,
+              end_date: true,
+              project_id: true,
+              date_created: true,
+              content_pillar: true,
+              platform: true
+            }
           }
         }
       }),
@@ -269,46 +282,161 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     const trendData = Object.values(trendMap).sort((a, b) => a.date.localeCompare(b.date));
     const statusTrendData = Object.values(statusTrendMap).sort((a, b) => a.date.localeCompare(b.date));
 
+    // In-memory filter for assignees based on range and project
+    const assigneesInRange = allAssignees.filter(a => {
+      if (!a.task) return false;
+      if (startDate.getTime() > 0 && new Date(a.task.date_created) < startDate) return false;
+      if (projectFilter && projectFilter !== 'Semua Project' && a.task.project_id !== parseInt(projectFilter)) return false;
+      return true;
+    });
+
     // 5. Team Revision Overview & Assignments (Grouped Bar Chart data)
-    const teamAssignments = teamUsers.map(u => {
-      const userTasks = allAssignees.filter(a => a.user_id === u.id);
-      const assigned = userTasks.length;
-      const done = userTasks.filter(a => a.task?.status === 5).length;
-      const revised = userTasks.filter(a => a.task?.status === 4).length;
-      const overdue = userTasks.filter(a =>
-        a.task && (a.task.status === 8 || (a.task.end_date && new Date(a.task.end_date) < now && a.task.status !== 5))
-      ).length;
+    const teamAssignments = teamUsers
+      .filter(u => {
+        const isClient = (u.role?.name || '').toLowerCase().includes('client') ||
+                         (u.firstname || '').toLowerCase().includes('client') ||
+                         (u.firstname || '').toLowerCase().includes('toko');
+        return !isClient;
+      })
+      .map(u => {
+        const uIdNum = Number(u.id);
+        const userTasks = assigneesInRange.filter(a => Number(a.user_id) === uIdNum && a.task != null);
+        const assigned = userTasks.length;
+        const done = userTasks.filter(a => a.task?.status === 5).length;
+        const revised = userTasks.filter(a => a.task?.status === 4).length;
+        const inProgress = userTasks.filter(a => [2, 6].includes(a.task?.status || 0)).length;
+        const overdue = userTasks.filter(a =>
+          a.task && (a.task.status === 8 || (a.task.end_date && new Date(a.task.end_date) < now && a.task.status !== 5))
+        ).length;
 
-      // Extract cleaned short name (strip [RESIGN] and parenthetical roles)
-      const cleanName = (u.firstname || '').replace(/\[RESIGN\]\s*/i, '').replace(/\s*\([^)]*\).*/g, '').trim() || (u.lastname || '').trim();
-      const parts = cleanName.split(/\s+/).filter(Boolean);
-      let shortName = parts[0] || 'User';
-      if (parts.length > 1) {
-        shortName += ' ' + parts[1][0] + '.';
-      }
+        const isResigned = (u.firstname || '').toLowerCase().includes('[resign]') || u.status === 'resign';
 
-      let avatarUrl = u.avatar || '';
-      if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
-        avatarUrl = `/avatars/${avatarUrl}`;
-      }
+        // Extract role from parenthetical if present in lastname, name, or firstname
+        let role = '';
+        const textWithRole = `${u.lastname || ''} ${u.name || ''} ${u.firstname || ''}`;
+        const roleMatch = textWithRole.match(/\(([^)]+)\)/);
+        if (roleMatch && roleMatch[1]) {
+          role = roleMatch[1].trim();
+        } else if (u.role?.name) {
+          role = u.role.name;
+        } else if (u.address && !['--', '-', '.', '0000'].includes(u.address.trim())) {
+          role = u.address.trim();
+        } else {
+          role = 'Creative Staff';
+        }
 
-      return {
-        id: u.id,
-        name: `${u.firstname} ${u.lastname || ''}`.trim(),
-        cleanName,
-        shortName,
-        role: u.role?.name || u.address || 'Staff',
-        avatar: avatarUrl,
-        assigned,
-        done,
-        revised,
-        overdue,
-        completionRate: assigned > 0 ? Math.round((done / assigned) * 100) : 0
-      };
-    }).filter(t => t.assigned > 0).sort((a, b) => b.assigned - a.assigned);
+        // Clean up role label
+        role = role
+          .replace(/^Creative\s*-\s*/i, '')
+          .replace(/^Production Team\s*-\s*/i, '')
+          .replace(/^IT\s*-\s*/i, '')
+          .replace(/^PKL\s*-\s*/i, 'Intern ')
+          .replace(/^Freelance\s*-\s*/i, 'Freelance ')
+          .trim();
+
+        // Extract clean name (strip [RESIGN] and parenthetical roles)
+        const cleanName = (u.firstname || u.name || '')
+          .replace(/\[RESIGN\]\s*/i, '')
+          .replace(/\s*\([^)]*\).*/g, '')
+          .trim() || (u.lastname || '').replace(/\s*\([^)]*\).*/g, '').trim() || 'User';
+
+        const parts = cleanName.split(/\s+/).filter(Boolean);
+        let shortName = parts[0] || 'User';
+        if (parts.length > 1) {
+          shortName += ' ' + parts[1][0] + '.';
+        }
+
+        let avatarUrl = u.avatar || '';
+        if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
+          avatarUrl = `/avatars/${avatarUrl}`;
+        }
+
+        // Group tasks by project for drilldown modal
+        const projectMapLocal = new Map(activeProjectsList.map(p => [p.id, p]));
+        const userProjectGroups: Record<number, any> = {};
+
+        userTasks.forEach(a => {
+          if (!a.task) return;
+          const pid = a.task.project_id;
+          if (!userProjectGroups[pid]) {
+            const prj = projectMapLocal.get(pid);
+            userProjectGroups[pid] = {
+              id: pid,
+              name: prj?.name || `Project #${pid}`,
+              client: prj?.client_name || '-',
+              status: prj?.status ?? 0,
+              totalTasks: 0,
+              completedTasks: 0,
+              tasks: []
+            };
+          }
+          userProjectGroups[pid].totalTasks++;
+          if (a.task.status === 5) {
+            userProjectGroups[pid].completedTasks++;
+          }
+
+          let statusLabel = 'Pending';
+          if (a.task.status === 5) statusLabel = 'Done';
+          else if (a.task.status === 6) statusLabel = 'Started';
+          else if (a.task.status === 2) statusLabel = 'In Progress';
+          else if (a.task.status === 3) statusLabel = 'In Review';
+          else if (a.task.status === 4) statusLabel = 'Revisions';
+          else if (a.task.status === 7) statusLabel = 'Hold';
+          else if (a.task.status === 8 || (a.task.end_date && new Date(a.task.end_date) < now && a.task.status !== 5)) statusLabel = 'Overdue';
+
+          let formattedDeadline = '-';
+          if (a.task.end_date) {
+            try {
+              formattedDeadline = new Date(a.task.end_date).toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              });
+            } catch {
+              formattedDeadline = '-';
+            }
+          }
+
+          userProjectGroups[pid].tasks.push({
+            id: a.task.id,
+            name: a.task.task || 'Untitled Task',
+            status: a.task.status,
+            statusLabel,
+            deadline: formattedDeadline,
+            pillar: a.task.content_pillar || null,
+            platform: a.task.platform || null
+          });
+        });
+
+        const projects = Object.values(userProjectGroups).map(g => ({
+          ...g,
+          completionRate: g.totalTasks > 0 ? Math.round((g.completedTasks / g.totalTasks) * 1000) / 10 : 0
+        })).sort((a, b) => b.totalTasks - a.totalTasks);
+
+        return {
+          id: uIdNum,
+          name: cleanName,
+          fullName: `${u.firstname} ${u.lastname || ''}`.trim(),
+          shortName,
+          role,
+          email: u.email || '',
+          avatar: avatarUrl,
+          isResigned,
+          assigned,
+          done,
+          inProgress,
+          revised,
+          overdue,
+          projectCount: projects.length,
+          projects,
+          completionRate: assigned > 0 ? Math.round((done / assigned) * 1000) / 10 : 0
+        };
+      })
+      .filter(t => t.assigned > 0)
+      .sort((a, b) => b.assigned - a.assigned);
 
     // 6. Project Progress Details (Carousel of Donut Charts & Deep Inspector)
-    const userMap = new Map(teamUsers.map(u => [u.id, u]));
+    const userMap = new Map(teamUsers.map(u => [Number(u.id), u]));
 
     const projectProgressDetails = activeProjectsList.map(p => {
       const pTasks = allTasksInRange.filter(t => t.project_id === p.id);
