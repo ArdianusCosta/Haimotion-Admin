@@ -18,10 +18,11 @@ try {
 const next = require('next');
 
 const dev = false;
-const port = process.env.PORT || 3000;
+// Use PORT from Passenger or default to 3999 (avoid port 3000 which is blocked/in-use on shared hosting)
+const port = process.env.PORT || 3999;
 
 console.log(`[Startup] Directory: ${__dirname}`);
-console.log(`[Startup] Port/Socket: ${port}`);
+console.log(`[Startup] Target port/socket: ${port}`);
 console.log(`[Startup] ACTIVE_DB: ${process.env.ACTIVE_DB || 'not set'}`);
 console.log(`[Startup] BETTER_AUTH_URL: ${process.env.BETTER_AUTH_URL || 'not set'}`);
 
@@ -42,14 +43,20 @@ app.prepare()
       }
     });
 
-    server.once('error', (err) => {
-      console.error('[Fatal] Server error:', err);
-      process.exit(1);
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`[Warn] Port ${port} is in use, falling back to random available port...`);
+        server.listen(0);
+      } else {
+        console.error('[Fatal] Server error:', err);
+        process.exit(1);
+      }
     });
 
-    // Standard Passenger listen call
     server.listen(port, () => {
-      console.log(`> Next.js production server ready on ${port}`);
+      const addr = server.address();
+      const actualPort = typeof addr === 'object' && addr ? addr.port : port;
+      console.log(`> Next.js production server ready on ${actualPort}`);
     });
   })
   .catch((err) => {
