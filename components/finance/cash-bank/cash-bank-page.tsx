@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { Plus, Search, Filter, Wallet, Landmark, Banknote } from 'lucide-react'
+import { Plus, Search, Wallet, Landmark, Banknote, Trash2 } from 'lucide-react'
 import { FinancePageHeader } from '../components'
-import { TransactionModal } from '../components/modals'
-import { useBankAccounts, useTransactions, useCreateTransaction } from '../queries'
+import { TransactionModal, ConfirmDeleteModal } from '../components/modals'
+import { useBankAccounts, useTransactions, useCreateTransaction, useDeleteTransaction } from '../queries'
 import { formatCurrency } from '../utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -12,10 +12,13 @@ import { useLanguage } from '@/components/language-provider'
 export function CashBankPage() {  const { t, formatDate } = useLanguage()
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
 
   const { data: bankAccounts, isLoading: isAccountsLoading } = useBankAccounts()
   const { data: transactions, isLoading: isTxLoading } = useTransactions({ search })
   const createTransaction = useCreateTransaction()
+  const deleteTransaction = useDeleteTransaction()
 
   const handleSave = (data: any) => {
     createTransaction.mutate(data, {
@@ -25,7 +28,7 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
     })
   }
 
-  const totalBank = bankAccounts?.filter(a => a.type === 'Bank').reduce((acc, curr) => acc + curr.balance, 0) || 0
+  const totalBank = bankAccounts?.filter(a => a.type !== 'Cash').reduce((acc, curr) => acc + curr.balance, 0) || 0
   const totalCash = bankAccounts?.filter(a => a.type === 'Cash').reduce((acc, curr) => acc + curr.balance, 0) || 0
   const totalBalance = totalBank + totalCash
 
@@ -87,7 +90,7 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
               </div>
               <div>
                 <h3 className="font-medium text-sm">{account.name}</h3>
-                <p className="text-xs text-muted-foreground">{account.accountNumber || 'Physical Cash'}</p>
+                <p className="text-xs text-muted-foreground">{account.account_number || 'Physical Cash'}</p>
               </div>
             </div>
             <p className="text-xl font-bold tracking-tight">{formatCurrency(account.balance)}</p>
@@ -108,8 +111,6 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
                 className="h-9 w-full sm:w-[280px] rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary transition-colors"
               />
             </div>
-            <Button variant="outline" size="sm" className="gap-2 h-9">
-              <Filter className="size-4" />{t('Filter')}</Button>
           </div>
         </div>
 
@@ -123,6 +124,7 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
                 <th className="px-5 py-3 font-medium text-xs">{t('Account')}</th>
                 <th className="px-5 py-3 font-medium text-xs">{t('Type')}</th>
                 <th className="px-5 py-3 font-medium text-xs text-right">{t('Amount')}</th>
+                <th className="px-5 py-3 font-medium text-xs text-right">{t('Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -139,7 +141,7 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
                 ))
               ) : transactions?.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     {t('No data found')}
                   </td>
                 </tr>
@@ -162,6 +164,17 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
                     <td className={`px-5 py-4 text-right font-medium ${tx.type === 'Income' ? 'text-emerald-500' : ''}`}>
                       {tx.type === 'Expense' ? '-' : tx.type === 'Income' ? '+' : ''}{formatCurrency(tx.amount)}
                     </td>
+                    <td className="px-5 py-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-rose-500"
+                        onClick={() => { setDeleteId(tx.id); setDeleteOpen(true) }}
+                        title={t('Delete')}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -175,6 +188,17 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
         onOpenChange={setIsModalOpen} 
         onSave={handleSave}
         accounts={bankAccounts || []}
+      />
+
+      <ConfirmDeleteModal
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onConfirm={() => {
+          if (deleteId) deleteTransaction.mutate(deleteId)
+          setDeleteId(null)
+        }}
+        title={t('Delete Transaction')}
+        description="Saldo akun akan disesuaikan kembali setelah transaksi dihapus."
       />
     </div>
   )

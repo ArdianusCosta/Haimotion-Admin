@@ -1,11 +1,11 @@
 import { headers } from "next/headers";
+import { cache } from "react";
 import { auth } from "./auth";
 import prisma from "@/lib/prisma";
 
-export async function getUserSession() {
+export const getUserSession = cache(async () => {
   try {
     const hdrs = new Headers(await headers());
-    console.log("getUserSession headers:", Object.fromEntries(hdrs.entries()));
     const session = await auth.api.getSession({
       headers: hdrs,
     });
@@ -35,7 +35,7 @@ export async function getUserSession() {
     console.error("getUserSession error:", error);
     return null;
   }
-}
+});
 
 export async function requireAuth() {
   const user = await getUserSession();

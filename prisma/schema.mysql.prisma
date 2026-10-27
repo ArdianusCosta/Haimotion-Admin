@@ -564,7 +564,7 @@ model FinanceAccount {
   name           String               @db.VarChar(200)
   type           String               @db.VarChar(50)
   balance        Float                @default(0)
-  currency       String               @default("USD") @db.VarChar(10)
+  currency       String               @default("IDR") @db.VarChar(10)
   account_number String?              @db.VarChar(100)
   created_at     DateTime             @default(now())
   updated_at     DateTime             @default(now()) @updatedAt
@@ -576,18 +576,28 @@ model FinanceAccount {
 model FinanceInvoice {
   id             Int                  @id @default(autoincrement())
   reference      String               @unique @db.VarChar(100)
+  // "SALES" = faktur penjualan, "PURCHASE" = faktur pembelian
+  type           String               @default("SALES") @db.VarChar(20)
+  contact_id     Int?
+  // Nama pihak pada dokumen. Untuk SALES berisi nama pelanggan, untuk PURCHASE berisi nama pemasok.
+  // Disimpan sebagai snapshot agar riwayat faktur tidak berubah saat data kontak diedit.
   customer_name  String               @db.VarChar(200)
   customer_email String?              @db.VarChar(200)
   date           DateTime             @db.Date
   due_date       DateTime             @db.Date
   amount         Float
   status         String               @default("Draft") @db.VarChar(50)
+  notes          String?              @db.Text
   created_at     DateTime             @default(now())
   updated_at     DateTime             @default(now()) @updatedAt
   created_by     Int?
+  contact        FinanceContact?      @relation(fields: [contact_id], references: [id], onDelete: SetNull)
   items          FinanceInvoiceItem[]
   payments       FinancePayment[]
 
+  @@index([type, status])
+  @@index([contact_id])
+  @@index([date])
   @@map("finance_invoices")
 }
 
@@ -819,7 +829,9 @@ model FinanceContact {
   address    String?  @db.Text
   created_at DateTime @default(now())
   updated_at DateTime @default(now()) @updatedAt
+  invoices   FinanceInvoice[]
 
+  @@index([type])
   @@map("finance_contacts")
 }
 

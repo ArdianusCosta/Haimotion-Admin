@@ -65,43 +65,66 @@ export interface KpiPerformanceData {
 function buildPeriodDates(dateRangeStr: string): { startDate: Date; endDate: Date; label: string } {
   const now = new Date()
   let startDate: Date
+  let endDate: Date = now
   let label: string
 
-  switch (dateRangeStr) {
-    case 'Today':
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      label = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-      break
-    case 'Last 7 days':
-      startDate = new Date(now); startDate.setDate(now.getDate() - 7)
-      label = '7 Hari Terakhir'
-      break
-    case 'Last 30 days':
-      startDate = new Date(now); startDate.setDate(now.getDate() - 30)
-      label = '30 Hari Terakhir'
-      break
-    case 'Last 3 months':
-      startDate = new Date(now); startDate.setMonth(now.getMonth() - 3)
-      label = '3 Bulan Terakhir'
-      break
-    case 'This year':
-      startDate = new Date(now.getFullYear(), 0, 1)
-      label = `Tahun ${now.getFullYear()}`
-      break
-    case 'All time':
-    case 'All Time':
-    case 'Semua Periode':
-    case 'Semua Waktu':
-    case 'Semua Waktu (All Time)':
-      startDate = new Date(0)
-      label = 'Semua Waktu (All Time)'
-      break
-    default:
-      startDate = new Date(0)
-      label = 'Semua Waktu (All Time)'
+  const monthNamesId = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ]
+
+  const monthNamesMap: Record<string, number> = {
+    'januari': 0, 'februari': 1, 'maret': 2, 'april': 3, 'mei': 4, 'juni': 5,
+    'juli': 6, 'agustus': 7, 'september': 8, 'oktober': 9, 'november': 10, 'desember': 11
   }
 
-  return { startDate, endDate: now, label }
+  const lowerRange = (dateRangeStr || '').toLowerCase().trim()
+
+  if (dateRangeStr === 'Today') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    label = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  } else if (dateRangeStr === 'This month' || dateRangeStr === 'Bulan Ini') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+    label = `Bulan Ini (${monthNamesId[now.getMonth()]} ${now.getFullYear()})`
+  } else if (dateRangeStr === 'Last month' || dateRangeStr === 'Bulan Lalu') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
+    const prevMonthIdx = (now.getMonth() - 1 + 12) % 12
+    label = `Bulan Lalu (${monthNamesId[prevMonthIdx]} ${startDate.getFullYear()})`
+  } else if (dateRangeStr.startsWith('Month:')) {
+    const monthIdx = parseInt(dateRangeStr.split(':')[1])
+    startDate = new Date(now.getFullYear(), monthIdx, 1)
+    endDate = new Date(now.getFullYear(), monthIdx + 1, 0, 23, 59, 59)
+    label = `${monthNamesId[monthIdx]} ${now.getFullYear()}`
+  } else if (monthNamesMap[lowerRange] !== undefined) {
+    const monthIdx = monthNamesMap[lowerRange]
+    startDate = new Date(now.getFullYear(), monthIdx, 1)
+    endDate = new Date(now.getFullYear(), monthIdx + 1, 0, 23, 59, 59)
+    label = `${monthNamesId[monthIdx]} ${now.getFullYear()}`
+  } else if (dateRangeStr === 'Last 7 days') {
+    startDate = new Date(now); startDate.setDate(now.getDate() - 7)
+    label = '7 Hari Terakhir'
+  } else if (dateRangeStr === 'Last 30 days') {
+    startDate = new Date(now); startDate.setDate(now.getDate() - 30)
+    label = '30 Hari Terakhir'
+  } else if (dateRangeStr === 'Last 3 months') {
+    startDate = new Date(now); startDate.setMonth(now.getMonth() - 3)
+    label = '3 Bulan Terakhir'
+  } else if (dateRangeStr === 'Last 6 months') {
+    startDate = new Date(now); startDate.setMonth(now.getMonth() - 6)
+    label = '6 Bulan Terakhir'
+  } else if (dateRangeStr === 'This year') {
+    startDate = new Date(now.getFullYear(), 0, 1)
+    label = `Tahun ${now.getFullYear()}`
+  } else if (dateRangeStr === 'All time' || dateRangeStr === 'All Time' || dateRangeStr === 'Semua Periode' || dateRangeStr === 'Semua Waktu' || dateRangeStr === 'Semua Waktu (All Time)') {
+    startDate = new Date(0)
+    label = 'Semua Periode'
+  } else {
+    startDate = new Date(0)
+    label = 'Semua Periode'
+  }
+
+  return { startDate, endDate, label }
 }
 
 /**

@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react'
+'use client'
+
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { getKpiPerformanceData, KpiPerformanceData } from '@/app/actions/dashboard-kpi'
 
 export function useKpiPerformance(
@@ -6,32 +8,26 @@ export function useKpiPerformance(
   projectFilter: string,
   memberFilter: string
 ) {
-  const [loading, setLoading] = useState(true)
-  const [isFetching, setIsFetching] = useState(false)
-  const [data, setData] = useState<KpiPerformanceData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    data,
+    isLoading: loading,
+    isFetching,
+    error,
+    refetch
+  } = useQuery<KpiPerformanceData>({
+    queryKey: ['kpi-performance', range, projectFilter, memberFilter],
+    queryFn: () => getKpiPerformanceData(range, projectFilter, memberFilter),
+    placeholderData: keepPreviousData,
+    staleTime: 30 * 1000, // 30s cache
+    refetchInterval: 15 * 1000, // Auto real-time background refresh every 15s
+    refetchOnWindowFocus: true, // Auto refresh when tab is focused
+  })
 
-  useEffect(() => {
-    if (!data) {
-      setLoading(true)
-    } else {
-      setIsFetching(true)
-    }
-    setError(null)
-
-    getKpiPerformanceData(range, projectFilter, memberFilter)
-      .then(res => {
-        setData(res)
-        setLoading(false)
-        setIsFetching(false)
-      })
-      .catch(err => {
-        console.error('KPI fetch error:', err)
-        setError(err?.message || 'Failed to load KPI data')
-        setLoading(false)
-        setIsFetching(false)
-      })
-  }, [range, projectFilter, memberFilter])
-
-  return { loading, isFetching, data, error }
+  return {
+    loading,
+    isFetching,
+    data: data ?? null,
+    error: error ? (error instanceof Error ? error.message : 'Failed to load KPI data') : null,
+    refetch
+  }
 }

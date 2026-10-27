@@ -9,7 +9,10 @@ if (datasourceUrl) {
 }
 
 const prismaClientSingleton = () => {
-  return new PrismaClient({ log: ['query'], datasourceUrl }).$extends({
+  return new PrismaClient({
+    log: process.env.PRISMA_LOG_QUERY === 'true' ? ['query', 'warn', 'error'] : ['error'],
+    datasourceUrl
+  }).$extends({
     query: {
       user: {
         async $allOperations({ operation, args, query }) {

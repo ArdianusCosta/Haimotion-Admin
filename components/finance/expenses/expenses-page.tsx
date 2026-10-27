@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Plus, Search, Download, MoreHorizontal } from 'lucide-react'
 import { FinancePageHeader, FinanceStatusBadge } from '../components'
 import { ExpenseModal, ConfirmDeleteModal } from '../components/modals'
-import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useExportExpenses, useImportExpenses } from '../queries'
+import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, useExportExpenses, useImportExpenses, useBankAccounts } from '../queries'
 import { formatCurrency } from '../utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ export function ExpensesPage() {  const { t, formatDate } = useLanguage()
   const deleteExpense = useDeleteExpense()
   const exportExpenses = useExportExpenses()
   const importExpenses = useImportExpenses()
+  const { data: bankAccounts } = useBankAccounts()
 
   const handleSave = (data: any) => {
     if (selectedExpense) {
@@ -101,9 +102,11 @@ export function ExpensesPage() {  const { t, formatDate } = useLanguage()
                 className="h-9 w-full sm:w-[250px] rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary transition-colors"
               />
             </div>
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={(value: string | null) => setCategory(value || 'All')}>
               <SelectTrigger className="w-[180px] h-9 bg-background">
-                <SelectValue placeholder="All Categories" />
+                <SelectValue placeholder="All Categories">
+                  {category === 'All' ? 'All Categories' : category}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Categories</SelectItem>
@@ -192,6 +195,7 @@ export function ExpensesPage() {  const { t, formatDate } = useLanguage()
         onOpenChange={setIsModalOpen} 
         onSave={handleSave} 
         initialData={selectedExpense} 
+        accounts={bankAccounts || []}
       />
 
       <ConfirmDeleteModal 

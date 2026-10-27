@@ -19,30 +19,19 @@ import { UsersPage } from '@/components/users-page'
 import { ActivityLogPage } from '@/components/activity-log-page'
 import { MeetingsPage } from '@/components/meetings-page'
 import { MainDashboard } from '@/components/dashboard/main-dashboard'
-import { InvoicesPage } from '@/components/finance/invoices/invoices-page'
 import { FinanceOverviewPage } from '@/components/finance/finance-overview/finance-overview-page'
 import { AkunPerkiraanPage } from '@/components/finance/akun-perkiraan/akun-perkiraan-page'
 
-import { PenawaranPenjualanPage } from '@/components/finance/penjualan/penawaran-penjualan-page'
-import { UangMukaPenjualanPage } from '@/components/finance/penjualan/uang-muka-penjualan-page'
 import { FakturPenjualanPage } from '@/components/finance/penjualan/faktur-penjualan-page'
-import { PenerimaanPenjualanPage } from '@/components/finance/penjualan/penerimaan-penjualan-page'
 import { PelangganPage } from '@/components/finance/penjualan/pelanggan-page'
 
-import { PesananPembelianPage } from '@/components/finance/pembelian/pesanan-pembelian-page'
 import { FakturPembelianPage } from '@/components/finance/pembelian/faktur-pembelian-page'
-import { UangMukaPembelianPage } from '@/components/finance/pembelian/uang-muka-pembelian-page'
-import { PembayaranPembelianPage } from '@/components/finance/pembelian/pembayaran-pembelian-page'
 import { PemasokPage } from '@/components/finance/pembelian/pemasok-page'
-
 
 import { ExpensesPage } from '@/components/finance/expenses/expenses-page'
 import { CashBankPage } from '@/components/finance/cash-bank/cash-bank-page'
 
 import { BarangJasaPage } from '@/components/finance/barang-jasa/barang-jasa-page'
-
-import { BukuBesarPage } from '@/components/finance/buku-besar/buku-besar-page'
-
 
 import { ReportsPage } from '@/components/finance/reports/reports-page'
 import { HROverviewPage } from '@/components/hr/hr-overview-page'
@@ -109,25 +98,19 @@ const financeMenu = [
   { label: 'Akun Perkiraan', icon: Wallet },
   {
     label: 'Penjualan', icon: TrendingUp, subItems: [
-      { label: 'Penawaran Penjualan' },
-      { label: 'Uang Muka Penjualan' },
       { label: 'Faktur Penjualan' },
-      { label: 'Penerimaan Penjualan' },
       { label: 'Pelanggan' }
     ]
   },
   {
     label: 'Pembelian', icon: TrendingDown, subItems: [
-      { label: 'Pesanan Pembelian' },
       { label: 'Faktur Pembelian' },
-      { label: 'Uang Muka Pembelian' },
-      { label: 'Pembayaran Pembelian' },
       { label: 'Pemasok' }
     ]
   },
+  { label: 'Pengeluaran', icon: Receipt },
   { label: 'Barang & Jasa', icon: Package },
-  { label: 'Karyawan', icon: Users },
-  { label: 'Buku Besar', icon: FileSpreadsheet },
+  { label: 'Laporan', icon: BarChart3 },
 ]
 const hrMenu = [
   { label: 'HR Overview', icon: LayoutDashboard },
@@ -331,38 +314,23 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
       'Cash & Bank': 'finance/cash-bank',
       'Akun Perkiraan': 'finance/chart-of-accounts',
       'Chart of Accounts': 'finance/chart-of-accounts',
-      'Penjualan': 'finance/sales',
-      'Sales': 'finance/sales',
-      'Penawaran Penjualan': 'finance/sales/penawaran',
-      'Sales Quote': 'finance/sales/penawaran',
-      'Uang Muka Penjualan': 'finance/sales/uang-muka',
-      'Sales Down Payment': 'finance/sales/uang-muka',
+      'Penjualan': 'finance/sales/faktur',
+      'Sales': 'finance/sales/faktur',
       'Faktur Penjualan': 'finance/sales/faktur',
       'Sales Invoice': 'finance/sales/faktur',
-      'Penerimaan Penjualan': 'finance/sales/penerimaan',
-      'Sales Receipt': 'finance/sales/penerimaan',
       'Pelanggan': 'finance/sales/pelanggan',
       'Customers': 'finance/sales/pelanggan',
-      'Pembelian': 'finance/purchases',
-      'Purchases': 'finance/purchases',
-      'Pesanan Pembelian': 'finance/purchases/pesanan',
-      'Purchase Order': 'finance/purchases/pesanan',
+      'Pembelian': 'finance/purchases/faktur',
+      'Purchases': 'finance/purchases/faktur',
       'Faktur Pembelian': 'finance/purchases/faktur',
       'Purchase Invoice': 'finance/purchases/faktur',
-      'Uang Muka Pembelian': 'finance/purchases/uang-muka',
-      'Purchase Down Payment': 'finance/purchases/uang-muka',
-      'Pembayaran Pembelian': 'finance/purchases/pembayaran',
-      'Purchase Payment': 'finance/purchases/pembayaran',
       'Pemasok': 'finance/purchases/pemasok',
       'Suppliers': 'finance/purchases/pemasok',
       'Barang & Jasa': 'finance/products-services',
       'Products & Services': 'finance/products-services',
-      'Karyawan': 'finance/employees',
-      'Employees': 'finance/employees',
-      'Buku Besar': 'finance/general-ledger',
-      'General Ledger': 'finance/general-ledger',
-      'Invoices': 'finance/invoices',
+      'Pengeluaran': 'finance/expenses',
       'Expenses': 'finance/expenses',
+      'Laporan': 'finance/reports',
       'Reports': 'finance/reports'
     }
 
@@ -880,39 +848,26 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Akun Perkiraan': return <AkunPerkiraanPage />
               case 'Chart of Accounts': return <AkunPerkiraanPage />
 
-              case 'Penjualan': return <PenawaranPenjualanPage />
-              case 'Sales': return <PenawaranPenjualanPage />
-              case 'Penawaran Penjualan': return <PenawaranPenjualanPage />
-              case 'Sales Quote': return <PenawaranPenjualanPage />
-              case 'Uang Muka Penjualan': return <UangMukaPenjualanPage />
-              case 'Sales Down Payment': return <UangMukaPenjualanPage />
+              case 'Penjualan': return <FakturPenjualanPage />
+              case 'Sales': return <FakturPenjualanPage />
               case 'Faktur Penjualan': return <FakturPenjualanPage />
               case 'Sales Invoice': return <FakturPenjualanPage />
-              case 'Penerimaan Penjualan': return <PenerimaanPenjualanPage />
-              case 'Sales Receipt': return <PenerimaanPenjualanPage />
               case 'Pelanggan': return <PelangganPage />
               case 'Customers': return <PelangganPage />
 
-              case 'Pembelian': return <PesananPembelianPage />
-              case 'Purchases': return <PesananPembelianPage />
-              case 'Pesanan Pembelian': return <PesananPembelianPage />
-              case 'Purchase Order': return <PesananPembelianPage />
+              case 'Pembelian': return <FakturPembelianPage />
+              case 'Purchases': return <FakturPembelianPage />
               case 'Faktur Pembelian': return <FakturPembelianPage />
               case 'Purchase Invoice': return <FakturPembelianPage />
-              case 'Uang Muka Pembelian': return <UangMukaPembelianPage />
-              case 'Purchase Down Payment': return <UangMukaPembelianPage />
-              case 'Pembayaran Pembelian': return <PembayaranPembelianPage />
-              case 'Purchase Payment': return <PembayaranPembelianPage />
               case 'Pemasok': return <PemasokPage />
               case 'Suppliers': return <PemasokPage />
 
               case 'Barang & Jasa': return <BarangJasaPage />
               case 'Products & Services': return <BarangJasaPage />
-              case 'Buku Besar': return <BukuBesarPage />
-              case 'General Ledger': return <BukuBesarPage />
 
-              case 'Invoices': return <InvoicesPage />
+              case 'Pengeluaran': return <ExpensesPage />
               case 'Expenses': return <ExpensesPage />
+              case 'Laporan': return <ReportsPage />
               case 'Reports': return <ReportsPage />
               case 'HR Overview': return <HROverviewPage />
               case 'Employees': return <EmployeesPage />

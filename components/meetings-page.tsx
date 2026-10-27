@@ -11,8 +11,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Search, Plus, Calendar, Clock, Video, Users, Play, Globe, Lock,
-  ShieldCheck, Copy, ExternalLink, MoreHorizontal, ChevronRight
+  ShieldCheck, Copy, ExternalLink, MoreHorizontal, ChevronRight,
+  Construction, Sparkles, CheckCircle2, Eye
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/components/ui/dialog'
 import { ScheduleMeetingDialog } from '@/components/meetings/dialogs/schedule-meeting-dialog'
 import { MeetingDetailSheet } from '@/components/meetings/dialogs/meeting-detail-sheet'
 import { MeetingRoom } from '@/components/meetings/meeting-room'
@@ -27,11 +35,13 @@ function getMeetingUrl(meetingCode: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { language } = useLanguage()
+  const isId = language === 'id'
   const map: Record<string, { label: string, variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-    SCHEDULED: { label: 'Scheduled', variant: 'default' },
-    LIVE: { label: '● Live', variant: 'destructive' },
-    ENDED: { label: 'Ended', variant: 'secondary' },
-    CANCELLED: { label: 'Cancelled', variant: 'outline' },
+    SCHEDULED: { label: isId ? 'Terjadwal' : 'Scheduled', variant: 'default' },
+    LIVE: { label: isId ? '● Live' : '● Live', variant: 'destructive' },
+    ENDED: { label: isId ? 'Selesai' : 'Ended', variant: 'secondary' },
+    CANCELLED: { label: isId ? 'Dibatalkan' : 'Cancelled', variant: 'outline' },
   }
   const config = map[status] || { label: status, variant: 'outline' }
   return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>
@@ -55,10 +65,24 @@ function MeetingCardSkeleton() {
 }
 
 function EmptyState({ tab, onSchedule }: { tab: string, onSchedule: () => void }) {
+  const { language, t } = useLanguage()
+  const isId = language === 'id'
   const messages: Record<string, { title: string, desc: string, showCta: boolean }> = {
-    upcoming: { title: 'No upcoming meetings', desc: 'Schedule a meeting to get started.', showCta: true },
-    today: { title: 'No meetings today', desc: 'You have a free day — enjoy it!', showCta: false },
-    past: { title: 'No past meetings', desc: 'Your meeting history will appear here.', showCta: false },
+    upcoming: {
+      title: isId ? 'Tidak ada rapat mendatang' : 'No upcoming meetings',
+      desc: isId ? 'Jadwalkan rapat untuk memulai kolaborasi.' : 'Schedule a meeting to get started.',
+      showCta: true
+    },
+    today: {
+      title: isId ? 'Tidak ada rapat hari ini' : 'No meetings today',
+      desc: isId ? 'Jadwal Anda kosong hari ini — nikmati harimu!' : 'You have a free day — enjoy it!',
+      showCta: false
+    },
+    past: {
+      title: isId ? 'Tidak ada riwayat rapat' : 'No past meetings',
+      desc: isId ? 'Riwayat rapat Anda akan muncul di sini.' : 'Your meeting history will appear here.',
+      showCta: false
+    },
   }
   const { title, desc, showCta } = messages[tab] || messages.upcoming
   return (
@@ -70,7 +94,7 @@ function EmptyState({ tab, onSchedule }: { tab: string, onSchedule: () => void }
       <p className="text-sm text-muted-foreground mb-4">{desc}</p>
       {showCta && (
         <Button size="sm" onClick={onSchedule}>
-          <Plus className="size-4 mr-1" /> Schedule Meeting
+          <Plus className="size-4 mr-1" /> {t('Schedule Meeting')}
         </Button>
       )}
     </div>
@@ -88,12 +112,13 @@ function MeetingCard({
   onDetail: () => void,
   onCopyLink: () => void,
 }) {
+  const { formatDate, formatTime, language } = useLanguage()
+  const isId = language === 'id'
   const isLive = meeting.status === 'LIVE'
   const isEnded = meeting.status === 'ENDED' || meeting.status === 'CANCELLED'
 
-  const startTime = new Date(meeting.start_time)
-  const dateStr = new Date(meeting.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const timeStr = startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const dateStr = formatDate(meeting.date)
+  const timeStr = formatTime(meeting.start_time)
 
   return (
     <div
@@ -107,14 +132,14 @@ function MeetingCard({
           <button
             className="p-1 rounded hover:bg-muted transition-colors"
             onClick={e => { e.stopPropagation(); onCopyLink() }}
-            title="Copy link"
+            title={isId ? 'Salin tautan' : 'Copy link'}
           >
             <Copy className="size-3.5 text-muted-foreground" />
           </button>
           <button
             className="p-1 rounded hover:bg-muted transition-colors"
             onClick={e => { e.stopPropagation(); onDetail() }}
-            title="View detail"
+            title={isId ? 'Lihat detail' : 'View detail'}
           >
             <ChevronRight className="size-3.5 text-muted-foreground" />
           </button>
@@ -137,15 +162,23 @@ function MeetingCard({
         </div>
         <div className="flex items-center gap-1.5">
           <Clock className="size-3.5 shrink-0" />
-          <span>{timeStr} · {meeting.duration} min</span>
+          <span>{timeStr} · {meeting.duration} {isId ? 'menit' : 'min'}</span>
         </div>
         <div className="flex items-center gap-1.5">
           {meeting.join_policy === 'INVITED_ONLY'
             ? <Lock className="size-3.5 shrink-0" />
             : <Globe className="size-3.5 shrink-0" />
           }
-          <span>{meeting.join_policy === 'INVITED_ONLY' ? 'Invited only' : 'Anyone with link'}</span>
-          {meeting.waiting_room && <span className="flex items-center gap-1"><ShieldCheck className="size-3" /> Waiting room</span>}
+          <span>
+            {meeting.join_policy === 'INVITED_ONLY'
+              ? (isId ? 'Hanya yang diundang' : 'Invited only')
+              : (isId ? 'Siapa pun dengan tautan' : 'Anyone with link')}
+          </span>
+          {meeting.waiting_room && (
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="size-3" /> {isId ? 'Ruang tunggu' : 'Waiting room'}
+            </span>
+          )}
         </div>
         {meeting.meeting_code && (
           <div className="flex items-center gap-1.5">
@@ -170,7 +203,7 @@ function MeetingCard({
             </div>
           )}
           {meeting.participants.length === 0 && (
-            <span className="text-xs text-muted-foreground">No participants yet</span>
+            <span className="text-xs text-muted-foreground">{isId ? 'Belum ada peserta' : 'No participants yet'}</span>
           )}
         </div>
 
@@ -183,7 +216,7 @@ function MeetingCard({
             onClick={e => { e.stopPropagation(); onJoin() }}
           >
             <Play className="size-3" />
-            {isLive ? 'Join Live' : 'Join'}
+            {isLive ? (isId ? 'Gabung Live' : 'Join Live') : (isId ? 'Gabung' : 'Join')}
           </Button>
         )}
       </div>
@@ -193,13 +226,16 @@ function MeetingCard({
 
 export function MeetingsPage({ slug }: { slug?: string[] }) {
   const router = useRouter()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  const isId = language === 'id'
+
   const [activeTab, setActiveTab] = useState<'upcoming' | 'today' | 'past'>('upcoming')
   const [searchQuery, setSearchQuery] = useState('')
   const [isScheduleOpen, setIsScheduleOpen] = useState(false)
   const [selectedMeeting, setSelectedMeeting] = useState<any>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [activeMeeting, setActiveMeeting] = useState<any>(null)
+  const [showDevModal, setShowDevModal] = useState(true)
 
   const { data: meetings, isLoading } = useMeetings()
   const { mutate: updateStatus } = useUpdateMeetingStatus()
@@ -244,7 +280,7 @@ export function MeetingsPage({ slug }: { slug?: string[] }) {
     if (!meeting.meeting_code) return
     const url = getMeetingUrl(meeting.meeting_code)
     navigator.clipboard.writeText(url).then(() => {
-      toast.success('Meeting link copied!', { description: url })
+      toast.success(isId ? 'Tautan rapat berhasil disalin!' : 'Meeting link copied!', { description: url })
     })
   }
 
@@ -254,9 +290,9 @@ export function MeetingsPage({ slug }: { slug?: string[] }) {
   }
 
   const tabs = [
-    { key: 'upcoming', label: 'Upcoming' },
-    { key: 'today', label: 'Today' },
-    { key: 'past', label: 'Past' },
+    { key: 'upcoming', label: isId ? 'Mendatang' : 'Upcoming' },
+    { key: 'today', label: isId ? 'Hari Ini' : 'Today' },
+    { key: 'past', label: isId ? 'Selesai' : 'Past' },
   ] as const
 
   const isCreating = slug && slug[1] === 'create'
@@ -281,7 +317,17 @@ export function MeetingsPage({ slug }: { slug?: string[] }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{t('Meetings')}</h1>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-2xl font-bold tracking-tight">{t('Meetings')}</h1>
+              <Badge
+                variant="outline"
+                onClick={() => setShowDevModal(true)}
+                className="cursor-pointer bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs font-semibold gap-1.5 hover:bg-amber-500/20 transition-all select-none shadow-2xs"
+              >
+                <Construction className="size-3.5" />
+                <span>{isId ? 'Tahap Pengembangan (Preview UI)' : 'Under Development (UI Preview)'}</span>
+              </Badge>
+            </div>
             <p className="text-sm text-muted-foreground mt-0.5">
               {t('Manage your scheduled meetings and video conferences.')}
             </p>
@@ -308,7 +354,7 @@ export function MeetingsPage({ slug }: { slug?: string[] }) {
           <div className="relative ml-auto w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
-              placeholder="Search meetings..."
+              placeholder={isId ? 'Cari jadwal rapat...' : 'Search meetings...'}
               className="pl-9 h-9 bg-background"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -350,6 +396,101 @@ export function MeetingsPage({ slug }: { slug?: string[] }) {
           onJoin={() => { setIsDetailOpen(false); handleJoin(selectedMeeting) }}
         />
       )}
+
+      {/* ─── MODAL TAHAP PENGEMBANGAN (Development Notice Modal) ─── */}
+      <Dialog open={showDevModal} onOpenChange={setShowDevModal}>
+        <DialogContent className="w-[95vw] sm:max-w-lg md:max-w-xl p-0 rounded-2xl border border-border shadow-2xl bg-card overflow-hidden">
+          {/* Header Banner */}
+          <div className="bg-linear-to-r from-amber-500/20 via-orange-500/15 to-primary/10 border-b border-border/70 p-6 flex items-start gap-4">
+            <div className="size-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 shadow-xs">
+              <Construction className="size-6 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <DialogTitle className="font-extrabold text-base sm:text-lg text-foreground tracking-tight">
+                  {isId ? 'Fitur Dalam Tahap Pengembangan' : 'Feature Under Active Development'}
+                </DialogTitle>
+                <Badge variant="outline" className="text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 uppercase tracking-wider">
+                  {isId ? 'Sedang Dikerjakan' : 'Work in Progress'}
+                </Badge>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+                {isId
+                  ? <>Modul <b>Meetings & Video Conference</b> saat ini sedang dalam proses pengembangan dan integrasi server WebRTC.</>
+                  : <>The <b>Meetings & Video Conference</b> module is currently in active development and WebRTC server integration.</>}
+              </DialogDescription>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Informational Callout */}
+            <div className="rounded-xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground space-y-2 leading-relaxed">
+              <p className="text-foreground font-semibold flex items-center gap-2">
+                <Sparkles className="size-4 text-amber-500" />
+                {isId ? 'Seluruh Tampilan Tetap Dapat Anda Jelajahi' : 'Full UI Preview Available'}
+              </p>
+              <p>
+                {isId
+                  ? 'Semua menu, tata letak antarmuka (UI), filter jadwal rapat, dan desain ruang meeting tetap ditampilkan secara utuh agar Anda dapat melihat dan mencoba pengalaman alur pengguna yang sedang dibangun.'
+                  : 'All menus, UI layouts, scheduling filters, and meeting room designs remain fully rendered so you can preview the user experience while live video calling is configured.'}
+              </p>
+            </div>
+
+            {/* Checklist Roadmap */}
+            <div className="space-y-2.5 text-xs">
+              <p className="font-bold text-foreground text-xs uppercase tracking-wider text-muted-foreground">
+                {isId ? 'Status Integrasi Modul' : 'Module Integration Status'}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+                  <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                  <span className="font-medium text-foreground">
+                    {isId ? 'Desain Ruang & Antarmuka' : 'Room & UI Layout'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+                  <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                  <span className="font-medium text-foreground">
+                    {isId ? 'Manajemen Jadwal Rapat' : 'Meeting Scheduling'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                  <Clock className="size-4 text-amber-500 shrink-0 animate-spin" />
+                  <span className="font-medium text-foreground">
+                    {isId ? 'Server WebRTC Video Call' : 'WebRTC Video Server'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5 p-2.5 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                  <Clock className="size-4 text-amber-500 shrink-0" />
+                  <span className="font-medium text-foreground">
+                    {isId ? 'Screen Share & Rekaman Rapat' : 'Screen Share & Recording'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2.5 border-t border-border/60">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/dashboard')}
+                className="w-full sm:w-auto text-xs text-muted-foreground hover:text-foreground"
+              >
+                {isId ? 'Kembali ke Dashboard' : 'Back to Dashboard'}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setShowDevModal(false)}
+                className="w-full sm:w-auto text-xs font-semibold gap-1.5 shadow-xs"
+              >
+                <Eye className="size-3.5" />
+                <span>{isId ? 'Lihat Tampilan (UI Preview)' : 'View Interface (UI Preview)'}</span>
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

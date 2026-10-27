@@ -6,9 +6,30 @@ import { requireAuth } from '@/lib/auth/authorization'
 export async function getDashboardData(dateRangeStr: string, projectFilter?: string) {
   const now = new Date();
   let startDate = new Date(0); // Default to all time
+  let endDate = new Date(now);
+
+  const monthNamesId: Record<string, number> = {
+    'januari': 0, 'februari': 1, 'maret': 2, 'april': 3, 'mei': 4, 'juni': 5,
+    'juli': 6, 'agustus': 7, 'september': 8, 'oktober': 9, 'november': 10, 'desember': 11
+  };
+
+  const lowerRange = (dateRangeStr || '').toLowerCase().trim();
 
   if (dateRangeStr === 'Today') {
     startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  } else if (dateRangeStr === 'This month' || dateRangeStr === 'Bulan Ini') {
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (dateRangeStr === 'Last month' || dateRangeStr === 'Bulan Lalu') {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  } else if (dateRangeStr.startsWith('Month:')) {
+    const monthIdx = parseInt(dateRangeStr.split(':')[1]);
+    startDate = new Date(now.getFullYear(), monthIdx, 1);
+    endDate = new Date(now.getFullYear(), monthIdx + 1, 0, 23, 59, 59);
+  } else if (monthNamesId[lowerRange] !== undefined) {
+    const monthIdx = monthNamesId[lowerRange];
+    startDate = new Date(now.getFullYear(), monthIdx, 1);
+    endDate = new Date(now.getFullYear(), monthIdx + 1, 0, 23, 59, 59);
   } else if (dateRangeStr === 'Last 7 days') {
     startDate = new Date();
     startDate.setDate(now.getDate() - 7);
@@ -34,11 +55,19 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
   const projectWhere: any = { is_archived: false };
   const taskWhere: any = {};
   if (startDate.getTime() > 0) {
-    taskWhere.date_created = { gte: startDate };
+    if (endDate.getTime() < now.getTime()) {
+      taskWhere.date_created = { gte: startDate, lte: endDate };
+    } else {
+      taskWhere.date_created = { gte: startDate };
+    }
   }
   const prodWhere: any = {};
   if (startDate.getTime() > 0) {
-    prodWhere.date = { gte: startDate };
+    if (endDate.getTime() < now.getTime()) {
+      prodWhere.date = { gte: startDate, lte: endDate };
+    } else {
+      prodWhere.date = { gte: startDate };
+    }
   }
   const prevProjectWhere: any = { is_archived: false, date_created: { gte: prevStartDate, lt: startDate } };
   const prevTaskWhere: any = { date_created: { gte: prevStartDate, lt: startDate } };
@@ -286,6 +315,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     const assigneesInRange = allAssignees.filter(a => {
       if (!a.task) return false;
       if (startDate.getTime() > 0 && new Date(a.task.date_created) < startDate) return false;
+      if (endDate.getTime() < now.getTime() && new Date(a.task.date_created) > endDate) return false;
       if (projectFilter && projectFilter !== 'Semua Project' && a.task.project_id !== parseInt(projectFilter)) return false;
       return true;
     });

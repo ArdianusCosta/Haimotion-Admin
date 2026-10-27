@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { getContacts, createContact, updateContact, deleteContact } from '@/app/actions/finance'
+import { useContacts, useCreateContact, useUpdateContact, useDeleteContact } from '@/components/finance/queries'
 import { ConfirmDeleteModal } from '@/components/finance/components/modals'
 import { toast } from 'sonner'
 import {
@@ -24,46 +24,31 @@ import {
 
 export function PelangganPage() {
   const { t } = useLanguage()
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data = [], isLoading: loading } = useContacts({ type: 'CUSTOMER' })
+  const createMutation = useCreateContact()
+  const updateMutation = useUpdateContact()
+  const deleteMutation = useDeleteContact()
+
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<number | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', address: ''
   })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const res = await getContacts({ type: 'CUSTOMER' })
-      setData(res)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSave = async () => {
     try {
       if (editingId) {
-        await updateContact(editingId, { ...formData, type: 'CUSTOMER' })
+        await updateMutation.mutateAsync({ id: editingId, data: { ...formData, type: 'CUSTOMER' } })
       } else {
-        await createContact({ ...formData, type: 'CUSTOMER' })
+        await createMutation.mutateAsync({ ...formData, type: 'CUSTOMER' })
       }
       setIsOpen(false)
       resetForm()
-      fetchData()
     } catch (err) {
       console.error(err)
     }
@@ -76,17 +61,11 @@ export function PelangganPage() {
 
   const confirmDelete = async () => {
     if (itemToDelete !== null) {
-      setIsDeleting(true)
       try {
-        await deleteContact(itemToDelete)
-        toast.success('Pelanggan berhasil dihapus')
-        fetchData()
+        await deleteMutation.mutateAsync(itemToDelete)
         setItemToDelete(null)
       } catch (err) {
         console.error(err)
-        toast.error('Gagal menghapus pelanggan')
-      } finally {
-        setIsDeleting(false)
       }
     }
   }
@@ -278,7 +257,7 @@ export function PelangganPage() {
         onConfirm={confirmDelete}
         title="Hapus Pelanggan"
         description="Apakah Anda yakin ingin menghapus pelanggan ini? Tindakan ini tidak dapat dibatalkan."
-        isLoading={isDeleting}
+        isLoading={deleteMutation.isPending}
       />
     </div>
   )

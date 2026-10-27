@@ -1,39 +1,34 @@
-import { useState, useEffect } from 'react'
-import { getChartOfAccounts, createAccount, updateAccount, deleteAccount } from '@/app/actions/finance'
+import { 
+  useChartOfAccounts, 
+  useCreateAccount, 
+  useUpdateAccount, 
+  useDeleteAccount 
+} from '@/components/finance/queries'
 
-export function useAkunPerkiraan() {
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const res = await getChartOfAccounts()
-      setData(res)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchData()
-  }, [])
+export function useAkunPerkiraan(filters?: { search?: string }) {
+  const { data = [], isLoading } = useChartOfAccounts(filters)
+  const createMutation = useCreateAccount()
+  const updateMutation = useUpdateAccount()
+  const deleteMutation = useDeleteAccount()
 
   const saveAccount = async (editingId: number | null, formData: any) => {
     if (editingId) {
-      await updateAccount(editingId, formData)
+      await updateMutation.mutateAsync({ id: editingId, data: formData })
     } else {
-      await createAccount(formData)
+      await createMutation.mutateAsync(formData)
     }
-    await fetchData()
   }
 
   const removeAccount = async (id: number) => {
-    await deleteAccount(id)
-    await fetchData()
+    await deleteMutation.mutateAsync(id)
   }
 
-  return { data, loading, saveAccount, removeAccount }
+  return { 
+    data: data || [], 
+    loading: isLoading, 
+    saveAccount, 
+    removeAccount,
+    isSaving: createMutation.isPending || updateMutation.isPending,
+    isDeleting: deleteMutation.isPending
+  }
 }

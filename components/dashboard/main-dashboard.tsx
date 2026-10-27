@@ -9,13 +9,12 @@ import { useLanguage } from '@/components/language-provider'
 import { KpiSummaryCards } from './components/kpi-summary-cards'
 import { ProjectProgressTrends } from './components/project-progress-trends'
 import { RecentActivitiesCard } from './components/recent-activities-card'
-import { TeamRevisionChart } from './components/team-revision-chart'
+import { TeamKpiSection } from './components/team-kpi-section'
 import { ProjectProgressDetails } from './components/project-progress-details'
 import { ProjectDetailInspector } from './components/project-detail-inspector'
 import { ParetoChart } from './components/pareto-chart'
 import { ProductionMonitoring } from './components/production-monitoring'
 import { ProjectOverview } from './components/project-overview'
-import { TeamKpiSection } from './components/team-kpi-section'
 
 export function MainDashboard({ user }: { user: any }) {
   const { range, setRange, projectFilter, setProjectFilter, loading, isFetching, data } = useDashboard()
@@ -25,14 +24,23 @@ export function MainDashboard({ user }: { user: any }) {
   const [dailyQuote, setDailyQuote] = useState("")
   const [selectedProject, setSelectedProject] = useState<any>(null)
 
+  const isId = language === 'id'
+
   useEffect(() => {
     const now = new Date()
     const hour = now.getHours()
 
-    if (hour >= 5 && hour < 12) setGreeting("Selamat Pagi")
-    else if (hour >= 12 && hour < 17) setGreeting("Selamat Siang")
-    else if (hour >= 17 && hour < 21) setGreeting("Selamat Sore")
-    else setGreeting("Selamat Malam")
+    if (isId) {
+      if (hour >= 5 && hour < 12) setGreeting("Selamat Pagi")
+      else if (hour >= 12 && hour < 17) setGreeting("Selamat Siang")
+      else if (hour >= 17 && hour < 21) setGreeting("Selamat Sore")
+      else setGreeting("Selamat Malam")
+    } else {
+      if (hour >= 5 && hour < 12) setGreeting("Good Morning")
+      else if (hour >= 12 && hour < 17) setGreeting("Good Afternoon")
+      else if (hour >= 17 && hour < 21) setGreeting("Good Evening")
+      else setGreeting("Good Night")
+    }
 
     const quotesId = [
       "Siap untuk menciptakan sesuatu yang luar biasa hari ini?",
@@ -49,8 +57,24 @@ export function MainDashboard({ user }: { user: any }) {
       "Beri yang terbaik hari ini, dan nikmati hasilnya esok hari."
     ]
 
-    setDailyQuote(quotesId[now.getDate() % quotesId.length])
-  }, [language])
+    const quotesEn = [
+      "Ready to create something extraordinary today?",
+      "Small daily improvements accumulate into stunning results.",
+      "Stay focused, execute with passion, and hit your goals!",
+      "Great achievements always start with small actions. Let's build!",
+      "Make today productive and full of creative inspiration.",
+      "Success is the outcome of consistent preparation and dedication.",
+      "Never give up! Every challenge is a stepping stone to mastery.",
+      "Hard work always yields remarkable rewards. Keep going!",
+      "Unleash your full potential and drive real progress today.",
+      "New day, new milestones. Let's accomplish them with excellence!",
+      "Focus on the craft; the results will naturally follow.",
+      "Give your best today, and celebrate your achievements tomorrow."
+    ]
+
+    const quotes = isId ? quotesId : quotesEn
+    setDailyQuote(quotes[now.getDate() % quotes.length])
+  }, [language, isId])
 
   // Automatically select the first project for the inspector
   useEffect(() => {
@@ -66,13 +90,19 @@ export function MainDashboard({ user }: { user: any }) {
       <div className="flex items-center justify-center h-full min-h-[500px]">
         <div className="flex flex-col items-center gap-4">
           <div className="size-9 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm font-medium text-muted-foreground">Memuat data dashboard workspace...</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            {isId ? 'Memuat data dashboard workspace...' : 'Loading workspace dashboard...'}
+          </p>
         </div>
       </div>
     )
   }
 
-  if (!data) return <div className="p-6 text-sm text-destructive">Gagal memuat data dashboard.</div>
+  if (!data) return (
+    <div className="p-6 text-sm text-destructive">
+      {isId ? 'Gagal memuat data dashboard.' : 'Failed to load dashboard data.'}
+    </div>
+  )
 
   const userName = user?.name || `${user?.firstname || ''} ${user?.lastname || ''}`.trim() || 'User'
   const userRoleOrDivision = user?.role?.name || user?.address || 'IT - Web Developer Staff'
@@ -83,7 +113,7 @@ export function MainDashboard({ user }: { user: any }) {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Hi, <span className="text-primary">{userName}</span>{' '}
+            {greeting}, <span className="text-primary">{userName}</span>{' '}
             <span className="text-sm sm:text-base font-medium text-muted-foreground">
               ({userRoleOrDivision})
             </span>{' '}
@@ -97,19 +127,38 @@ export function MainDashboard({ user }: { user: any }) {
           {/* Periode Capsule */}
           <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5">
             <Calendar className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-[11px] font-medium text-muted-foreground select-none">Periode:</span>
+            <span className="text-[11px] font-medium text-muted-foreground select-none">
+              {isId ? 'Periode:' : 'Period:'}
+            </span>
             <Select value={range} onValueChange={setRange}>
-              <SelectTrigger className="h-7 w-[135px] sm:w-[145px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors">
-                <SelectValue placeholder="Pilih Periode" />
+              <SelectTrigger className="h-7 w-[140px] sm:w-[170px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
+                <SelectValue placeholder={isId ? 'Pilih Periode' : 'Select Period'} />
               </SelectTrigger>
-              <SelectContent align="end">
-                <SelectItem value="Today">Hari Ini</SelectItem>
-                <SelectItem value="Last 7 days">7 Hari Terakhir</SelectItem>
-                <SelectItem value="Last 30 days">30 Hari Terakhir</SelectItem>
-                <SelectItem value="Last 3 months">3 Bulan Terakhir</SelectItem>
-                <SelectItem value="Last 6 months">6 Bulan Terakhir</SelectItem>
-                <SelectItem value="This year">Tahun Ini</SelectItem>
-                <SelectItem value="All time">Semua Periode</SelectItem>
+              <SelectContent align="end" className="max-h-[340px] overflow-y-auto">
+                <SelectItem value="All time">{isId ? 'Semua Periode' : 'All Time'}</SelectItem>
+                <SelectItem value="Today">{isId ? 'Hari Ini' : 'Today'}</SelectItem>
+                <SelectItem value="This month">{isId ? 'Bulan Ini' : 'This Month'}</SelectItem>
+                <SelectItem value="Last month">{isId ? 'Bulan Lalu' : 'Last Month'}</SelectItem>
+                <SelectItem value="Last 7 days">{isId ? '7 Hari Terakhir' : 'Last 7 Days'}</SelectItem>
+                <SelectItem value="Last 30 days">{isId ? '30 Hari Terakhir' : 'Last 30 Days'}</SelectItem>
+                <SelectItem value="Last 3 months">{isId ? '3 Bulan Terakhir' : 'Last 3 Months'}</SelectItem>
+                <SelectItem value="Last 6 months">{isId ? '6 Bulan Terakhir' : 'Last 6 Months'}</SelectItem>
+                <SelectItem value="This year">{isId ? 'Tahun Ini' : 'This Year'}</SelectItem>
+                <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-t border-border/50 my-1 bg-muted/40 rounded-sm">
+                  {isId ? 'Pilih Bulan Kalender' : 'Select Calendar Month'}
+                </div>
+                <SelectItem value="Month:9">{isId ? 'Oktober' : 'October'}</SelectItem>
+                <SelectItem value="Month:8">{isId ? 'September' : 'September'}</SelectItem>
+                <SelectItem value="Month:7">{isId ? 'Agustus' : 'August'}</SelectItem>
+                <SelectItem value="Month:6">{isId ? 'Juli' : 'July'}</SelectItem>
+                <SelectItem value="Month:5">{isId ? 'Juni' : 'June'}</SelectItem>
+                <SelectItem value="Month:4">{isId ? 'Mei' : 'May'}</SelectItem>
+                <SelectItem value="Month:3">{isId ? 'April' : 'April'}</SelectItem>
+                <SelectItem value="Month:2">{isId ? 'Maret' : 'March'}</SelectItem>
+                <SelectItem value="Month:1">{isId ? 'Februari' : 'February'}</SelectItem>
+                <SelectItem value="Month:0">{isId ? 'Januari' : 'January'}</SelectItem>
+                <SelectItem value="Month:10">{isId ? 'November' : 'November'}</SelectItem>
+                <SelectItem value="Month:11">{isId ? 'Desember' : 'December'}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -117,13 +166,15 @@ export function MainDashboard({ user }: { user: any }) {
           {/* Project Capsule */}
           <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5">
             <Briefcase className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-[11px] font-medium text-muted-foreground select-none">Project:</span>
+            <span className="text-[11px] font-medium text-muted-foreground select-none">
+              {isId ? 'Project:' : 'Project:'}
+            </span>
             <Select value={projectFilter} onValueChange={setProjectFilter}>
               <SelectTrigger className="h-7 w-[150px] sm:w-[185px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
-                <SelectValue placeholder="Pilih Project" />
+                <SelectValue placeholder={isId ? 'Pilih Project' : 'Select Project'} />
               </SelectTrigger>
               <SelectContent align="end">
-                <SelectItem value="Semua Project">Semua Project</SelectItem>
+                <SelectItem value="Semua Project">{isId ? 'Semua Project' : 'All Projects'}</SelectItem>
                 {(data?.allProjectsList || data?.projectPerformance || []).map((p: any) => (
                   <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                 ))}
@@ -158,8 +209,8 @@ export function MainDashboard({ user }: { user: any }) {
         <RecentActivitiesCard data={data} />
       </div>
 
-      {/* 4. TEAM REVISION OVERVIEW & ASSIGNMENTS (Grouped Bar Chart + Tutorial Video Banner) */}
-      <TeamRevisionChart data={data} />
+      {/* 4. TEAM KPI & PRODUKTIVITAS TIM (Unified: Overview Grafik, Leaderboard, Kartu Performa, Distribusi Project) */}
+      <TeamKpiSection data={data} range={range} projectFilter={projectFilter} />
 
       {/* 5. PROJECT PROGRESS DETAILS (Carousel of Donut Charts with Left/Right Navigation) */}
       <ProjectProgressDetails
@@ -179,9 +230,6 @@ export function MainDashboard({ user }: { user: any }) {
 
       {/* 8. PROJECT OVERVIEW STAGES */}
       <ProjectOverview data={data} />
-
-      {/* 9. TEAM PRODUCTIVITY & LEADERBOARD SECTION */}
-      <TeamKpiSection range={range} projectFilter={projectFilter} />
     </div>
   )
 }

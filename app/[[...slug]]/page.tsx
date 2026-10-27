@@ -35,65 +35,41 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'coa': 'Akun Perkiraan',
         'accounts': 'Akun Perkiraan',
 
-        // Penjualan / Sales (Parent)
+        // Penjualan / Sales
         'sales': 'Penjualan',
         'penjualan': 'Penjualan',
-
-        // Penjualan Sub-items
-        'sales/penawaran': 'Penawaran Penjualan',
-        'penawaran': 'Penawaran Penjualan',
-        'penawaran-penjualan': 'Penawaran Penjualan',
-        'sales/quote': 'Penawaran Penjualan',
-        'sales/quotation': 'Penawaran Penjualan',
-        'quotation': 'Penawaran Penjualan',
-
-        'sales/uang-muka': 'Uang Muka Penjualan',
-        'uang-muka': 'Uang Muka Penjualan',
-        'uang-muka-penjualan': 'Uang Muka Penjualan',
-        'sales/down-payment': 'Uang Muka Penjualan',
-        'down-payment': 'Uang Muka Penjualan',
-
         'sales/faktur': 'Faktur Penjualan',
         'faktur-penjualan': 'Faktur Penjualan',
         'sales/invoice': 'Faktur Penjualan',
         'sales/invoices': 'Faktur Penjualan',
-
-        'sales/penerimaan': 'Penerimaan Penjualan',
-        'penerimaan-penjualan': 'Penerimaan Penjualan',
-        'sales/receipt': 'Penerimaan Penjualan',
-        'sales/receipts': 'Penerimaan Penjualan',
-
+        'invoices': 'Faktur Penjualan',
+        // Alias lama: penawaran / uang muka / penerimaan kini memakai Faktur Penjualan
+        'sales/penawaran': 'Faktur Penjualan',
+        'penawaran': 'Faktur Penjualan',
+        'sales/quote': 'Faktur Penjualan',
+        'sales/uang-muka': 'Faktur Penjualan',
+        'uang-muka': 'Faktur Penjualan',
+        'sales/penerimaan': 'Faktur Penjualan',
+        'penerimaan-penjualan': 'Faktur Penjualan',
         'sales/pelanggan': 'Pelanggan',
         'pelanggan': 'Pelanggan',
         'sales/customers': 'Pelanggan',
         'customers': 'Pelanggan',
 
-        // Pembelian / Purchases (Parent)
+        // Pembelian / Purchases
         'purchases': 'Pembelian',
         'pembelian': 'Pembelian',
-
-        // Pembelian Sub-items
-        'purchases/pesanan': 'Pesanan Pembelian',
-        'pesanan': 'Pesanan Pembelian',
-        'pesanan-pembelian': 'Pesanan Pembelian',
-        'purchases/order': 'Pesanan Pembelian',
-        'purchases/orders': 'Pesanan Pembelian',
-
         'purchases/faktur': 'Faktur Pembelian',
         'faktur-pembelian': 'Faktur Pembelian',
         'purchases/invoice': 'Faktur Pembelian',
         'purchases/invoices': 'Faktur Pembelian',
-
-        'purchases/uang-muka': 'Uang Muka Pembelian',
-        'uang-muka-pembelian': 'Uang Muka Pembelian',
-        'purchases/down-payment': 'Uang Muka Pembelian',
-
-        'purchases/pembayaran': 'Pembayaran Pembelian',
-        'pembayaran': 'Pembayaran Pembelian',
-        'pembayaran-pembelian': 'Pembayaran Pembelian',
-        'purchases/payment': 'Pembayaran Pembelian',
-        'purchases/payments': 'Pembayaran Pembelian',
-
+        // Alias lama: pesanan / uang muka / pembayaran kini memakai Faktur Pembelian
+        'purchases/pesanan': 'Faktur Pembelian',
+        'pesanan': 'Faktur Pembelian',
+        'purchases/uang-muka': 'Faktur Pembelian',
+        'uang-muka-pembelian': 'Faktur Pembelian',
+        'purchases/pembayaran': 'Faktur Pembelian',
+        'pembayaran': 'Faktur Pembelian',
         'purchases/pemasok': 'Pemasok',
         'pemasok': 'Pemasok',
         'purchases/suppliers': 'Pemasok',
@@ -105,19 +81,20 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'products': 'Barang & Jasa',
         'services': 'Barang & Jasa',
 
-        // Karyawan / Employees
-        'employees': 'Karyawan',
-        'karyawan': 'Karyawan',
+        // Pengeluaran / Expenses
+        'expenses': 'Pengeluaran',
+        'pengeluaran': 'Pengeluaran',
 
-        // Buku Besar / General Ledger
-        'general-ledger': 'Buku Besar',
-        'buku-besar': 'Buku Besar',
-        'ledger': 'Buku Besar',
+        // Laporan / Reports (menggantikan Buku Besar)
+        'reports': 'Laporan',
+        'laporan': 'Laporan',
+        'general-ledger': 'Laporan',
+        'buku-besar': 'Laporan',
+        'ledger': 'Laporan',
 
-        // Extra Finance Pages
-        'invoices': 'Invoices',
-        'expenses': 'Expenses',
-        'reports': 'Reports'
+        // Karyawan finance lama diarahkan ke modul HR
+        'employees': 'Employees',
+        'karyawan': 'Employees'
       }
       initialSection = financeRouteMap[fullSubRoute] || financeRouteMap[subRoute] || 'Beranda'
     } else if (resolvedParams.slug[0].toLowerCase() === 'hr' && resolvedParams.slug.length > 1) {

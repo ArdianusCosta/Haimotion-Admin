@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { getContacts, createContact, updateContact, deleteContact } from '@/app/actions/finance'
+import { useContacts, useCreateContact, useUpdateContact, useDeleteContact } from '@/components/finance/queries'
 import { ConfirmDeleteModal } from '@/components/finance/components/modals'
 import { toast } from 'sonner'
 import {
@@ -26,52 +26,33 @@ import {
 
 export function PemasokPage() {
   const { t } = useLanguage()
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data = [], isLoading: loading } = useContacts({ type: 'SUPPLIER' })
+  const createMutation = useCreateContact()
+  const updateMutation = useUpdateContact()
+  const deleteMutation = useDeleteContact()
+
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<number | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', address: ''
   })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const res = await getContacts({ type: 'SUPPLIER' })
-      setData(res || [])
-    } catch (err) {
-      console.error(err)
-      toast.error('Gagal memuat data pemasok')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSave = async () => {
     try {
       if (editingId) {
-        await updateContact(editingId, { ...formData, type: 'SUPPLIER' })
-        toast.success('Pemasok berhasil diperbarui')
+        await updateMutation.mutateAsync({ id: editingId, data: { ...formData, type: 'SUPPLIER' } })
       } else {
-        await createContact({ ...formData, type: 'SUPPLIER' })
-        toast.success('Pemasok berhasil ditambahkan')
+        await createMutation.mutateAsync({ ...formData, type: 'SUPPLIER' })
       }
       setIsOpen(false)
       resetForm()
-      fetchData()
     } catch (err) {
       console.error(err)
-      toast.error('Gagal menyimpan pemasok')
     }
   }
 
@@ -82,17 +63,11 @@ export function PemasokPage() {
 
   const confirmDelete = async () => {
     if (itemToDelete !== null) {
-      setIsDeleting(true)
       try {
-        await deleteContact(itemToDelete)
-        toast.success('Pemasok berhasil dihapus')
-        fetchData()
+        await deleteMutation.mutateAsync(itemToDelete)
         setItemToDelete(null)
       } catch (err) {
         console.error(err)
-        toast.error('Gagal menghapus pemasok')
-      } finally {
-        setIsDeleting(false)
       }
     }
   }
@@ -285,7 +260,7 @@ export function PemasokPage() {
         onConfirm={confirmDelete}
         title="Hapus Pemasok"
         description="Apakah Anda yakin ingin menghapus pemasok ini? Tindakan ini tidak dapat dibatalkan."
-        isLoading={isDeleting}
+        isLoading={deleteMutation.isPending}
       />
     </div>
   )

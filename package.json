@@ -6,6 +6,7 @@
     "dev": "next dev -H 0.0.0.0",
     "build": "node scripts/prepare-prisma.js generate && next build",
     "start": "next start",
+    "start:cpanel": "node server.js",
     "prisma:generate": "node scripts/prepare-prisma.js generate",
     "db:push": "node scripts/prepare-prisma.js db push",
     "db:studio": "node scripts/prepare-prisma.js studio",

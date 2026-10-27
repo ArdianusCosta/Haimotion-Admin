@@ -4,6 +4,62 @@ import prisma from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
 
+/**
+ * Modul Finance.
+ *
+ * Satu tabel (`finance_invoices`) dipakai untuk faktur penjualan maupun faktur
+ * pembelian, dibedakan lewat kolom `type`. Ini menghindari duplikasi model,
+ * aksi, dan UI untuk dokumen yang strukturnya sama.
+ */
+
+export type InvoiceType = 'SALES' | 'PURCHASE'
+
+const EPSILON = 0.005
+const round2 = (value: number) => Math.round((Number(value) || 0) * 100) / 100
+
+/** Status yang dianggap final sehingga tidak boleh berubah sendiri jadi "Overdue". */
+const CLOSED_STATUSES = ['Paid', 'Cancelled', 'Draft']
+
+async function currentUserId(): Promise<number> {
+  const auth = await requireAuth()
+  return typeof auth.id === 'string' ? parseInt(auth.id, 10) : auth.id
+}
+
+function normalizeType(type?: string | null): InvoiceType {
+  return type === 'PURCHASE' ? 'PURCHASE' : 'SALES'
+}
+
+function startOfToday() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return today
+}
+
+/**
+ * Status efektif sebuah faktur. Faktur yang sudah jatuh tempo tapi belum lunas
+ * ditampilkan sebagai "Overdue" tanpa perlu mengubah data di database.
+ */
+function deriveStatus(invoice: { status: string; due_date: Date | string }): string {
+  if (CLOSED_STATUSES.includes(invoice.status)) return invoice.status
+  const due = new Date(invoice.due_date)
+  if (due.getTime() < startOfToday().getTime()) return 'Overdue'
+  return invoice.status
+}
+
+/** Nomor dokumen berurutan per jenis per tahun, mis. INV-2026-0001 / PIB-2026-0001. */
+async function generateInvoiceReference(type: InvoiceType): Promise<string> {
+  const prefix = type === 'PURCHASE' ? 'PIB' : 'INV'
+  const year = new Date().getFullYear()
+  const base = `${prefix}-${year}-`
+  const last = await prisma.financeInvoice.findFirst({
+    where: { reference: { startsWith: base } },
+    orderBy: { reference: 'desc' },
+    select: { reference: true }
+  })
+  const parsed = last ? parseInt(last.reference.slice(base.length), 10) : 0
+  return `${base}${String((Number.isNaN(parsed) ? 0 : parsed) + 1).padStart(4, '0')}`
+}
+
 function toCSV(records: any[]) {
   if (records.length === 0) return ''
   const headers = Object.keys(records[0])
@@ -29,7 +85,7 @@ function fromCSV(csv: string) {
   const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
   const records = []
   for (let i = 1; i < lines.length; i++) {
-    // Basic CSV line parsing (doesn't handle commas inside quotes perfectly, but sufficient here)
+    // Parser sederhana: cukup untuk CSV tanpa koma di dalam tanda kutip.
     const values = lines[i].split(',')
     const record: any = {}
     headers.forEach((h, idx) => {
@@ -42,229 +98,565 @@ function fromCSV(csv: string) {
   return records
 }
 
+/** Hitung total faktur dari rincian item. Mengembalikan null jika tidak ada item. */
+function sumItems(items?: Array<{ quantity?: number | string; price?: number | string }> | null): number | null {
+  if (!items || items.length === 0) return null
+  return round2(
+    items.reduce((total, item) => {
+      const qty = Number(item.quantity) || 0
+      const price = Number(item.price) || 0
+      return total + qty * price
+    }, 0)
+  )
+}
+
+/** Status faktur baru tidak boleh langsung "Paid" sebelum ada pembayaran tercatat. */
+function initialStatus(status?: string | null): string {
+  const value = (status || 'Draft').trim()
+  if (value === 'Paid') return 'Sent'
+  return value
+}
+
+/** Cari id master kategori berdasarkan nama. Null bila belum terdaftar. */
+async function resolveCategoryId(name: string): Promise<number | null> {
+  const category = await prisma.financeCategory.findFirst({ where: { name } })
+  return category?.id ?? null
+}
+
 // -----------------------------------------------------------------------------
 // OVERVIEW & SUMMARY
 // -----------------------------------------------------------------------------
 export async function getFinanceSummary() {
   await requireAuth()
-  
-  const [invoices, expenses, accounts, unpaidInvoicesCount, paidInvoicesCount, totalTransactionsCount] = await Promise.all([
-    prisma.financeInvoice.aggregate({
-      _sum: { amount: true },
-      where: { status: 'Paid' }
+
+  const today = startOfToday()
+  const year = new Date().getFullYear()
+  const yearStart = new Date(year, 0, 1)
+  const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999)
+
+  const [
+    salesInvoices,
+    purchaseInvoices,
+    paidExpenses,
+    accounts,
+    unpaidInvoices,
+    paidInvoicesCount,
+    payments,
+    recentTransactions,
+    totalTransactionsCount
+  ] = await Promise.all([
+    prisma.financeInvoice.findMany({
+      where: { type: 'SALES' },
+      select: { amount: true, status: true, due_date: true, payments: { select: { amount: true } } }
     }),
-    prisma.financeExpense.aggregate({
-      _sum: { amount: true },
-      where: { status: 'Paid' }
+    prisma.financeInvoice.findMany({
+      where: { type: 'PURCHASE' },
+      select: { amount: true, status: true, payments: { select: { amount: true } } }
     }),
-    prisma.financeAccount.aggregate({
-      _sum: { balance: true }
+    prisma.financeExpense.aggregate({ _sum: { amount: true }, where: { status: 'Paid' } }),
+    prisma.financeAccount.aggregate({ _sum: { balance: true } }),
+    // Faktur penjualan yang belum lunas (termasuk yang sudah lewat jatuh tempo)
+    prisma.financeInvoice.findMany({
+      where: { type: 'SALES', status: { notIn: ['Paid', 'Cancelled'] } },
+      select: { amount: true, status: true, due_date: true, payments: { select: { amount: true } } }
     }),
-    prisma.financeInvoice.count({
-      where: { status: { in: ['Draft', 'Sent', 'Overdue', 'Unpaid'] } }
+    prisma.financeInvoice.count({ where: { type: 'SALES', status: 'Paid' } }),
+    prisma.financePayment.findMany({
+      where: { payment_date: { gte: yearStart, lte: yearEnd } },
+      select: { amount: true, payment_date: true, invoice: { select: { type: true } } }
     }),
-    prisma.financeInvoice.count({
-      where: { status: 'Paid' }
+    prisma.financeTransaction.findMany({
+      orderBy: { date: 'desc' },
+      take: 6,
+      include: { account: { select: { name: true } } }
     }),
     prisma.financeTransaction.count()
   ])
-  
-  const totalRevenue = invoices._sum.amount || 0
-  const totalExpenses = expenses._sum.amount || 0
-  const netProfit = totalRevenue - totalExpenses
-  
-  const outstandingInvoicesResult = await prisma.financeInvoice.aggregate({
-    _sum: { amount: true },
-    where: { status: { in: ['Draft', 'Sent', 'Overdue', 'Unpaid'] } }
-  })
 
-  // Group transactions by month for the current year
-  const currentYear = new Date().getFullYear()
-  const transactions = await prisma.financeTransaction.findMany({
-    where: {
-      date: {
-        gte: new Date(`${currentYear}-01-01`),
-        lte: new Date(`${currentYear}-12-31`)
-      }
-    }
-  })
+  const paidOf = (invoice: { payments: Array<{ amount: number }> }) =>
+    (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0)
+
+  /**
+   * Nilai yang diakui = total pembayaran yang tercatat; untuk data lama yang
+   * statusnya sudah "Paid" tetapi belum punya baris pembayaran, pakai nilai faktur.
+   */
+  const recognizedOf = (invoice: { amount: number; status: string; payments: Array<{ amount: number }> }) => {
+    const paid = paidOf(invoice)
+    if (paid > 0) return paid
+    return invoice.status === 'Paid' ? invoice.amount : 0
+  }
+
+  // Pendapatan diakui dari pembayaran faktur penjualan, biaya dari faktur pembelian.
+  const totalRevenue = round2(salesInvoices.reduce((sum, i) => sum + recognizedOf(i), 0))
+  const purchaseCost = round2(purchaseInvoices.reduce((sum, i) => sum + recognizedOf(i), 0))
+  const operatingExpenses = round2(paidExpenses._sum.amount || 0)
+  const totalExpenses = round2(purchaseCost + operatingExpenses)
+
+  const outstandingInvoices = round2(
+    unpaidInvoices.reduce((sum, i) => sum + Math.max(0, i.amount - paidOf(i)), 0)
+  )
+  const overdueInvoicesCount = unpaidInvoices.filter(i => deriveStatus(i) === 'Overdue').length
 
   const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const month = new Date(currentYear, i).toLocaleString('en-US', { month: 'short' })
+    const month = new Date(year, i).toLocaleString('en-US', { month: 'short' })
     return { name: month, income: 0, expenses: 0 }
   })
 
-  transactions.forEach(tx => {
-    const monthIndex = new Date(tx.date).getMonth()
-    if (tx.type === 'Income') {
-      monthlyData[monthIndex].income += tx.amount
-    } else if (tx.type === 'Expense') {
-      monthlyData[monthIndex].expenses += tx.amount
+  // Arus kas per bulan diambil dari transaksi kas/bank yang benar-benar tercatat
+  payments.forEach(payment => {
+    const monthIndex = new Date(payment.payment_date).getMonth()
+    if (monthIndex < 0 || monthIndex > 11) return
+    if (payment.invoice?.type === 'PURCHASE') {
+      monthlyData[monthIndex].expenses += payment.amount
+    } else {
+      monthlyData[monthIndex].income += payment.amount
     }
   })
-  
+
   return {
     totalRevenue,
     totalExpenses,
-    netProfit,
-    outstandingInvoices: outstandingInvoicesResult._sum.amount || 0,
-    outstandingInvoicesCount: unpaidInvoicesCount,
+    purchaseCost,
+    operatingExpenses,
+    netProfit: round2(totalRevenue - totalExpenses),
+    outstandingInvoices,
+    outstandingInvoicesCount: unpaidInvoices.length,
+    overdueInvoicesCount,
     paidInvoicesCount,
     totalTransactionsCount,
-    cashAndBank: accounts._sum.balance || 0,
-    monthlyData
+    cashAndBank: round2(accounts._sum.balance || 0),
+    monthlyData,
+    recentTransactions: recentTransactions.map(tx => ({
+      id: tx.id,
+      date: tx.date,
+      description: tx.description,
+      type: tx.type,
+      amount: tx.amount,
+      reference: tx.reference,
+      account: tx.account?.name || '-'
+    })),
+    today
   }
 }
 
 // -----------------------------------------------------------------------------
-// INVOICES
+// INVOICES (faktur penjualan & pembelian)
 // -----------------------------------------------------------------------------
-export async function getInvoices(filters?: { status?: string, search?: string }) {
+export async function getInvoices(filters?: { type?: InvoiceType | string; status?: string; search?: string }) {
   await requireAuth()
-  
-  const where: any = {}
+
+  const conditions: any[] = [{ type: normalizeType(filters?.type) }]
+
   if (filters?.status && filters.status !== 'All') {
-    where.status = filters.status
+    if (filters.status === 'Overdue') {
+      conditions.push({
+        OR: [
+          { status: 'Overdue' },
+          {
+            AND: [
+              { status: { in: ['Sent', 'Unpaid', 'Partial'] } },
+              { due_date: { lt: startOfToday() } }
+            ]
+          }
+        ]
+      })
+    } else {
+      conditions.push({ status: filters.status })
+    }
   }
+
   if (filters?.search) {
-    where.OR = [
-      { customer_name: { contains: filters.search } },
-      { reference: { contains: filters.search } }
-    ]
+    conditions.push({
+      OR: [
+        { customer_name: { contains: filters.search } },
+        { reference: { contains: filters.search } }
+      ]
+    })
   }
-  
-  return prisma.financeInvoice.findMany({
-    where,
-    orderBy: { created_at: 'desc' },
-    include: { items: true, payments: true }
+
+  const invoices = await prisma.financeInvoice.findMany({
+    where: { AND: conditions },
+    orderBy: [{ date: 'desc' }, { id: 'desc' }],
+    include: {
+      items: true,
+      payments: { orderBy: { payment_date: 'desc' } },
+      contact: { select: { id: true, name: true, email: true, phone: true } }
+    }
+  })
+
+  return invoices.map(invoice => {
+    const paid = round2((invoice.payments || []).reduce((sum, p) => sum + p.amount, 0))
+    return {
+      ...invoice,
+      paid_amount: paid,
+      outstanding: round2(Math.max(0, invoice.amount - paid)),
+      display_status: deriveStatus(invoice)
+    }
   })
 }
 
 export async function createInvoice(data: any) {
-  const auth = await requireAuth()
-  
-  // Format dates
-  const date = data.date ? new Date(data.date) : new Date()
-  const due_date = data.dueDate ? new Date(data.dueDate) : new Date()
-  
-  // Create reference if missing
-  const ref = data.reference || `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`
+  const uid = await currentUserId()
+  const type = normalizeType(data.type)
+
+  const partyName = (data.customerName || data.partyName || '').trim()
+  if (!partyName) {
+    throw new Error(type === 'PURCHASE' ? 'Pemasok wajib dipilih.' : 'Pelanggan wajib dipilih.')
+  }
+
+  if (!data.date) throw new Error('Tanggal faktur wajib diisi.')
+  const date = new Date(data.date)
+  const dueDate = data.dueDate ? new Date(data.dueDate) : new Date(date.getTime() + 14 * 24 * 60 * 60 * 1000)
+  if (Number.isNaN(date.getTime())) throw new Error('Tanggal faktur tidak valid.')
+  if (Number.isNaN(dueDate.getTime())) throw new Error('Tanggal jatuh tempo tidak valid.')
+  if (dueDate < date) throw new Error('Jatuh tempo tidak boleh lebih awal dari tanggal faktur.')
+
+  const items = Array.isArray(data.items)
+    ? data.items
+        .filter((item: any) => item && (item.description || '').trim() !== '')
+        .map((item: any) => ({
+          description: String(item.description).trim(),
+          quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
+          price: Math.max(0, Number(item.price) || 0)
+        }))
+    : []
+
+  // Total selalu dihitung ulang dari rincian item bila item tersedia,
+  // supaya angka header tidak pernah berbeda dari barisnya.
+  const itemsTotal = sumItems(items)
+  const amount = itemsTotal !== null ? itemsTotal : round2(Number(data.amount))
+  if (!amount || amount <= 0) throw new Error('Total faktur harus lebih besar dari 0.')
+
+  let contactId: number | null = null
+  if (data.contactId) {
+    const contact = await prisma.financeContact.findUnique({ where: { id: Number(data.contactId) } })
+    if (contact) {
+      const expectedType = type === 'PURCHASE' ? 'SUPPLIER' : 'CUSTOMER'
+      if (contact.type && contact.type !== expectedType) {
+        throw new Error(`Kontak "${contact.name}" bukan ${expectedType === 'SUPPLIER' ? 'pemasok' : 'pelanggan'}.`)
+      }
+      contactId = contact.id
+    }
+  }
+
+  let reference = (data.reference || '').trim()
+  if (!reference) reference = await generateInvoiceReference(type)
+
+  // Nomor dokumen harus unik; bila bentrok, ambil nomor berikutnya.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const existing = await prisma.financeInvoice.findUnique({ where: { reference } })
+    if (!existing) break
+    if (attempt === 2) throw new Error(`Nomor faktur "${reference}" sudah dipakai.`)
+    reference = await generateInvoiceReference(type)
+  }
 
   const invoice = await prisma.financeInvoice.create({
     data: {
-      reference: ref,
-      customer_name: data.customerName,
-      customer_email: data.customerEmail,
+      reference,
+      type,
+      contact_id: contactId,
+      customer_name: partyName,
+      customer_email: data.customerEmail || null,
       date,
-      due_date,
-      amount: data.amount,
-      status: data.status || 'Draft',
-      created_by: parseInt(auth.id, 10),
+      due_date: dueDate,
+      amount,
+      status: initialStatus(data.status),
+      notes: data.notes || data.description || null,
+      created_by: uid,
       items: {
-        create: data.items ? data.items.map((i: any) => ({
-          description: i.description,
-          quantity: i.quantity,
-          price: i.price
-        })) : []
+        create: items.length > 0 ? items : [{ description: data.description || 'Faktur', quantity: 1, price: amount }]
       }
-    }
+    },
+    include: { items: true, payments: true }
   })
-  
-  await logActivity({
-    userId: parseInt(auth.id, 10),
-    activityType: 'create',
-    description: `Created invoice: ${invoice.reference}`
-  });
 
-  return invoice;
+  await logActivity({
+    userId: uid,
+    activityType: 'create',
+    description: `Created ${type === 'PURCHASE' ? 'purchase' : 'sales'} invoice: ${invoice.reference}`
+  })
+
+  return invoice
 }
 
 export async function updateInvoice(id: number, data: any) {
-  const auth = await requireAuth()
-  const invoice = await prisma.financeInvoice.update({
+  const uid = await currentUserId()
+  const existing = await prisma.financeInvoice.findUnique({
     where: { id },
-    data: {
-      status: data.status
-    }
+    select: { id: true, type: true, amount: true, reference: true, payments: { select: { amount: true } } }
   })
-  
+  if (!existing) throw new Error('Faktur tidak ditemukan.')
+
+  const paid = round2((existing.payments || []).reduce((sum, p) => sum + p.amount, 0))
+
+  const updateData: any = {}
+
+  if (data.reference !== undefined) {
+    const reference = String(data.reference).trim()
+    if (!reference) throw new Error('Nomor faktur wajib diisi.')
+    if (reference !== existing.reference) {
+      const duplicate = await prisma.financeInvoice.findUnique({ where: { reference } })
+      if (duplicate) throw new Error(`Nomor faktur "${reference}" sudah dipakai.`)
+      updateData.reference = reference
+    }
+  }
+
+  if (data.customerName !== undefined || data.partyName !== undefined) {
+    const partyName = String(data.customerName ?? data.partyName ?? '').trim()
+    if (!partyName) throw new Error('Nama pelanggan/pemasok wajib diisi.')
+    updateData.customer_name = partyName
+  }
+
+  if (data.customerEmail !== undefined) updateData.customer_email = data.customerEmail || null
+  if (data.notes !== undefined) updateData.notes = data.notes || null
+  if (data.contactId !== undefined) updateData.contact_id = data.contactId ? Number(data.contactId) : null
+
+  if (data.date) {
+    const date = new Date(data.date)
+    if (Number.isNaN(date.getTime())) throw new Error('Tanggal faktur tidak valid.')
+    updateData.date = date
+  }
+  if (data.dueDate) {
+    const dueDate = new Date(data.dueDate)
+    if (Number.isNaN(dueDate.getTime())) throw new Error('Tanggal jatuh tempo tidak valid.')
+    updateData.due_date = dueDate
+  }
+  if (updateData.date && updateData.due_date && updateData.due_date < updateData.date) {
+    throw new Error('Jatuh tempo tidak boleh lebih awal dari tanggal faktur.')
+  }
+
+  const items: Array<{ description: string; quantity: number; price: number }> | null = Array.isArray(data.items)
+    ? data.items
+        .filter((item: any) => item && (item.description || '').trim() !== '')
+        .map((item: any) => ({
+          description: String(item.description).trim(),
+          quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
+          price: Math.max(0, Number(item.price) || 0)
+        }))
+    : null
+
+  const itemsTotal = sumItems(items)
+  if (itemsTotal !== null) {
+    updateData.amount = itemsTotal
+  } else if (data.amount !== undefined) {
+    updateData.amount = round2(Number(data.amount))
+  }
+
+  if (updateData.amount !== undefined) {
+    if (!updateData.amount || updateData.amount <= 0) throw new Error('Total faktur harus lebih besar dari 0.')
+    if (updateData.amount + EPSILON < paid) {
+      throw new Error(`Total faktur tidak boleh lebih kecil dari pembayaran yang sudah masuk (Rp ${paid.toLocaleString('id-ID')}).`)
+    }
+  }
+
+  if (data.status !== undefined) updateData.status = initialStatus(data.status)
+
+  // Status otomatis mengikuti jumlah pembayaran bila total berubah.
+  if (updateData.amount !== undefined && data.status === undefined && existing.type) {
+    if (paid >= updateData.amount - EPSILON) updateData.status = 'Paid'
+    else if (paid > 0) updateData.status = 'Partial'
+  }
+
+  const invoice = await prisma.$transaction(async tx => {
+    if (items && items.length > 0) {
+      await tx.financeInvoiceItem.deleteMany({ where: { invoice_id: id } })
+      await tx.financeInvoiceItem.createMany({
+        data: items.map(item => ({ ...item, invoice_id: id }))
+      })
+    }
+    return tx.financeInvoice.update({
+      where: { id },
+      data: updateData,
+      include: { items: true, payments: true }
+    })
+  })
+
   await logActivity({
-    userId: parseInt(auth.id, 10),
+    userId: uid,
     activityType: 'update',
-    description: `Updated invoice status: ${invoice.reference}`
-  });
-  
-  return invoice;
+    description: `Updated invoice: ${invoice.reference}`
+  })
+
+  return invoice
 }
 
 export async function deleteInvoice(id: number) {
-  const auth = await requireAuth()
-  const invoice = await prisma.financeInvoice.delete({
-    where: { id }
+  const uid = await currentUserId()
+
+  const invoice = await prisma.financeInvoice.findUnique({ where: { id } })
+  if (!invoice) throw new Error('Faktur tidak ditemukan.')
+
+  await prisma.$transaction(async tx => {
+    // Transaksi kas/bank yang lahir dari pembayaran faktur ini ikut dibatalkan,
+    // supaya saldo akun tidak menyisakan uang yang sebenarnya tidak ada.
+    const linked = await tx.financeTransaction.findMany({ where: { reference: invoice.reference } })
+    for (const txRow of linked) {
+      if (txRow.account_id) {
+        const delta = txRow.type === 'Income' ? -txRow.amount : txRow.amount
+        await tx.financeAccount.update({
+          where: { id: txRow.account_id },
+          data: { balance: { increment: delta } }
+        })
+      }
+    }
+    if (linked.length > 0) {
+      await tx.financeTransaction.deleteMany({ where: { id: { in: linked.map(t => t.id) } } })
+    }
+
+    await tx.financeInvoice.delete({ where: { id } })
   })
-  
+
   await logActivity({
-    userId: parseInt(auth.id, 10),
+    userId: uid,
     activityType: 'delete',
     description: `Deleted invoice: ${invoice.reference}`
-  });
-  
-  return invoice;
+  })
+
+  return invoice
 }
 
-export async function exportInvoicesCsv() {
+export async function exportInvoicesCsv(type?: InvoiceType | string) {
   await requireAuth()
+  const invoiceType = normalizeType(type)
   const invoices = await prisma.financeInvoice.findMany({
-    orderBy: { created_at: 'desc' }
+    where: { type: invoiceType },
+    orderBy: { created_at: 'desc' },
+    include: { payments: { select: { amount: true } } }
   })
-  
-  const records = invoices.map(i => ({
-    Reference: i.reference,
-    Customer: i.customer_name,
-    Email: i.customer_email || '',
-    Date: i.date.toISOString().split('T')[0],
-    DueDate: i.due_date.toISOString().split('T')[0],
-    Amount: i.amount,
-    Status: i.status
-  }))
-  
+
+  const records = invoices.map(i => {
+    const paid = (i.payments || []).reduce((sum, p) => sum + p.amount, 0)
+    return {
+      Reference: i.reference,
+      [invoiceType === 'PURCHASE' ? 'Supplier' : 'Customer']: i.customer_name,
+      Email: i.customer_email || '',
+      Date: i.date.toISOString().split('T')[0],
+      DueDate: i.due_date.toISOString().split('T')[0],
+      Amount: i.amount,
+      Paid: round2(paid),
+      Outstanding: round2(Math.max(0, i.amount - paid)),
+      Status: deriveStatus(i)
+    }
+  })
+
   return toCSV(records)
 }
 
-export async function importInvoicesCsv(csvContent: string) {
-  const auth = await requireAuth()
-  const records = fromCSV(csvContent)
-  
-  let count = 0
-  for (const record of records) {
-    try {
-      await prisma.financeInvoice.create({
+// -----------------------------------------------------------------------------
+// INVOICE PAYMENTS
+// -----------------------------------------------------------------------------
+/**
+ * Catat pembayaran faktur. Sekaligus:
+ *  - memperbarui status faktur (Lunas / Sebagian),
+ *  - mencatat transaksi kas/bank bila `accountId` dipilih, sehingga saldo
+ *    akun dan laporan arus kas ikut benar.
+ */
+export async function recordInvoicePayment(data: {
+  invoiceId: number
+  amount: number
+  paymentDate?: string
+  method?: string
+  reference?: string
+  notes?: string
+  accountId?: number | null
+}) {
+  const uid = await currentUserId()
+  const amount = round2(Number(data.amount))
+
+  if (!data.invoiceId) throw new Error('Faktur tidak dipilih.')
+  if (!amount || amount <= 0) throw new Error('Jumlah pembayaran harus lebih besar dari 0.')
+
+  const invoice = await prisma.financeInvoice.findUnique({
+    where: { id: Number(data.invoiceId) },
+    include: { payments: { select: { amount: true } } }
+  })
+  if (!invoice) throw new Error('Faktur tidak ditemukan.')
+
+  const paidBefore = round2((invoice.payments || []).reduce((sum, p) => sum + p.amount, 0))
+  const outstanding = round2(invoice.amount - paidBefore)
+  if (outstanding <= EPSILON) throw new Error('Faktur ini sudah lunas.')
+  if (amount > outstanding + EPSILON) {
+    throw new Error(`Jumlah pembayaran melebihi sisa tagihan (Rp ${outstanding.toLocaleString('id-ID')}).`)
+  }
+
+  const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date()
+  if (Number.isNaN(paymentDate.getTime())) throw new Error('Tanggal pembayaran tidak valid.')
+
+  let accountId: number | null = null
+  if (data.accountId) {
+    const account = await prisma.financeAccount.findUnique({ where: { id: Number(data.accountId) } })
+    if (!account) throw new Error('Akun kas/bank tidak ditemukan.')
+    accountId = account.id
+  }
+
+  const paidAfter = round2(paidBefore + amount)
+  const isFullyPaid = paidAfter >= invoice.amount - EPSILON
+  const nextStatus = isFullyPaid ? 'Paid' : 'Partial'
+
+  const result = await prisma.$transaction(async tx => {
+    const payment = await tx.financePayment.create({
+      data: {
+        invoice_id: invoice.id,
+        amount,
+        payment_date: paymentDate,
+        payment_method: data.method || 'Transfer',
+        reference: data.reference || invoice.reference,
+        notes: data.notes || null
+      }
+    })
+
+    const updatedInvoice = await tx.financeInvoice.update({
+      where: { id: invoice.id },
+      data: { status: nextStatus }
+    })
+
+    // Dampak kas hanya dicatat bila pengguna memilih akun.
+    if (accountId) {
+      const isIncome = invoice.type !== 'PURCHASE'
+      await tx.financeTransaction.create({
         data: {
-          reference: record.Reference || `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
-          customer_name: record.Customer || 'Unknown',
-          customer_email: record.Email || null,
-          date: record.Date ? new Date(record.Date) : new Date(),
-          due_date: record.DueDate ? new Date(record.DueDate) : new Date(),
-          amount: parseFloat(record.Amount) || 0,
-          status: record.Status || 'Draft',
-          created_by: parseInt(auth.id, 10)
+          date: paymentDate,
+          description: `${isIncome ? 'Penerimaan' : 'Pembayaran'} faktur ${invoice.reference} (${invoice.customer_name})`,
+          type: isIncome ? 'Income' : 'Expense',
+          amount,
+          reference: invoice.reference,
+          account_id: accountId,
+          created_by: uid
         }
       })
-      count++
-    } catch (err) {
-      console.error('Failed to import invoice record', err)
+      await tx.financeAccount.update({
+        where: { id: accountId },
+        data: { balance: { increment: isIncome ? amount : -amount } }
+      })
+    }
+
+    return { payment, updatedInvoice }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Recorded payment Rp ${amount.toLocaleString('id-ID')} for invoice ${invoice.reference}`
+  })
+
+  return {
+    success: true,
+    data: {
+      payment: result.payment,
+      invoice: result.updatedInvoice,
+      paid_amount: paidAfter,
+      outstanding: round2(Math.max(0, invoice.amount - paidAfter)),
+      status: nextStatus
     }
   }
-  return count
 }
-
 
 // -----------------------------------------------------------------------------
 // EXPENSES
 // -----------------------------------------------------------------------------
-export async function getExpenses(filters?: { category?: string, search?: string }) {
+export async function getExpenses(filters?: { category?: string; search?: string }) {
   await requireAuth()
-  
+
   const where: any = {}
   if (filters?.category && filters.category !== 'All') {
     where.category = filters.category
@@ -275,7 +667,7 @@ export async function getExpenses(filters?: { category?: string, search?: string
       { description: { contains: filters.search } }
     ]
   }
-  
+
   return prisma.financeExpense.findMany({
     where,
     orderBy: { date: 'desc' }
@@ -283,52 +675,155 @@ export async function getExpenses(filters?: { category?: string, search?: string
 }
 
 export async function createExpense(data: any) {
-  const auth = await requireAuth()
-  
-  const expense = await prisma.financeExpense.create({
-    data: {
-      date: data.date ? new Date(data.date) : new Date(),
-      description: data.description,
-      category: data.category || 'Other',
-      amount: data.amount,
-      vendor: data.vendor,
-      status: data.status || 'Pending',
-      created_by: parseInt(auth.id, 10)
+  const uid = await currentUserId()
+  const amount = round2(Number(data.amount))
+  if (!amount || amount <= 0) throw new Error('Jumlah pengeluaran harus lebih besar dari 0.')
+  if (!data.description || !String(data.description).trim()) throw new Error('Keterangan pengeluaran wajib diisi.')
+
+  const categoryName = data.category || 'Lain-lain'
+
+  // Hubungkan ke master kategori bila namanya cocok, agar laporan per kategori akurat.
+  const categoryId = await resolveCategoryId(categoryName)
+
+  let accountId: number | null = data.accountId ? Number(data.accountId) : null
+  if (accountId) {
+    const account = await prisma.financeAccount.findUnique({ where: { id: accountId } })
+    if (!account) throw new Error('Akun kas/bank tidak ditemukan.')
+  }
+
+  const expense = await prisma.$transaction(async tx => {
+    const created = await tx.financeExpense.create({
+      data: {
+        date: data.date ? new Date(data.date) : new Date(),
+        description: String(data.description).trim(),
+        category: categoryName,
+        amount,
+        vendor: (data.vendor || '').trim() || '-',
+        status: data.status || 'Paid',
+        category_id: categoryId,
+        created_by: uid
+      }
+    })
+
+    // Bila akun dipilih, pengeluaran langsung mengurangi saldo kas/bank.
+    if (accountId) {
+      await tx.financeTransaction.create({
+        data: {
+          date: created.date,
+          description: created.description,
+          type: 'Expense',
+          amount,
+          reference: `EXP-${created.id}`,
+          account_id: accountId,
+          created_by: uid
+        }
+      })
+      await tx.financeAccount.update({
+        where: { id: accountId },
+        data: { balance: { increment: -amount } }
+      })
     }
+
+    return created
   })
-  
+
   await logActivity({
-    userId: parseInt(auth.id, 10),
+    userId: uid,
     activityType: 'create',
     description: `Created expense: ${expense.description}`
-  });
+  })
 
-  return expense;
+  return expense
 }
 
 export async function updateExpense(id: number, data: any) {
-  await requireAuth()
-  return prisma.financeExpense.update({
-    where: { id },
-    data: {
-      status: data.status
-    }
+  const uid = await currentUserId()
+
+  const existing = await prisma.financeExpense.findUnique({ where: { id } })
+  if (!existing) throw new Error('Pengeluaran tidak ditemukan.')
+
+  const updateData: any = {}
+  if (data.date !== undefined) updateData.date = data.date ? new Date(data.date) : existing.date
+  if (data.description !== undefined) updateData.description = String(data.description).trim()
+  if (data.category !== undefined) {
+    const categoryName = data.category || 'Lain-lain'
+    updateData.category = categoryName
+    updateData.category_id = await resolveCategoryId(categoryName)
+  }
+  if (data.vendor !== undefined) updateData.vendor = (data.vendor || '').trim() || '-'
+  if (data.status !== undefined) updateData.status = data.status
+  if (data.amount !== undefined) {
+    const amount = round2(Number(data.amount))
+    if (!amount || amount <= 0) throw new Error('Jumlah pengeluaran harus lebih besar dari 0.')
+    updateData.amount = amount
+  }
+
+  const updated = await prisma.financeExpense.update({ where: { id }, data: updateData })
+
+  // Sinkronkan transaksi kas yang lahir dari pengeluaran ini.
+  const linked = await prisma.financeTransaction.findFirst({ where: { reference: `EXP-${id}` } })
+  if (linked) {
+    const nextAmount = updateData.amount ?? existing.amount
+    const nextDate = updateData.date ?? existing.date
+    const delta = round2(linked.amount - nextAmount)
+    await prisma.$transaction(async tx => {
+      await tx.financeTransaction.update({
+        where: { id: linked.id },
+        data: {
+          date: nextDate,
+          amount: nextAmount,
+          description: updateData.description ?? existing.description
+        }
+      })
+      if (linked.account_id && delta !== 0) {
+        await tx.financeAccount.update({
+          where: { id: linked.account_id },
+          data: { balance: { increment: delta } }
+        })
+      }
+    })
+  }
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Updated expense: ${updated.description}`
   })
+
+  return updated
 }
 
 export async function deleteExpense(id: number) {
-  await requireAuth()
-  return prisma.financeExpense.delete({
-    where: { id }
+  const uid = await currentUserId()
+
+  await prisma.$transaction(async tx => {
+    // Batalkan transaksi kas yang terkait lalu kembalikan saldo akun.
+    const linked = await tx.financeTransaction.findFirst({ where: { reference: `EXP-${id}` } })
+    if (linked) {
+      if (linked.account_id) {
+        await tx.financeAccount.update({
+          where: { id: linked.account_id },
+          data: { balance: { increment: linked.amount } }
+        })
+      }
+      await tx.financeTransaction.delete({ where: { id: linked.id } })
+    }
+    await tx.financeExpense.delete({ where: { id } })
   })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'delete',
+    description: `Deleted expense #${id}`
+  })
+
+  return { success: true }
 }
 
 export async function exportExpensesCsv() {
   await requireAuth()
-  const expenses = await prisma.financeExpense.findMany({
-    orderBy: { date: 'desc' }
-  })
-  
+  const expenses = await prisma.financeExpense.findMany({ orderBy: { date: 'desc' } })
+
   const records = expenses.map(e => ({
     Date: e.date.toISOString().split('T')[0],
     Vendor: e.vendor,
@@ -337,26 +832,28 @@ export async function exportExpensesCsv() {
     Amount: e.amount,
     Status: e.status
   }))
-  
+
   return toCSV(records)
 }
 
 export async function importExpensesCsv(csvContent: string) {
-  const auth = await requireAuth()
+  const uid = await currentUserId()
   const records = fromCSV(csvContent)
-  
+
   let count = 0
   for (const record of records) {
     try {
+      const categoryName = record.Category || 'Lain-lain'
       await prisma.financeExpense.create({
         data: {
           date: record.Date ? new Date(record.Date) : new Date(),
           vendor: record.Vendor || 'Unknown',
           description: record.Description || 'Imported Expense',
-          category: record.Category || 'Other',
-          amount: parseFloat(record.Amount) || 0,
-          status: record.Status || 'Pending',
-          created_by: parseInt(auth.id, 10)
+          category: categoryName,
+          category_id: await resolveCategoryId(categoryName),
+          amount: round2(parseFloat(record.Amount) || 0),
+          status: record.Status || 'Paid',
+          created_by: uid
         }
       })
       count++
@@ -368,113 +865,133 @@ export async function importExpensesCsv(csvContent: string) {
 }
 
 // -----------------------------------------------------------------------------
-// ACCOUNTS & TRANSACTIONS
+// CASH & BANK
 // -----------------------------------------------------------------------------
 export async function getBankAccounts() {
-  try {
-    await requireAuth()
-    let accounts = await prisma.financeAccount.findMany({
-      orderBy: { name: 'asc' }
-    })
-    
-    if (accounts.length === 0) {
-      await prisma.financeAccount.createMany({
-        data: [
-          { name: 'Main Checking', type: 'Bank', balance: 0, currency: 'USD' },
-          { name: 'Petty Cash', type: 'Cash', balance: 0, currency: 'USD' }
-        ]
-      })
-      accounts = await prisma.financeAccount.findMany({
-        orderBy: { name: 'asc' }
-      })
-    }
-    return accounts
-  } catch (err) {
-    console.error('Database connection failed, using mock data for getBankAccounts', err);
-    return [
-      { id: 1, name: 'BCA Utama', type: 'Bank', balance: 145000000, accountNumber: '1234567890', currency: 'IDR' },
-      { id: 2, name: 'Mandiri Operasional', type: 'Bank', balance: 35000000, accountNumber: '0987654321', currency: 'IDR' },
-      { id: 3, name: 'Kas Kecil', type: 'Cash', balance: 2500000, accountNumber: null, currency: 'IDR' }
-    ];
-  }
-}
+  await requireAuth()
 
-export async function getTransactions(filters?: { search?: string }) {
-  try {
-    await requireAuth()
-    const where: any = {}
-    if (filters?.search) {
-      where.OR = [
-        { description: { contains: filters.search } },
-        { reference: { contains: filters.search } }
+  let accounts = await prisma.financeAccount.findMany({ orderBy: { name: 'asc' } })
+
+  // Seed sekali pakai agar instalasi baru punya akun kas/bank dasar.
+  // Tidak lagi mengembalikan data palsu saat query gagal — error dibiarkan naik
+  // supaya masalah database terlihat, bukan disembunyikan.
+  if (accounts.length === 0) {
+    await prisma.financeAccount.createMany({
+      data: [
+        { name: 'Kas Utama', type: 'Cash', balance: 0, currency: 'IDR' },
+        { name: 'Bank Utama', type: 'Bank', balance: 0, currency: 'IDR' }
       ]
-    }
-    return await prisma.financeTransaction.findMany({
-      where,
-      orderBy: { date: 'desc' },
-      include: { account: true }
     })
-  } catch (err) {
-    console.error('Database connection failed, using mock data for getTransactions', err);
-    return [
-      { id: 1, date: new Date().toISOString(), description: 'Pembayaran Klien A', reference: 'INV-001', type: 'Income', amount: 15000000, account: { name: 'BCA Utama' } },
-      { id: 2, date: new Date(Date.now() - 86400000).toISOString(), description: 'Biaya Listrik', reference: 'EXP-001', type: 'Expense', amount: 1200000, account: { name: 'Kas Kecil' } },
-      { id: 3, date: new Date(Date.now() - 86400000 * 2).toISOString(), description: 'Pembayaran Klien B', reference: 'INV-002', type: 'Income', amount: 8000000, account: { name: 'Mandiri Operasional' } },
-      { id: 4, date: new Date(Date.now() - 86400000 * 3).toISOString(), description: 'Sewa Kantor', reference: 'EXP-002', type: 'Expense', amount: 5000000, account: { name: 'BCA Utama' } },
-      { id: 5, date: new Date(Date.now() - 86400000 * 4).toISOString(), description: 'Beli ATK', reference: 'EXP-003', type: 'Expense', amount: 350000, account: { name: 'Kas Kecil' } }
-    ];
+    accounts = await prisma.financeAccount.findMany({ orderBy: { name: 'asc' } })
   }
+
+  return accounts
 }
 
-export async function createTransaction(data: any) {
-  const auth = await requireAuth()
-  
-  // Fetch account first
-  let accountId = data.accountId
-  if (!accountId && data.account) {
-    const acc = await prisma.financeAccount.findFirst({
-      where: { name: data.account }
-    })
-    if (acc) {
-      accountId = acc.id
-    }
-  }
-  
-  if (!accountId) {
-    const acc = await prisma.financeAccount.findFirst()
-    accountId = acc?.id || 1
-  }
+export async function getTransactions(filters?: { search?: string; accountId?: number }) {
+  await requireAuth()
 
-  // Update Account Balance
-  if (data.type === 'Income') {
-    await prisma.financeAccount.update({
-      where: { id: accountId },
-      data: { balance: { increment: data.amount } }
-    })
-  } else if (data.type === 'Expense') {
-    await prisma.financeAccount.update({
-      where: { id: accountId },
-      data: { balance: { decrement: data.amount } }
-    })
+  const where: any = {}
+  if (filters?.search) {
+    where.OR = [
+      { description: { contains: filters.search } },
+      { reference: { contains: filters.search } }
+    ]
   }
+  if (filters?.accountId) where.account_id = filters.accountId
 
-  return prisma.financeTransaction.create({
-    data: {
-      date: data.date ? new Date(data.date) : new Date(),
-      description: data.description,
-      type: data.type || 'Expense',
-      amount: data.amount,
-      reference: data.reference,
-      account_id: accountId,
-      created_by: parseInt(auth.id, 10)
-    }
+  return prisma.financeTransaction.findMany({
+    where,
+    orderBy: [{ date: 'desc' }, { id: 'desc' }],
+    include: { account: true }
   })
 }
 
+export async function createTransaction(data: any) {
+  const uid = await currentUserId()
+  const amount = round2(Number(data.amount))
+  if (!amount || amount <= 0) throw new Error('Jumlah transaksi harus lebih besar dari 0.')
+
+  let accountId = data.accountId ? Number(data.accountId) : null
+  if (!accountId && data.account) {
+    const account = await prisma.financeAccount.findFirst({ where: { name: data.account } })
+    accountId = account?.id ?? null
+  }
+  if (!accountId) {
+    // Jangan lagi menebak account_id 1 — itu bisa menempel ke akun yang salah.
+    const firstAccount = await prisma.financeAccount.findFirst({ orderBy: { id: 'asc' } })
+    accountId = firstAccount?.id ?? null
+  }
+  if (!accountId) throw new Error('Belum ada akun kas/bank. Tambahkan akun terlebih dahulu.')
+
+  const account = await prisma.financeAccount.findUnique({ where: { id: accountId } })
+  if (!account) throw new Error('Akun kas/bank tidak ditemukan.')
+
+  const type = data.type === 'Income' ? 'Income' : 'Expense'
+  const delta = type === 'Income' ? amount : -amount
+
+  return prisma.$transaction(async tx => {
+    const transaction = await tx.financeTransaction.create({
+      data: {
+        date: data.date ? new Date(data.date) : new Date(),
+        description: (data.description || '').trim() || (type === 'Income' ? 'Pemasukan' : 'Pengeluaran'),
+        type,
+        amount,
+        reference: data.reference || null,
+        account_id: accountId as number,
+        created_by: uid
+      }
+    })
+
+    await tx.financeAccount.update({
+      where: { id: accountId as number },
+      data: { balance: { increment: delta } }
+    })
+
+    return transaction
+  })
+}
+
+/**
+ * Hapus transaksi manual. Transaksi otomatis (hasil pembayaran faktur atau
+ * pencatatan pengeluaran) harus dihapus dari dokumen sumbernya agar saldo tetap konsisten.
+ */
+export async function deleteTransaction(id: number) {
+  const uid = await currentUserId()
+
+  const transaction = await prisma.financeTransaction.findUnique({ where: { id } })
+  if (!transaction) throw new Error('Transaksi tidak ditemukan.')
+
+  if (transaction.reference) {
+    const sourceInvoice = await prisma.financeInvoice.findUnique({ where: { reference: transaction.reference } })
+    if (sourceInvoice || transaction.reference.startsWith('EXP-')) {
+      throw new Error('Transaksi ini berasal dari faktur/pengeluaran. Hapus dokumen sumbernya agar saldo tetap konsisten.')
+    }
+  }
+
+  await prisma.$transaction(async tx => {
+    if (transaction.account_id) {
+      await tx.financeAccount.update({
+        where: { id: transaction.account_id },
+        data: { balance: { increment: transaction.type === 'Income' ? -transaction.amount : transaction.amount } }
+      })
+    }
+    await tx.financeTransaction.delete({ where: { id } })
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'delete',
+    description: `Deleted cash transaction: ${transaction.description}`
+  })
+
+  return { success: true }
+}
+
 // -----------------------------------------------------------------------------
-// CONTACTS (CUSTOMERS / SUPPLIERS)
+// CONTACTS (pelanggan & pemasok)
 // -----------------------------------------------------------------------------
-export async function getContacts(filters?: { type?: string, search?: string }) {
+export async function getContacts(filters?: { type?: string; search?: string }) {
   await requireAuth()
   const where: any = {}
   if (filters?.type && filters.type !== 'All') {
@@ -491,10 +1008,13 @@ export async function getContacts(filters?: { type?: string, search?: string }) 
 
 export async function createContact(data: any) {
   await requireAuth()
+  const name = (data.name || '').trim()
+  if (!name) throw new Error('Nama wajib diisi.')
+
   return prisma.financeContact.create({
     data: {
       type: data.type || 'CUSTOMER',
-      name: data.name,
+      name,
       email: data.email || null,
       phone: data.phone || null,
       address: data.address || null
@@ -504,14 +1024,17 @@ export async function createContact(data: any) {
 
 export async function updateContact(id: number, data: any) {
   await requireAuth()
+  const name = (data.name || '').trim()
+  if (!name) throw new Error('Nama wajib diisi.')
+
   return prisma.financeContact.update({
     where: { id },
     data: {
       type: data.type,
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      address: data.address
+      name,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null
     }
   })
 }
@@ -524,7 +1047,7 @@ export async function deleteContact(id: number) {
 // -----------------------------------------------------------------------------
 // PRODUCTS & SERVICES
 // -----------------------------------------------------------------------------
-export async function getProductsServices(filters?: { type?: string, search?: string }) {
+export async function getProductsServices(filters?: { type?: string; search?: string }) {
   await requireAuth()
   const where: any = {}
   if (filters?.type && filters.type !== 'All') {
@@ -588,7 +1111,7 @@ export async function deleteProductService(id: number) {
 }
 
 // -----------------------------------------------------------------------------
-// ACCOUNTS (CHART OF ACCOUNTS)
+// CHART OF ACCOUNTS
 // -----------------------------------------------------------------------------
 export async function getChartOfAccounts(filters?: { search?: string }) {
   await requireAuth()
@@ -604,10 +1127,13 @@ export async function getChartOfAccounts(filters?: { search?: string }) {
 
 export async function createAccount(data: any) {
   await requireAuth()
+  const name = (data.name || '').trim()
+  if (!name) throw new Error('Nama akun wajib diisi.')
+
   return prisma.financeAccount.create({
     data: {
       code: data.code || null,
-      name: data.name,
+      name,
       type: data.type || 'Asset',
       sub_type: data.subType || null,
       balance: parseFloat(data.balance) || 0,
@@ -618,13 +1144,16 @@ export async function createAccount(data: any) {
 
 export async function updateAccount(id: number, data: any) {
   await requireAuth()
+  const name = (data.name || '').trim()
+  if (!name) throw new Error('Nama akun wajib diisi.')
+
   return prisma.financeAccount.update({
     where: { id },
     data: {
-      code: data.code,
-      name: data.name,
+      code: data.code || null,
+      name,
       type: data.type,
-      sub_type: data.subType,
+      sub_type: data.subType || null,
       balance: parseFloat(data.balance) || 0
     }
   })
@@ -632,15 +1161,31 @@ export async function updateAccount(id: number, data: any) {
 
 export async function deleteAccount(id: number) {
   await requireAuth()
+  const used = await prisma.financeTransaction.count({ where: { account_id: id } })
+  if (used > 0) {
+    throw new Error(`Akun tidak bisa dihapus karena sudah dipakai pada ${used} transaksi.`)
+  }
   return prisma.financeAccount.delete({ where: { id } })
 }
 
 // -----------------------------------------------------------------------------
-// PHASE 3: CATEGORIES, BUDGETS, AND PAYMENTS
+// CATEGORIES & BUDGETS
 // -----------------------------------------------------------------------------
+const DEFAULT_CATEGORIES = ['Operations', 'Salaries', 'Marketing', 'Utilities', 'Office Supplies', 'Transportation', 'Other']
+
+/** Kategori pengeluaran dasar dibuat sekali bila tabel master masih kosong. */
+async function ensureDefaultCategories() {
+  const count = await prisma.financeCategory.count()
+  if (count > 0) return
+  await prisma.financeCategory.createMany({
+    data: DEFAULT_CATEGORIES.map(name => ({ name, type: 'EXPENSE' }))
+  })
+}
+
 export async function getFinanceCategories() {
   await requireAuth()
   try {
+    await ensureDefaultCategories()
     const categories = await prisma.financeCategory.findMany({ orderBy: { name: 'asc' } })
     return { success: true, data: categories }
   } catch (error: any) {
@@ -663,7 +1208,7 @@ export async function getFinanceBudgets(projectId?: number) {
   }
 }
 
-export async function createFinanceBudget(data: { name: string, amount: number, start_date: string, end_date: string, category_id?: number, project_id?: number }) {
+export async function createFinanceBudget(data: { name: string; amount: number; start_date: string; end_date: string; category_id?: number; project_id?: number }) {
   await requireAuth()
   try {
     const budget = await prisma.financeBudget.create({
@@ -683,23 +1228,190 @@ export async function createFinanceBudget(data: { name: string, amount: number, 
   }
 }
 
-export async function createFinancePayment(data: { invoice_id: number, amount: number, payment_date: string, method?: string, reference?: string, notes?: string }) {
+// -----------------------------------------------------------------------------
+// REPORTS
+// -----------------------------------------------------------------------------
+export type { FinanceReportKind } from '@/types/finance'
+
+
+function resolveRange(from?: string, to?: string) {
+  const now = new Date()
+  const start = from ? new Date(from) : new Date(now.getFullYear(), 0, 1)
+  const end = to ? new Date(to) : now
+  start.setHours(0, 0, 0, 0)
+  end.setHours(23, 59, 59, 999)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error('Rentang tanggal tidak valid.')
+  }
+  return { start, end }
+}
+
+export async function getFinanceReport(params: {
+  report: FinanceReportKind | string
+  from?: string
+  to?: string
+}) {
   await requireAuth()
-  try {
-    const payment = await prisma.financePayment.create({
-      data: {
-        invoice_id: data.invoice_id,
-        amount: data.amount,
-        payment_date: new Date(data.payment_date),
-        method: data.method || 'Transfer',
-        reference: data.reference,
-        notes: data.notes
+  const { start, end } = resolveRange(params.from, params.to)
+  const report = params.report as FinanceReportKind
+
+  const empty = {
+    report,
+    from: start.toISOString().slice(0, 10),
+    to: end.toISOString().slice(0, 10),
+    summary: [] as Array<{ label: string; value: number | string }>,
+    columns: [] as string[],
+    rows: [] as any[]
+  }
+
+  if (report === 'profit-loss') {
+    const [salesPayments, purchasePayments, paidExpenses] = await Promise.all([
+      prisma.financePayment.findMany({
+        where: { payment_date: { gte: start, lte: end }, invoice: { type: 'SALES' } },
+        select: { amount: true }
+      }),
+      prisma.financePayment.findMany({
+        where: { payment_date: { gte: start, lte: end }, invoice: { type: 'PURCHASE' } },
+        select: { amount: true }
+      }),
+      prisma.financeExpense.findMany({
+        where: { status: 'Paid', date: { gte: start, lte: end } },
+        select: { amount: true }
+      })
+    ])
+
+    const revenue = round2(salesPayments.reduce((s, p) => s + p.amount, 0))
+    const purchaseCost = round2(purchasePayments.reduce((s, p) => s + p.amount, 0))
+    const operatingExpenses = round2(paidExpenses.reduce((s, e) => s + e.amount, 0))
+    const grossProfit = round2(revenue - purchaseCost)
+    const netProfit = round2(grossProfit - operatingExpenses)
+
+    return {
+      ...empty,
+      summary: [
+        { label: 'Pendapatan (pembayaran faktur penjualan)', value: revenue },
+        { label: 'Biaya pembelian (pembayaran faktur pembelian)', value: purchaseCost },
+        { label: 'Laba kotor', value: grossProfit },
+        { label: 'Pengeluaran operasional (lunas)', value: operatingExpenses },
+        { label: 'Laba bersih', value: netProfit }
+      ],
+      columns: ['Keterangan', 'Jumlah'],
+      rows: [
+        { keterangan: 'Pendapatan', jumlah: revenue },
+        { keterangan: 'Biaya Pembelian', jumlah: -purchaseCost },
+        { keterangan: 'Laba Kotor', jumlah: grossProfit },
+        { keterangan: 'Pengeluaran Operasional', jumlah: -operatingExpenses },
+        { keterangan: 'Laba Bersih', jumlah: netProfit }
+      ]
+    }
+  }
+
+  if (report === 'cash-flow') {
+    const transactions = await prisma.financeTransaction.findMany({
+      where: { date: { gte: start, lte: end }, type: { in: ['Income', 'Expense'] } },
+      select: { date: true, type: true, amount: true }
+    })
+
+    const buckets = new Map<string, { period: string; income: number; expense: number }>()
+    transactions.forEach(tx => {
+      const date = new Date(tx.date)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+      const bucket = buckets.get(key) || { period: key, income: 0, expense: 0 }
+      if (tx.type === 'Income') bucket.income += tx.amount
+      else bucket.expense += tx.amount
+      buckets.set(key, bucket)
+    })
+
+    const rows = Array.from(buckets.values())
+      .sort((a, b) => a.period.localeCompare(b.period))
+      .map(b => ({
+        periode: b.period,
+        pemasukan: round2(b.income),
+        pengeluaran: round2(b.expense),
+        selisih: round2(b.income - b.expense)
+      }))
+
+    const totalIncome = round2(rows.reduce((s, r) => s + r.pemasukan, 0))
+    const totalExpense = round2(rows.reduce((s, r) => s + r.pengeluaran, 0))
+
+    return {
+      ...empty,
+      summary: [
+        { label: 'Total pemasukan', value: totalIncome },
+        { label: 'Total pengeluaran', value: totalExpense },
+        { label: 'Arus kas bersih', value: round2(totalIncome - totalExpense) }
+      ],
+      columns: ['Periode', 'Pemasukan', 'Pengeluaran', 'Selisih'],
+      rows
+    }
+  }
+
+  if (report === 'expenses-by-category') {
+    const expenses = await prisma.financeExpense.findMany({
+      where: { date: { gte: start, lte: end }, status: 'Paid' },
+      select: { category: true, amount: true }
+    })
+
+    const buckets = new Map<string, { category: string; total: number; count: number }>()
+    expenses.forEach(e => {
+      const key = e.category || 'Lain-lain'
+      const bucket = buckets.get(key) || { category: key, total: 0, count: 0 }
+      bucket.total += e.amount
+      bucket.count += 1
+      buckets.set(key, bucket)
+    })
+
+    const rows = Array.from(buckets.values())
+      .map(b => ({ kategori: b.category, jumlah_transaksi: b.count, total_dibayar: round2(b.total) }))
+      .sort((a, b) => b.total_dibayar - a.total_dibayar)
+
+    return {
+      ...empty,
+      summary: [
+        { label: 'Total kategori', value: rows.length },
+        { label: 'Total pengeluaran lunas', value: round2(rows.reduce((s, r) => s + r.total_dibayar, 0)) }
+      ],
+      columns: ['Kategori', 'Jumlah Transaksi', 'Total Dibayar'],
+      rows
+    }
+  }
+
+  // outstanding
+  const invoices = await prisma.financeInvoice.findMany({
+    where: { type: 'SALES', status: { notIn: ['Paid', 'Cancelled'] } },
+    orderBy: { due_date: 'asc' },
+    include: { payments: { select: { amount: true } } }
+  })
+
+  const rows = invoices
+    .map(inv => {
+      const paid = (inv.payments || []).reduce((s, p) => s + p.amount, 0)
+      return {
+        referensi: inv.reference,
+        pelanggan: inv.customer_name,
+        tanggal: inv.date.toISOString().slice(0, 10),
+        jatuh_tempo: inv.due_date.toISOString().slice(0, 10),
+        total: round2(inv.amount),
+        dibayar: round2(paid),
+        sisa: round2(Math.max(0, inv.amount - paid)),
+        status: deriveStatus(inv)
       }
     })
-    
-    // Automatically update invoice status to Paid if fully paid, but for simplicity we'll just return the payment
-    return { success: true, data: payment }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+    .filter(row => row.sisa > 0)
+
+  return {
+    ...empty,
+    summary: [
+      { label: 'Jumlah faktur belum lunas', value: rows.length },
+      { label: 'Total sisa tagihan', value: round2(rows.reduce((s, r) => s + r.sisa, 0)) },
+      { label: 'Sudah jatuh tempo', value: rows.filter(r => r.status === 'Overdue').length }
+    ],
+    columns: ['Referensi', 'Pelanggan', 'Tanggal', 'Jatuh Tempo', 'Total', 'Dibayar', 'Sisa', 'Status'],
+    rows
   }
+}
+
+export async function exportFinanceReportCsv(params: { report: FinanceReportKind | string; from?: string; to?: string }) {
+  const result = await getFinanceReport(params)
+  return toCSV(result.rows as any[])
 }

@@ -14,7 +14,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { getProductsServices, createProductService, updateProductService, deleteProductService } from '@/app/actions/finance'
+import { 
+  useProductsServices, 
+  useCreateProductService, 
+  useUpdateProductService, 
+  useDeleteProductService 
+} from '@/components/finance/queries'
 import { ConfirmDeleteModal } from '@/components/finance/components/modals'
 import { toast } from 'sonner'
 import {
@@ -26,52 +31,33 @@ import {
 
 export function BarangJasaPage() {
   const { t } = useLanguage()
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data = [], isLoading: loading } = useProductsServices()
+  const createMutation = useCreateProductService()
+  const updateMutation = useUpdateProductService()
+  const deleteMutation = useDeleteProductService()
+
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<number | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   
   const [formData, setFormData] = useState({
     code: '', name: '', type: 'Barang', unit: 'Pcs', brand: '', price: 0
   })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const res = await getProductsServices()
-      setData(res || [])
-    } catch (err) {
-      console.error(err)
-      toast.error('Gagal memuat data produk & jasa')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSave = async () => {
     try {
       if (editingId) {
-        await updateProductService(editingId, formData)
-        toast.success('Produk / jasa berhasil diperbarui')
+        await updateMutation.mutateAsync({ id: editingId, data: formData })
       } else {
-        await createProductService(formData)
-        toast.success('Produk / jasa berhasil ditambahkan')
+        await createMutation.mutateAsync(formData)
       }
       setIsOpen(false)
       resetForm()
-      fetchData()
     } catch (err) {
       console.error(err)
-      toast.error('Gagal menyimpan produk / jasa')
     }
   }
 
@@ -82,17 +68,11 @@ export function BarangJasaPage() {
 
   const confirmDelete = async () => {
     if (itemToDelete !== null) {
-      setIsDeleting(true)
       try {
-        await deleteProductService(itemToDelete)
-        toast.success('Produk / jasa berhasil dihapus')
-        fetchData()
+        await deleteMutation.mutateAsync(itemToDelete)
         setItemToDelete(null)
       } catch (err) {
         console.error(err)
-        toast.error('Gagal menghapus produk / jasa')
-      } finally {
-        setIsDeleting(false)
       }
     }
   }
@@ -315,7 +295,7 @@ export function BarangJasaPage() {
         onConfirm={confirmDelete}
         title="Hapus Barang / Jasa"
         description="Apakah Anda yakin ingin menghapus barang atau jasa ini? Tindakan ini tidak dapat dibatalkan."
-        isLoading={isDeleting}
+        isLoading={deleteMutation.isPending}
       />
     </div>
   )

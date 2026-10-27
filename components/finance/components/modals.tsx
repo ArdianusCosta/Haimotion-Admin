@@ -69,59 +69,14 @@ export function ConfirmDeleteModal({
   )
 }
 
-interface InvoiceModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (data: any) => void
-  initialData?: any | null
-}
-export function InvoiceModal({ open, onOpenChange, onSave, initialData }: InvoiceModalProps) {
-  const { t } = useLanguage()
-  const [customerName, setCustomerName] = useState(initialData?.customer_name || '')
-  const [amount, setAmount] = useState(initialData?.amount?.toString() || '')
-
-  // Reset state when modal opens/closes or initialData changes
-  React.useEffect(() => {
-    if (open) {
-      setCustomerName(initialData?.customer_name || '')
-      setAmount(initialData?.amount?.toString() || '')
-    }
-  }, [open, initialData])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave({ customerName, amount: Number(amount) })
-    onOpenChange(false)
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>{initialData ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
-            <DialogDescription>
-              {initialData ? 'Update the invoice details below.' : 'Add a new invoice to track customer billing.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="customerName">Customer Name</Label>
-              <Input id="customerName" value={customerName} onChange={e => setCustomerName(e.target.value)} required placeholder="PT ABC" />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Amount (IDR)</Label>
-              <Input id="amount" type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="0" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">Save changes</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
+const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  Operations: 'Operasional',
+  Salaries: 'Gaji',
+  Marketing: 'Marketing',
+  Utilities: 'Utilitas',
+  'Office Supplies': 'Perlengkapan Kantor',
+  Transportation: 'Transportasi',
+  Other: 'Lain-lain'
 }
 
 interface ExpenseModalProps {
@@ -129,64 +84,133 @@ interface ExpenseModalProps {
   onOpenChange: (open: boolean) => void
   onSave: (data: any) => void
   initialData?: any | null
+  accounts?: any[]
 }
-export function ExpenseModal({ open, onOpenChange, onSave, initialData }: ExpenseModalProps) {
+export function ExpenseModal({ open, onOpenChange, onSave, initialData, accounts = [] }: ExpenseModalProps) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [description, setDescription] = useState(initialData?.description || '')
   const [amount, setAmount] = useState(initialData?.amount?.toString() || '')
   const [category, setCategory] = useState(initialData?.category || 'Operations')
+  const [vendor, setVendor] = useState(initialData?.vendor && initialData.vendor !== '-' ? initialData.vendor : '')
+  const [status, setStatus] = useState(initialData?.status || 'Paid')
+  const [accountId, setAccountId] = useState('')
 
   React.useEffect(() => {
     if (open) {
+      setDate(initialData?.date ? new Date(initialData.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10))
       setDescription(initialData?.description || '')
       setAmount(initialData?.amount?.toString() || '')
       setCategory(initialData?.category || 'Operations')
+      setVendor(initialData?.vendor && initialData.vendor !== '-' ? initialData.vendor : '')
+      setStatus(initialData?.status || 'Paid')
+      setAccountId('')
     }
   }, [open, initialData])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ description, amount: Number(amount), category })
+    onSave({
+      date,
+      description,
+      amount: Number(amount),
+      category,
+      vendor,
+      status,
+      // Akun hanya dipakai saat membuat data baru agar saldo tidak terpotong dua kali.
+      accountId: !initialData && accountId ? Number(accountId) : undefined
+    })
     onOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[480px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{initialData ? 'Edit Expense' : 'Record Expense'}</DialogTitle>
+            <DialogTitle>{initialData ? 'Edit Pengeluaran' : 'Catat Pengeluaran'}</DialogTitle>
             <DialogDescription>
-              Track your company spending.
+              Catat biaya operasional agar laporan laba rugi dan arus kas akurat.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="desc">Description</Label>
+              <Label htmlFor="expDate">Tanggal</Label>
+              <Input id="expDate" type="date" value={date} onChange={e => setDate(e.target.value)} required />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="desc">Keterangan</Label>
               <Input id="desc" value={description} onChange={e => setDescription(e.target.value)} required placeholder="Sewa Kantor" />
             </div>
-            <div className="grid gap-2">
-              <Label>Category</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Operations">Operations</SelectItem>
-                  <SelectItem value="Salaries">Salaries</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Utilities">Utilities</SelectItem>
-                  <SelectItem value="Office Supplies">Office Supplies</SelectItem>
-                  <SelectItem value="Transportation">Transportation</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Kategori</Label>
+                <Select value={category} onValueChange={(value: string | null) => setCategory(value || 'Operations')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kategori">
+                      {EXPENSE_CATEGORY_LABELS[category] || category || 'Pilih kategori'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Operations">Operasional</SelectItem>
+                    <SelectItem value="Salaries">Gaji</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Utilities">Utilitas</SelectItem>
+                    <SelectItem value="Office Supplies">Perlengkapan Kantor</SelectItem>
+                    <SelectItem value="Transportation">Transportasi</SelectItem>
+                    <SelectItem value="Other">Lain-lain</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Status</Label>
+                <Select value={status} onValueChange={(value: string | null) => setStatus(value || 'Paid')}>
+                  <SelectTrigger>
+                    <SelectValue>
+                      {status === 'Paid' ? 'Lunas' : 'Belum Dibayar'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Paid">Lunas</SelectItem>
+                    <SelectItem value="Pending">Belum Dibayar</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="amountExp">Amount (IDR)</Label>
-              <Input id="amountExp" type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="0" />
+              <Label htmlFor="vendor">Pemasok / Vendor</Label>
+              <Input id="vendor" value={vendor} onChange={e => setVendor(e.target.value)} placeholder="Opsional" />
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="amountExp">Jumlah (IDR)</Label>
+              <Input id="amountExp" type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="1" />
+            </div>
+            {!initialData && (
+              <div className="grid gap-2">
+                <Label>Bayar dari akun</Label>
+                <Select value={accountId || 'none'} onValueChange={(value: string | null) => setAccountId(!value || value === 'none' ? '' : value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tidak mengurangi kas/bank">
+                      {!accountId || accountId === 'none'
+                        ? 'Tidak mengurangi kas/bank'
+                        : (accounts.find(acc => acc.id.toString() === accountId)?.name || 'Tidak mengurangi kas/bank')}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Tidak mengurangi kas/bank</SelectItem>
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Pilih akun bila pengeluaran ini sudah benar-benar dibayar, saldo akan otomatis berkurang.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">Save Expense</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
+            <Button type="submit">Simpan</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -201,6 +225,7 @@ interface TransactionModalProps {
   accounts: any[]
 }
 export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: TransactionModalProps) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [type, setType] = useState('Expense')
@@ -208,6 +233,7 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
 
   React.useEffect(() => {
     if (open) {
+      setDate(new Date().toISOString().slice(0, 10))
       setDescription('')
       setAmount('')
       setType('Expense')
@@ -217,7 +243,7 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ description, amount: Number(amount), type: type as any, accountId: Number(accountId) })
+    onSave({ date, description, amount: Number(amount), type: type as any, accountId: Number(accountId) })
     onOpenChange(false)
   }
 
@@ -226,28 +252,39 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add Transaction</DialogTitle>
+            <DialogTitle>Tambah Transaksi Kas/Bank</DialogTitle>
             <DialogDescription>
-              Record manual cash or bank transactions.
+              Catat uang masuk atau keluar yang tidak berasal dari faktur.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="txdate">Tanggal</Label>
+              <Input id="txdate" type="date" value={date} onChange={e => setDate(e.target.value)} required />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Type</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Jenis</Label>
+                <Select value={type} onValueChange={(value: string | null) => setType(value || 'Expense')}>
+                  <SelectTrigger>
+                    <SelectValue>
+                      {type === 'Income' ? 'Uang Masuk' : 'Uang Keluar'}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Income">Income</SelectItem>
-                    <SelectItem value="Expense">Expense</SelectItem>
-                    <SelectItem value="Transfer">Transfer</SelectItem>
+                    <SelectItem value="Income">Uang Masuk</SelectItem>
+                    <SelectItem value="Expense">Uang Keluar</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Account</Label>
-                <Select value={accountId} onValueChange={setAccountId}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <Label>Akun</Label>
+                <Select value={accountId} onValueChange={(value: string | null) => setAccountId(value || '')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih akun">
+                      {accounts.find(acc => acc.id.toString() === accountId)?.name || (accountId ? `Akun #${accountId}` : 'Pilih akun')}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {accounts.map(acc => (
                       <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
@@ -257,17 +294,17 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="txdesc">Description</Label>
+              <Label htmlFor="txdesc">Keterangan</Label>
               <Input id="txdesc" value={description} onChange={e => setDescription(e.target.value)} required />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="txamt">Amount (IDR)</Label>
-              <Input id="txamt" type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="0" />
+              <Label htmlFor="txamt">Jumlah (IDR)</Label>
+              <Input id="txamt" type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="1" />
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">Save Transaction</Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>
+            <Button type="submit">Simpan</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -275,71 +312,3 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
   )
 }
 
-export function InvoicePaymentModal({ open, onOpenChange, invoice, onSave }: any) {
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('Transfer')
-  const [reference, setReference] = useState('')
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
-
-  React.useEffect(() => {
-    if (invoice) {
-      setAmount(invoice.amount?.toString() || '')
-    }
-  }, [invoice])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave({
-      invoice_id: invoice.id,
-      amount: parseFloat(amount),
-      method,
-      reference,
-      payment_date: paymentDate
-    })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              Record a payment for invoice {invoice?.reference}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Payment Date</Label>
-              <Input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} required />
-            </div>
-            <div className="grid gap-2">
-              <Label>Amount (IDR)</Label>
-              <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="1" max={invoice?.amount || undefined} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Payment Method</Label>
-              <Select value={method} onValueChange={setMethod}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="Credit Card">Credit Card</SelectItem>
-                  <SelectItem value="Cheque">Cheque</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Reference Note</Label>
-              <Input value={reference} onChange={e => setReference(e.target.value)} placeholder="e.g. BCA 123456" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit">Save Payment</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
