@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "node scripts/prepare-prisma.js generate && next build",
+    "build": "node scripts/prepare-prisma.js generate && next build --webpack",
     "start": "next start",
     "start:cpanel": "node server.js",
     "prisma:generate": "node scripts/prepare-prisma.js generate",
