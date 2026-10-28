@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { usePayrolls, useCreatePayroll, useEmployees } from './queries';
+import { usePayrolls, useCreatePayroll, useUpdatePayroll, useDeletePayroll, useEmployees } from './queries';
 import { exportPayrollsCsv } from '@/app/actions/hr';
 import { HRPageHeader } from './components';
-import { PayrollModal } from './components/modals';
-import { Search, Download, Plus } from 'lucide-react';
+import { PayrollModal, UpdatePayrollModal, ProofPreviewModal } from './components/modals';
+import { Search, Download, Plus, Edit3, Trash2, Paperclip, CheckCircle2, Clock, Eye, AlertCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,8 +19,13 @@ export function PayrollPage() {
   const { data: payrolls, isLoading } = usePayrolls();
   const { data: employees } = useEmployees();
   const createPayroll = useCreatePayroll();
+  const updatePayroll = useUpdatePayroll();
+  const deletePayroll = useDeletePayroll();
+
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPayroll, setEditingPayroll] = useState<any | null>(null);
+  const [previewProofPayroll, setPreviewProofPayroll] = useState<any | null>(null);
 
   const handleSave = (data: any) => {
     createPayroll.mutate(data, {
@@ -29,6 +34,31 @@ export function PayrollPage() {
         toast.success(t('Payroll generated successfully!'));
       }
     });
+  };
+
+  const handleUpdate = (data: any) => {
+    updatePayroll.mutate(data, {
+      onSuccess: () => {
+        setEditingPayroll(null);
+        toast.success('Status payroll berhasil diperbarui!');
+      },
+      onError: (err: any) => {
+        toast.error(err?.message || 'Gagal memperbarui status payroll');
+      }
+    });
+  };
+
+  const handleDelete = (payroll: any) => {
+    if (confirm(`Apakah kamu yakin ingin menghapus payroll untuk ${payroll.employee?.name} periode ${payroll.period}?`)) {
+      deletePayroll.mutate(payroll.id, {
+        onSuccess: () => {
+          toast.success('Data payroll berhasil dihapus.');
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Gagal menghapus data payroll');
+        }
+      });
+    }
   };
 
   const handleExport = async () => {
@@ -51,8 +81,38 @@ export function PayrollPage() {
 
   const filteredPayrolls = payrolls?.filter((p: any) => 
     p.employee?.name?.toLowerCase().includes(search.toLowerCase()) || 
-    p.period.toLowerCase().includes(search.toLowerCase())
+    p.period.toLowerCase().includes(search.toLowerCase()) ||
+    p.status.toLowerCase().includes(search.toLowerCase())
   );
+
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Paid':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <CheckCircle2 className="w-3 h-3 mr-1" /> {t('Paid')}
+          </span>
+        );
+      case 'Processing':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+            <Clock className="w-3 h-3 mr-1 animate-spin" /> {t('Processing')}
+          </span>
+        );
+      case 'Cancelled':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+            <XCircle className="w-3 h-3 mr-1" /> {t('Cancelled')}
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <Clock className="w-3 h-3 mr-1" /> {t('Pending')}
+          </span>
+        );
+    }
+  };
 
   return (
     <div className="p-8 flex-1 overflow-y-auto w-full">
@@ -100,6 +160,8 @@ export function PayrollPage() {
                     <th className="px-6 py-4 font-medium text-right">{t('Deduction')}</th>
                     <th className="px-6 py-4 font-medium text-right">{t('Net Pay')}</th>
                     <th className="px-6 py-4 font-medium">{t('Status')}</th>
+                    <th className="px-6 py-4 font-medium text-center">{t('Bukti / Slip')}</th>
+                    <th className="px-6 py-4 font-medium text-right">{t('Aksi')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -113,26 +175,76 @@ export function PayrollPage() {
                         <td className="px-6 py-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
                         <td className="px-6 py-4"><Skeleton className="h-4 w-32 ml-auto" /></td>
                         <td className="px-6 py-4"><Skeleton className="h-6 w-16 rounded-full" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-6 w-16 mx-auto" /></td>
+                        <td className="px-6 py-4"><Skeleton className="h-6 w-16 ml-auto" /></td>
                       </tr>
                     ))
                   ) : filteredPayrolls?.map((payroll: any) => (
                     <tr key={payroll.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-foreground">{payroll.employee?.name}</td>
-                      <td className="px-6 py-4">{payroll.period}</td>
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        <div>{payroll.employee?.name}</div>
+                        {payroll.notes && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5 max-w-[200px] truncate" title={payroll.notes}>
+                            📝 {payroll.notes}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>{payroll.period}</div>
+                        {payroll.payment_date && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            Bayar: {new Date(payroll.payment_date).toLocaleDateString('id-ID')}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right text-muted-foreground">{formatCurrency(payroll.basic_salary)}</td>
                       <td className="px-6 py-4 text-right text-green-600 dark:text-green-400">+{formatCurrency(payroll.allowance)}</td>
                       <td className="px-6 py-4 text-right text-red-600 dark:text-red-400">-{formatCurrency(payroll.deduction)}</td>
-                      <td className="px-6 py-4 text-right font-bold">{formatCurrency(payroll.net_pay)}</td>
+                      <td className="px-6 py-4 text-right font-bold text-foreground">{formatCurrency(payroll.net_pay)}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-medium ${payroll.status === 'Paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'}`}>
-                          {payroll.status === 'Paid' ? t('Paid') : t('Pending')}
-                        </span>
+                        {renderStatusBadge(payroll.status)}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {payroll.payment_proof ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2.5 text-xs text-primary border-primary/30 hover:bg-primary/10"
+                            onClick={() => setPreviewProofPayroll(payroll)}
+                          >
+                            <Eye className="w-3.5 h-3.5 mr-1" /> Bukti
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs"
+                            onClick={() => setEditingPayroll(payroll)}
+                            title="Update Status / Upload Bukti"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 mr-1" /> Update
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                            onClick={() => handleDelete(payroll)}
+                            title="Hapus Data Payroll"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {filteredPayrolls?.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
+                      <td colSpan={9} className="px-6 py-8 text-center text-muted-foreground">
                         {t('No data found')}
                       </td>
                     </tr>
@@ -143,11 +255,29 @@ export function PayrollPage() {
         </div>
       </div>
 
+      {/* Modal Generate Payroll Baru */}
       <PayrollModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         employees={employees || []}
+      />
+
+      {/* Modal Update Status & Upload Bukti Pembayaran */}
+      <UpdatePayrollModal
+        isOpen={!!editingPayroll}
+        onClose={() => setEditingPayroll(null)}
+        onSave={handleUpdate}
+        payroll={editingPayroll}
+      />
+
+      {/* Modal Preview Bukti Transfer */}
+      <ProofPreviewModal
+        isOpen={!!previewProofPayroll}
+        onClose={() => setPreviewProofPayroll(null)}
+        proofUrl={previewProofPayroll?.payment_proof || null}
+        employeeName={previewProofPayroll?.employee?.name}
+        period={previewProofPayroll?.period}
       />
     </div>
   );

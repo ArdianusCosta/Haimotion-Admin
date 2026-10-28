@@ -225,6 +225,96 @@ export async function createPayroll(data: any) {
   return payroll;
 }
 
+export async function updatePayroll(data: {
+  id: number
+  status: string
+  paymentProof?: string | null
+  paymentDate?: string | null
+  notes?: string | null
+  syncToFinance?: boolean
+}) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const existing = await prisma.hrPayroll.findUnique({
+    where: { id: data.id },
+    include: { employee: true }
+  })
+  if (!existing) throw new Error('Payroll record not found.')
+
+  let paymentDateVal: Date | null = null
+  if (data.paymentDate) {
+    paymentDateVal = new Date(data.paymentDate)
+  } else if (data.status === 'Paid') {
+    paymentDateVal = existing.payment_date || new Date()
+  }
+
+  const updated = await prisma.hrPayroll.update({
+    where: { id: data.id },
+    data: {
+      status: data.status,
+      payment_proof: data.paymentProof !== undefined ? data.paymentProof : existing.payment_proof,
+      payment_date: paymentDateVal,
+      notes: data.notes !== undefined ? data.notes : existing.notes
+    },
+    include: { employee: true }
+  })
+
+  // Optional: Sync to Finance Expenses if marked as Paid
+  if (data.syncToFinance && data.status === 'Paid' && updated.net_pay > 0) {
+    try {
+      const categoryName = 'Gaji & Upah'
+      const category = await prisma.financeCategory.findFirst({
+        where: { name: { contains: 'Gaji' } }
+      })
+
+      await prisma.financeExpense.create({
+        data: {
+          date: paymentDateVal || new Date(),
+          description: `Gaji Karyawan: ${updated.employee.name} (Periode ${updated.period})`,
+          category: category?.name || categoryName,
+          category_id: category?.id || null,
+          amount: updated.net_pay,
+          vendor: updated.employee.name,
+          status: 'Paid',
+          created_by: uid
+        }
+      })
+    } catch (err) {
+      console.error('Error syncing payroll to finance expense:', err)
+    }
+  }
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Updated payroll status for ${updated.employee.name} (${updated.period}) to ${data.status}`
+  })
+
+  return updated
+}
+
+export async function deletePayroll(id: number) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const existing = await prisma.hrPayroll.findUnique({
+    where: { id },
+    include: { employee: true }
+  })
+  if (!existing) throw new Error('Payroll record not found.')
+
+  await prisma.hrPayroll.delete({ where: { id } })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'delete',
+    description: `Deleted payroll record for ${existing.employee.name} period ${existing.period}`
+  })
+
+  return { success: true }
+}
+
 export async function exportPayrollsCsv() {
   await requireAuth()
   const payrolls = await prisma.hrPayroll.findMany({
@@ -232,9 +322,9 @@ export async function exportPayrollsCsv() {
     include: { employee: true }
   })
   
-  const header = 'ID,Employee Name,Period,Basic Salary,Allowance,Deduction,Net Pay,Status\n'
+  const header = 'ID,Employee Name,Period,Basic Salary,Allowance,Deduction,Net Pay,Status,Payment Date,Notes,Payment Proof\n'
   const rows = payrolls.map(p => 
-    `${p.id},"${p.employee?.name || ''}",${p.period},${p.basic_salary},${p.allowance},${p.deduction},${p.net_pay},${p.status}`
+    `${p.id},"${p.employee?.name || ''}",${p.period},${p.basic_salary},${p.allowance},${p.deduction},${p.net_pay},${p.status},"${p.payment_date ? p.payment_date.toISOString().slice(0, 10) : ''}","${(p.notes || '').replace(/"/g, '""')}","${p.payment_proof || ''}"`
   ).join('\n')
   
   return header + rows

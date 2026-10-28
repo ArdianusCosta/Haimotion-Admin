@@ -12,6 +12,8 @@ import {
   importAttendances,
   getPayrolls,
   createPayroll,
+  updatePayroll,
+  deletePayroll,
   getCandidates,
   updateCandidateStatus,
   createCandidate,
@@ -143,6 +145,30 @@ export function useCreatePayroll() {
     mutationFn: (data: any) => createPayroll(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hr-payrolls'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
+export function useUpdatePayroll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => updatePayroll(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-payrolls'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+      queryClient.invalidateQueries({ queryKey: ['finance'] });
+    },
+  });
+}
+
+export function useDeletePayroll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deletePayroll(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-payrolls'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
     },
   });
 }

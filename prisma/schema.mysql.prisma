@@ -734,10 +734,13 @@ model HrPayroll {
   allowance    Float    @default(0)
   deduction    Float    @default(0)
   net_pay      Float
-  status       String   @default("Pending") @db.VarChar(50)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now()) @updatedAt
-  employee     User     @relation("HrUserPayrolls", fields: [employee_id], references: [id], onDelete: Cascade)
+  status       String    @default("Pending") @db.VarChar(50)
+  payment_proof String?   @db.Text
+  payment_date  DateTime?
+  notes         String?   @db.Text
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now()) @updatedAt
+  employee     User      @relation("HrUserPayrolls", fields: [employee_id], references: [id], onDelete: Cascade)
 
   @@index([employee_id], map: "hr_payrolls_employee_id_fkey")
   @@map("hr_payrolls")
