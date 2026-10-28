@@ -2,7 +2,7 @@
 -- HAIMOTION DATA MIGRATION SCRIPT (DATA ONLY - PRESERVES NEW STRUCTURE)
 -- Source: haimoti2_db (2).sql
 -- Target: haimoti2_dashboardv2 (MySQL)
--- Generated At: 2026-10-28T03:43:02.404Z
+-- Generated At: 2026-10-28T04:16:34.649Z
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -68,6 +68,11 @@ INSERT INTO `users` (`id`, `firstname`, `lastname`, `email`, `notification_email
 (83, 'Fardan', '(PKL - Design Graphic)', 'fardan@haimotion.com', 'fardan.haimotion@gmail.com', '34a2c406fea4cc91a50651479e34d4f0', 'ava_6abdcf03cc8907.36632908_avatar.png', '2026-10-01 09:46:40', '000', 'Tetap berusaha yang terbaik', false, 'active', 3, '2026-10-01 09:46:40', 'Fardan (PKL - Design Graphic)'),
 (84, 'Dihair Studio', '( Client )', 'client@dihairstudio.com', 'it.dihairstudio@gmail.com', 'e807f1fcf82d132f9bb018ca6738a19f', 'ava_6adecc0b1c1132.83804607_avatar.png', '2026-10-26 10:42:03', 'Client20250801', 'Akun khusus Monitoring Marketing Operasional', false, 'active', 4, '2026-10-26 10:42:03', 'Dihair Studio ( Client )')
 ON DUPLICATE KEY UPDATE `email` = VALUES(`email`), `status` = VALUES(`status`), `role_id` = VALUES(`role_id`), `name` = VALUES(`name`);
+
+-- Data for table `account` (Better Auth credentials derived from users)
+INSERT INTO `account` (`id`, `accountId`, `providerId`, `userId`, `password`, `createdAt`, `updatedAt`)
+SELECT CONCAT('acc_', `id`), CAST(`id` AS CHAR), 'credential', `id`, `password`, `date_created`, `updatedAt` FROM `users` WHERE `password` IS NOT NULL AND `password` != ''
+ON DUPLICATE KEY UPDATE `password` = VALUES(`password`);
 
 -- Data for table `system_settings` (1 rows)
 INSERT IGNORE INTO `system_settings` (`id`, `name`, `email`, `contact`, `address`, `cover_img`) VALUES
