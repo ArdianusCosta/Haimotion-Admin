@@ -80,7 +80,7 @@ export async function deleteEmployee(_id: number) {
 }
 
 // -----------------------------------------------------------------------------
-// ATTENDANCE & LEAVES
+// ATTENDANCE & LEAVES (FULL CRUD & APPROVALS)
 // -----------------------------------------------------------------------------
 export async function getAttendances() {
   await requireAuth()
@@ -88,6 +88,116 @@ export async function getAttendances() {
     orderBy: { date: 'desc' },
     include: { employee: true }
   })
+}
+
+export async function createAttendance(data: {
+  employeeId: number
+  date: string | Date
+  timeIn?: string | null
+  timeOut?: string | null
+  status: string
+  approvalStatus?: string
+  attachment?: string | null
+  notes?: string | null
+}) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const attendance = await prisma.hrAttendance.create({
+    data: {
+      employee_id: Number(data.employeeId),
+      date: new Date(data.date),
+      time_in: data.timeIn || null,
+      time_out: data.timeOut || null,
+      status: data.status || 'Present',
+      approval_status: data.approvalStatus || (['Sick', 'Permit', 'Sakit', 'Izin'].includes(data.status) ? 'Pending' : 'Approved'),
+      attachment: data.attachment || null,
+      notes: data.notes || null,
+    },
+    include: { employee: true }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'create',
+    description: `Created attendance record for employee ${data.employeeId} on ${data.date}`
+  })
+
+  return attendance
+}
+
+export async function updateAttendance(id: number, data: {
+  employeeId?: number
+  date?: string | Date
+  timeIn?: string | null
+  timeOut?: string | null
+  status?: string
+  approvalStatus?: string
+  attachment?: string | null
+  notes?: string | null
+}) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const updateData: any = {}
+  if (data.employeeId !== undefined) updateData.employee_id = Number(data.employeeId)
+  if (data.date !== undefined) updateData.date = new Date(data.date)
+  if (data.timeIn !== undefined) updateData.time_in = data.timeIn
+  if (data.timeOut !== undefined) updateData.time_out = data.timeOut
+  if (data.status !== undefined) updateData.status = data.status
+  if (data.approvalStatus !== undefined) updateData.approval_status = data.approvalStatus
+  if (data.attachment !== undefined) updateData.attachment = data.attachment
+  if (data.notes !== undefined) updateData.notes = data.notes
+
+  const attendance = await prisma.hrAttendance.update({
+    where: { id },
+    data: updateData,
+    include: { employee: true }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Updated attendance record ${id}`
+  })
+
+  return attendance
+}
+
+export async function updateAttendanceApproval(id: number, approval_status: string) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const attendance = await prisma.hrAttendance.update({
+    where: { id },
+    data: { approval_status },
+    include: { employee: true }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Updated attendance approval for ${id} to ${approval_status}`
+  })
+
+  return attendance
+}
+
+export async function deleteAttendance(id: number) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  await prisma.hrAttendance.delete({
+    where: { id }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'delete',
+    description: `Deleted attendance record ${id}`
+  })
+
+  return { success: true }
 }
 
 export async function importAttendances(data: any[]) {
@@ -116,12 +226,110 @@ export async function importAttendances(data: any[]) {
   return result;
 }
 
+// -----------------------------------------------------------------------------
+// ATTENDANCE SUMMARY CRUD
+// -----------------------------------------------------------------------------
 export async function getAttendanceSummaries() {
   await requireAuth()
   return prisma.hrAttendanceSummary.findMany({
     orderBy: { created_at: 'desc' },
     include: { employee: true }
   })
+}
+
+export async function createAttendanceSummary(data: any) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const summary = await prisma.hrAttendanceSummary.create({
+    data: {
+      employee_id: Number(data.employeeId),
+      period: data.period,
+      department: data.department || null,
+      work_hours_standard: data.workHoursStandard ? parseFloat(data.workHoursStandard) : null,
+      work_hours_actual: data.workHoursActual ? parseFloat(data.workHoursActual) : null,
+      late_hours: data.lateHours ? parseInt(data.lateHours) : 0,
+      late_minutes: data.lateMinutes ? parseInt(data.lateMinutes) : 0,
+      early_leave_hours: data.earlyLeaveHours ? parseInt(data.earlyLeaveHours) : 0,
+      early_leave_minutes: data.earlyLeaveMinutes ? parseInt(data.earlyLeaveMinutes) : 0,
+      overtime_normal: data.overtimeNormal ? parseFloat(data.overtimeNormal) : 0,
+      overtime_special: data.overtimeSpecial ? parseFloat(data.overtimeSpecial) : 0,
+      attendance_days_standard: data.attendanceDaysStandard ? parseFloat(data.attendanceDaysStandard) : 0,
+      attendance_days_actual: data.attendanceDaysActual ? parseFloat(data.attendanceDaysActual) : 0,
+      business_trip_days: data.businessTripDays ? parseInt(data.businessTripDays) : 0,
+      absent_days: data.absentDays ? parseInt(data.absentDays) : 0,
+      leave_days: data.leaveDays ? parseInt(data.leaveDays) : 0,
+      percentage: data.percentage ? parseFloat(data.percentage) : null,
+      status: data.status || 'Approved',
+      notes: data.notes || null,
+    },
+    include: { employee: true }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'create',
+    description: `Created attendance summary for employee ${data.employeeId} period ${data.period}`
+  })
+
+  return summary
+}
+
+export async function updateAttendanceSummary(id: number, data: any) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const updateData: any = {}
+  if (data.employeeId !== undefined) updateData.employee_id = Number(data.employeeId)
+  if (data.period !== undefined) updateData.period = data.period
+  if (data.department !== undefined) updateData.department = data.department
+  if (data.workHoursStandard !== undefined) updateData.work_hours_standard = parseFloat(data.workHoursStandard)
+  if (data.workHoursActual !== undefined) updateData.work_hours_actual = parseFloat(data.workHoursActual)
+  if (data.lateHours !== undefined) updateData.late_hours = parseInt(data.lateHours)
+  if (data.lateMinutes !== undefined) updateData.late_minutes = parseInt(data.lateMinutes)
+  if (data.earlyLeaveHours !== undefined) updateData.early_leave_hours = parseInt(data.earlyLeaveHours)
+  if (data.earlyLeaveMinutes !== undefined) updateData.early_leave_minutes = parseInt(data.earlyLeaveMinutes)
+  if (data.overtimeNormal !== undefined) updateData.overtime_normal = parseFloat(data.overtimeNormal)
+  if (data.overtimeSpecial !== undefined) updateData.overtime_special = parseFloat(data.overtimeSpecial)
+  if (data.attendanceDaysStandard !== undefined) updateData.attendance_days_standard = parseFloat(data.attendanceDaysStandard)
+  if (data.attendanceDaysActual !== undefined) updateData.attendance_days_actual = parseFloat(data.attendanceDaysActual)
+  if (data.businessTripDays !== undefined) updateData.business_trip_days = parseInt(data.businessTripDays)
+  if (data.absentDays !== undefined) updateData.absent_days = parseInt(data.absentDays)
+  if (data.leaveDays !== undefined) updateData.leave_days = parseInt(data.leaveDays)
+  if (data.percentage !== undefined) updateData.percentage = parseFloat(data.percentage)
+  if (data.status !== undefined) updateData.status = data.status
+  if (data.notes !== undefined) updateData.notes = data.notes
+
+  const summary = await prisma.hrAttendanceSummary.update({
+    where: { id },
+    data: updateData,
+    include: { employee: true }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Updated attendance summary ${id}`
+  })
+
+  return summary
+}
+
+export async function deleteAttendanceSummary(id: number) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  await prisma.hrAttendanceSummary.delete({
+    where: { id }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'delete',
+    description: `Deleted attendance summary ${id}`
+  })
+
+  return { success: true }
 }
 
 export async function importAttendanceSummaries(data: any[]) {
@@ -153,6 +361,9 @@ export async function importAttendanceSummaries(data: any[]) {
   })
 }
 
+// -----------------------------------------------------------------------------
+// LEAVE REQUESTS (FULL CRUD & APPROVALS)
+// -----------------------------------------------------------------------------
 export async function getLeaves() {
   await requireAuth()
   return prisma.hrLeaveRequest.findMany({
@@ -161,15 +372,88 @@ export async function getLeaves() {
   })
 }
 
-export async function updateLeaveStatus(id: number, status: string) {
+export async function createLeaveRequest(data: {
+  employeeId: number
+  type: string
+  startDate: string | Date
+  endDate: string | Date
+  reason: string
+  attachment?: string | null
+  status?: string
+}) {
   const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const leave = await prisma.hrLeaveRequest.create({
+    data: {
+      employee_id: Number(data.employeeId),
+      type: data.type,
+      start_date: new Date(data.startDate),
+      end_date: new Date(data.endDate),
+      reason: data.reason,
+      attachment: data.attachment || null,
+      status: data.status || 'Pending'
+    },
+    include: { employee: true }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'create',
+    description: `Created leave request (${data.type}) for employee ${data.employeeId}`
+  })
+
+  return leave
+}
+
+export async function updateLeaveRequest(id: number, data: {
+  employeeId?: number
+  type?: string
+  startDate?: string | Date
+  endDate?: string | Date
+  reason?: string
+  attachment?: string | null
+  status?: string
+}) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const updateData: any = {}
+  if (data.employeeId !== undefined) updateData.employee_id = Number(data.employeeId)
+  if (data.type !== undefined) updateData.type = data.type
+  if (data.startDate !== undefined) updateData.start_date = new Date(data.startDate)
+  if (data.endDate !== undefined) updateData.end_date = new Date(data.endDate)
+  if (data.reason !== undefined) updateData.reason = data.reason
+  if (data.attachment !== undefined) updateData.attachment = data.attachment
+  if (data.status !== undefined) updateData.status = data.status
+
   const leave = await prisma.hrLeaveRequest.update({
     where: { id },
-    data: { status }
+    data: updateData,
+    include: { employee: true }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Updated leave request ${id}`
+  })
+
+  return leave
+}
+
+export async function updateLeaveStatus(id: number, status: string) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const leave = await prisma.hrLeaveRequest.update({
+    where: { id },
+    data: { status },
+    include: { employee: true }
   })
   
   await logActivity({
-    userId: parseInt(auth.id, 10),
+    userId: uid,
     activityType: 'update',
     description: `Updated leave request ${id} to ${status}`
   })
@@ -177,18 +461,21 @@ export async function updateLeaveStatus(id: number, status: string) {
   return leave;
 }
 
-export async function createLeaveRequest(data: any) {
-  await requireAuth()
-  return prisma.hrLeaveRequest.create({
-    data: {
-      employee_id: data.employeeId,
-      type: data.type,
-      start_date: data.startDate ? new Date(data.startDate) : new Date(),
-      end_date: data.endDate ? new Date(data.endDate) : new Date(),
-      reason: data.reason,
-      status: data.status || 'Pending'
-    }
+export async function deleteLeaveRequest(id: number) {
+  const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  await prisma.hrLeaveRequest.delete({
+    where: { id }
   })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'delete',
+    description: `Deleted leave request ${id}`
+  })
+
+  return { success: true }
 }
 
 // -----------------------------------------------------------------------------

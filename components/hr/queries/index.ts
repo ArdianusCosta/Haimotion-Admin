@@ -8,7 +8,13 @@ import {
   getLeaves,
   updateLeaveStatus,
   createLeaveRequest,
+  updateLeaveRequest,
+  deleteLeaveRequest,
   getAttendances,
+  createAttendance,
+  updateAttendance,
+  updateAttendanceApproval,
+  deleteAttendance,
   importAttendances,
   getPayrolls,
   createPayroll,
@@ -18,6 +24,9 @@ import {
   updateCandidateStatus,
   createCandidate,
   getAttendanceSummaries,
+  createAttendanceSummary,
+  updateAttendanceSummary,
+  deleteAttendanceSummary,
   importAttendanceSummaries
 } from '@/app/actions/hr';
 
@@ -63,11 +72,33 @@ export function useDeleteEmployee() {
   });
 }
 
-// Leaves / Attendance Queries & Mutations
+// Leaves Queries & Mutations
 export function useLeaves() {
   return useQuery({
     queryKey: ['hr-leaves'],
     queryFn: () => getLeaves(),
+  });
+}
+
+export function useCreateLeaveRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createLeaveRequest(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
+export function useUpdateLeaveRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateLeaveRequest(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
   });
 }
 
@@ -83,10 +114,10 @@ export function useUpdateLeaveStatus() {
   });
 }
 
-export function useCreateLeaveRequest() {
+export function useDeleteLeaveRequest() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: any) => createLeaveRequest(data),
+    mutationFn: (id: number) => deleteLeaveRequest(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hr-leaves'] });
       queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
@@ -102,6 +133,51 @@ export function useAttendances() {
   });
 }
 
+export function useCreateAttendance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createAttendance(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
+export function useUpdateAttendance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateAttendance(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
+export function useUpdateAttendanceApproval() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, approval_status }: { id: number; approval_status: string }) =>
+      updateAttendanceApproval(id, approval_status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
+export function useDeleteAttendance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteAttendance(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendances'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
 export function useImportAttendances() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -113,10 +189,44 @@ export function useImportAttendances() {
   });
 }
 
+// Attendance Summary Queries & Mutations
 export function useAttendanceSummaries() {
   return useQuery({
     queryKey: ['hr-attendance-summaries'],
     queryFn: () => getAttendanceSummaries(),
+  });
+}
+
+export function useCreateAttendanceSummary() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createAttendanceSummary(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendance-summaries'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
+export function useUpdateAttendanceSummary() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateAttendanceSummary(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendance-summaries'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
+  });
+}
+
+export function useDeleteAttendanceSummary() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteAttendanceSummary(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-attendance-summaries'] });
+      queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
+    },
   });
 }
 

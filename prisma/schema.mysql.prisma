@@ -672,16 +672,18 @@ model HrEmployee {
 }
 
 model HrAttendance {
-  id          Int      @id @default(autoincrement())
-  employee_id Int
-  date        DateTime @db.Date
-  time_in     String?  @db.VarChar(10)
-  time_out    String?  @db.VarChar(10)
-  status      String   @default("Present") @db.VarChar(50)
-  notes       String?  @db.Text
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now()) @updatedAt
-  employee    User     @relation("HrUserAttendance", fields: [employee_id], references: [id], onDelete: Cascade)
+  id              Int      @id @default(autoincrement())
+  employee_id     Int
+  date            DateTime @db.Date
+  time_in         String?  @db.VarChar(10)
+  time_out        String?  @db.VarChar(10)
+  status          String   @default("Present") @db.VarChar(50)
+  approval_status String?  @default("Approved") @db.VarChar(50)
+  attachment      String?  @db.Text
+  notes           String?  @db.Text
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now()) @updatedAt
+  employee        User     @relation("HrUserAttendance", fields: [employee_id], references: [id], onDelete: Cascade)
 
   @@index([employee_id], map: "hr_attendances_employee_id_fkey")
   @@map("hr_attendances")
@@ -706,6 +708,8 @@ model HrAttendanceSummary {
   absent_days              Int?
   leave_days               Int?
   percentage               Float?
+  status                   String?  @default("Approved") @db.VarChar(50)
+  notes                    String?  @db.Text
   created_at               DateTime @default(now())
   updated_at               DateTime @default(now()) @updatedAt
   employee                 User     @relation("HrUserAttendanceSummary", fields: [employee_id], references: [id], onDelete: Cascade)
@@ -721,6 +725,7 @@ model HrLeaveRequest {
   start_date  DateTime @db.Date
   end_date    DateTime @db.Date
   reason      String   @db.Text
+  attachment  String?  @db.Text
   status      String   @default("Pending") @db.VarChar(50)
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now()) @updatedAt
