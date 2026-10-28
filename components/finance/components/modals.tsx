@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Upload, FileText, CheckCircle, ExternalLink, Eye, Loader2, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface ConfirmDeleteModalProps {
   open: boolean
@@ -307,6 +308,279 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
             <Button type="submit">Simpan</Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function PayExpenseModal({
+  open,
+  onOpenChange,
+  onPay,
+  expense,
+  accounts = []
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onPay: (data: any) => void
+  expense: any
+  accounts: any[]
+}) {
+  const [accountId, setAccountId] = useState('')
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
+  const [notes, setNotes] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+
+  React.useEffect(() => {
+    if (expense) {
+      setAccountId(accounts[0]?.id?.toString() || '')
+      setPaymentDate(new Date().toISOString().slice(0, 10))
+      setReceiptUrl(expense.receipt_url || null)
+      setNotes(expense.notes || '')
+    }
+  }, [expense, accounts])
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('Ukuran file maksimal 8MB')
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json()
+      if (data.url) {
+        setReceiptUrl(data.url)
+        toast.success('Bukti transfer berhasil diunggah!')
+      } else {
+        toast.error('Gagal mengunggah bukti transfer.')
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan saat upload bukti transfer.')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onPay({
+      id: expense.id,
+      accountId: accountId && accountId !== 'none' ? Number(accountId) : null,
+      paymentDate,
+      receiptUrl,
+      notes
+    })
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount)
+  }
+
+  if (!expense) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>Bayar Pengeluaran / Gaji</DialogTitle>
+          <DialogDescription>
+            Konfirmasi pembayaran kas/bank dan lampirkan bukti transfer.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Ringkasan Biaya */}
+        <div className="bg-muted/40 border rounded-lg p-3.5 text-xs space-y-1.5">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Keterangan:</span>
+            <span className="font-medium text-foreground max-w-[280px] text-right truncate">{expense.description}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Penerima / Karyawan:</span>
+            <span className="font-medium text-foreground">{expense.vendor || '-'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Kategori:</span>
+            <span className="font-medium text-foreground">{expense.category}</span>
+          </div>
+          <div className="border-t pt-1.5 flex justify-between font-bold text-sm text-foreground">
+            <span>Total yang Harus Dibayar:</span>
+            <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(expense.amount)}</span>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="grid gap-4 py-2">
+          {/* Akun Kas/Bank */}
+          <div className="grid gap-1.5">
+            <Label>Bayar dari Akun Kas/Bank</Label>
+            <Select value={accountId || 'none'} onValueChange={(val: string | null) => setAccountId(!val || val === 'none' ? '' : val)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih akun kas/bank" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Tidak memotong kas/bank (Catatan saja)</SelectItem>
+                {accounts.map(acc => (
+                  <SelectItem key={acc.id} value={acc.id.toString()}>
+                    {acc.name} ({formatCurrency(acc.balance)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Saldo akun yang dipilih akan otomatis berkurang sebesar {formatCurrency(expense.amount)}.
+            </p>
+          </div>
+
+          {/* Tanggal Transfer */}
+          <div className="grid gap-1.5">
+            <Label>Tanggal Pembayaran / Transfer</Label>
+            <Input
+              type="date"
+              required
+              value={paymentDate}
+              onChange={e => setPaymentDate(e.target.value)}
+            />
+          </div>
+
+          {/* Upload Bukti Transfer */}
+          <div className="grid gap-1.5">
+            <Label className="flex items-center justify-between">
+              <span>Bukti Transfer / Struk Bank</span>
+              {receiptUrl && (
+                <button
+                  type="button"
+                  onClick={() => setReceiptUrl(null)}
+                  className="text-xs text-red-500 hover:underline flex items-center"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" /> Hapus
+                </button>
+              )}
+            </Label>
+
+            {receiptUrl ? (
+              <div className="flex items-center space-x-3 p-2.5 rounded-lg border bg-muted/20">
+                {receiptUrl.toLowerCase().endsWith('.pdf') ? (
+                  <FileText className="w-8 h-8 text-primary shrink-0" />
+                ) : (
+                  <img src={receiptUrl} alt="Preview" className="w-12 h-12 object-cover rounded border shrink-0" />
+                )}
+                <div className="flex-1 overflow-hidden">
+                  <p className="text-xs font-medium text-foreground truncate">Bukti Transfer Terlampir</p>
+                  <a
+                    href={receiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-primary hover:underline flex items-center mt-0.5"
+                  >
+                    <Eye className="w-3 h-3 mr-1" /> Lihat Bukti
+                  </a>
+                </div>
+                <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+              </div>
+            ) : (
+              <div className="relative border-2 border-dashed border-input rounded-lg p-3 hover:bg-muted/30 transition-colors text-center cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  disabled={isUploading}
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div className="flex flex-col items-center justify-center space-y-1">
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      <p className="text-xs text-muted-foreground">Mengunggah file...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5 text-muted-foreground" />
+                      <p className="text-xs font-medium text-foreground">Klik untuk upload bukti struk / slip transfer</p>
+                      <p className="text-[10px] text-muted-foreground">Mendukung JPG, PNG, PDF (Maks. 8MB)</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Catatan */}
+          <div className="grid gap-1.5">
+            <Label>Catatan Transfer (Opsional)</Label>
+            <Input
+              type="text"
+              placeholder="Contoh: Transfer m-BCA ref: 948210"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+            />
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+              Batal
+            </Button>
+            <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              Konfirmasi & Tandai Lunas
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function ReceiptPreviewModal({
+  open,
+  onOpenChange,
+  receiptUrl,
+  description
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  receiptUrl: string | null
+  description?: string
+}) {
+  if (!receiptUrl) return null
+  const isPdf = receiptUrl.toLowerCase().endsWith('.pdf')
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh] flex flex-col p-6">
+        <DialogHeader>
+          <DialogTitle>Bukti Pengeluaran / Transfer</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
+        </DialogHeader>
+        <div className="flex-1 overflow-auto my-3 flex items-center justify-center bg-muted/30 rounded-lg p-2 min-h-[280px]">
+          {isPdf ? (
+            <iframe src={receiptUrl} className="w-full h-[400px] rounded border" />
+          ) : (
+            <img 
+              src={receiptUrl} 
+              alt="Bukti Transfer" 
+              className="max-h-[400px] w-auto object-contain rounded shadow-sm" 
+            />
+          )}
+        </div>
+        <DialogFooter className="flex justify-between items-center w-full sm:justify-between">
+          <Button variant="outline" asChild size="sm">
+            <a href={receiptUrl} target="_blank" rel="noopener noreferrer" download>
+              <ExternalLink className="mr-2 h-4 w-4" /> Buka Tab Baru / Unduh
+            </a>
+          </Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} size="sm">
+            Tutup
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

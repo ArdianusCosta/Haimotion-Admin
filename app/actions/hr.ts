@@ -204,24 +204,55 @@ export async function getPayrolls() {
 
 export async function createPayroll(data: any) {
   const auth = await requireAuth()
+  const uid = parseInt(auth.id, 10)
+
+  const employee = await prisma.user.findUnique({
+    where: { id: parseInt(data.employeeId, 10) }
+  })
+  const netPay = data.basicSalary + (data.allowance || 0) - (data.deduction || 0)
+
   const payroll = await prisma.hrPayroll.create({
     data: {
-      employee_id: data.employeeId,
+      employee_id: parseInt(data.employeeId, 10),
       period: data.period,
       basic_salary: data.basicSalary,
       allowance: data.allowance || 0,
       deduction: data.deduction || 0,
-      net_pay: data.basicSalary + (data.allowance || 0) - (data.deduction || 0),
+      net_pay: netPay,
       status: data.status || 'Pending'
     }
   })
-  
+
+  // Otomatis masukkan ke antrean Pengeluaran di Finance
+  if (netPay > 0) {
+    try {
+      const category = await prisma.financeCategory.findFirst({
+        where: { name: { contains: 'Gaji' } }
+      })
+      await prisma.financeExpense.create({
+        data: {
+          date: new Date(),
+          description: `Gaji Karyawan: ${employee?.name || 'Karyawan'} (Periode ${data.period})`,
+          category: 'Salaries',
+          category_id: category?.id || null,
+          amount: netPay,
+          vendor: employee?.name || 'Karyawan',
+          status: 'Pending',
+          payroll_id: payroll.id,
+          created_by: uid
+        }
+      })
+    } catch (err) {
+      console.error('Error auto-creating finance expense for payroll:', err)
+    }
+  }
+
   await logActivity({
-    userId: parseInt(auth.id, 10),
+    userId: uid,
     activityType: 'create',
     description: `Created payroll for employee ${data.employeeId} period ${data.period}`
   })
-  
+
   return payroll;
 }
 
@@ -303,6 +334,11 @@ export async function deletePayroll(id: number) {
     include: { employee: true }
   })
   if (!existing) throw new Error('Payroll record not found.')
+
+  // Juga hapus dari antrean pengeluaran finance jika masih Pending
+  await prisma.financeExpense.deleteMany({
+    where: { payroll_id: id, status: 'Pending' }
+  }).catch(() => {})
 
   await prisma.hrPayroll.delete({ where: { id } })
 

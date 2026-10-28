@@ -7,6 +7,7 @@ import {
   createExpense,
   updateExpense,
   deleteExpense,
+  payExpense,
   createTransaction,
   deleteTransaction,
   exportExpensesCsv,
@@ -144,6 +145,23 @@ export function useUpdateExpense() {
       toast.success('Pengeluaran berhasil diperbarui.')
     },
     onError: (err: any) => toast.error(err.message || 'Gagal memperbarui pengeluaran.')
+  })
+}
+
+export function usePayExpense() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { id: number; accountId?: number | null; paymentDate?: string; receiptUrl?: string | null; notes?: string | null }) => payExpense(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finance', 'expenses'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'overview'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'bankAccounts'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'reports'] })
+      queryClient.invalidateQueries({ queryKey: ['hr-payrolls'] })
+      toast.success('Pembayaran pengeluaran / gaji berhasil diproses!')
+    },
+    onError: (err: any) => toast.error(err.message || 'Gagal memproses pembayaran pengeluaran.')
   })
 }
 

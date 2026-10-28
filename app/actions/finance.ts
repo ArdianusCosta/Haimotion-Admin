@@ -657,6 +657,46 @@ export async function recordInvoicePayment(data: {
 export async function getExpenses(filters?: { category?: string; search?: string }) {
   await requireAuth()
 
+  // Auto-sync any existing HR payrolls to Finance Expenses if not yet queued
+  try {
+    const payrolls = await prisma.hrPayroll.findMany({
+      include: { employee: true }
+    })
+    for (const p of payrolls) {
+      if (p.net_pay > 0) {
+        const existingExp = await prisma.financeExpense.findFirst({
+          where: {
+            OR: [
+              { payroll_id: p.id },
+              { description: { contains: `Periode ${p.period}` }, vendor: p.employee?.name || '' }
+            ]
+          }
+        })
+        if (!existingExp) {
+          const category = await prisma.financeCategory.findFirst({
+            where: { name: { contains: 'Gaji' } }
+          })
+          await prisma.financeExpense.create({
+            data: {
+              date: p.payment_date || p.created_at || new Date(),
+              description: `Gaji Karyawan: ${p.employee?.name || 'Karyawan'} (Periode ${p.period})`,
+              category: 'Salaries',
+              category_id: category?.id || null,
+              amount: p.net_pay,
+              vendor: p.employee?.name || 'Karyawan',
+              status: p.status || 'Pending',
+              payroll_id: p.id,
+              receipt_url: p.payment_proof || null,
+              notes: p.notes || null
+            }
+          })
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error auto-syncing payrolls into expenses:', err)
+  }
+
   const where: any = {}
   if (filters?.category && filters.category !== 'All') {
     where.category = filters.category
@@ -818,6 +858,78 @@ export async function deleteExpense(id: number) {
   })
 
   return { success: true }
+}
+
+export async function payExpense(data: {
+  id: number
+  accountId?: number | null
+  paymentDate?: string
+  receiptUrl?: string | null
+  notes?: string | null
+}) {
+  const uid = await currentUserId()
+  const expense = await prisma.financeExpense.findUnique({ where: { id: data.id } })
+  if (!expense) throw new Error('Pengeluaran tidak ditemukan.')
+
+  const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date()
+  const accountId = data.accountId ? Number(data.accountId) : null
+
+  const updated = await prisma.$transaction(async (tx) => {
+    // 1. Update status to Paid and record proof/date/account
+    const exp = await tx.financeExpense.update({
+      where: { id: data.id },
+      data: {
+        status: 'Paid',
+        date: paymentDate,
+        receipt_url: data.receiptUrl !== undefined ? data.receiptUrl : expense.receipt_url,
+        account_id: accountId,
+        notes: data.notes !== undefined ? data.notes : expense.notes
+      }
+    })
+
+    // 2. If accountId selected, record transaction and deduct account balance
+    if (accountId) {
+      await tx.financeTransaction.create({
+        data: {
+          date: paymentDate,
+          description: `Pembayaran: ${expense.description}`,
+          type: 'Expense',
+          amount: expense.amount,
+          reference: `EXP-${expense.id}`,
+          account_id: accountId,
+          created_by: uid
+        }
+      })
+
+      await tx.financeAccount.update({
+        where: { id: accountId },
+        data: { balance: { increment: -expense.amount } }
+      })
+    }
+
+    // 3. If linked to hr_payrolls, update hr_payrolls as Paid with proof and date!
+    if (expense.payroll_id) {
+      await tx.hrPayroll.update({
+        where: { id: expense.payroll_id },
+        data: {
+          status: 'Paid',
+          payment_date: paymentDate,
+          payment_proof: data.receiptUrl || undefined,
+          notes: data.notes || undefined
+        }
+      }).catch(err => console.warn('Could not update linked payroll:', err))
+    }
+
+    return exp
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Paid expense: ${expense.description} (Rp ${expense.amount.toLocaleString('id-ID')})`
+  })
+
+  return updated
 }
 
 export async function exportExpensesCsv() {

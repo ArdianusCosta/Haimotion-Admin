@@ -622,6 +622,10 @@ model FinanceExpense {
   amount           Float
   vendor           String           @db.VarChar(200)
   status           String           @default("Pending") @db.VarChar(50)
+  receipt_url      String?          @db.Text
+  payroll_id       Int?
+  account_id       Int?
+  notes            String?          @db.Text
   created_at       DateTime         @default(now())
   updated_at       DateTime         @default(now()) @updatedAt
   created_by       Int?
