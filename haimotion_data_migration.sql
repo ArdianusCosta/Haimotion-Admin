@@ -2,7 +2,7 @@
 -- HAIMOTION DATA MIGRATION SCRIPT (DATA ONLY - PRESERVES NEW STRUCTURE)
 -- Source: haimoti2_db (2).sql
 -- Target: haimoti2_dashboardv2 (MySQL)
--- Generated At: 2026-10-28T03:25:15.243Z
+-- Generated At: 2026-10-28T03:43:02.404Z
 -- =====================================================================
 
 SET NAMES utf8mb4;
@@ -49,7 +49,7 @@ INSERT INTO `users` (`id`, `firstname`, `lastname`, `email`, `notification_email
 (63, '[RESIGN] Siska Harmelia Merywati Sihaloho', '( Creative )', 'siska@haimotion.com', '', '6fb42da0e32e07b61c9f0251fe627a9c', 'ava_6a0d10533aeb54.51603739_avatar.png', '2026-04-22 10:16:55', '0000', '-', false, 'resign', 3, '2026-04-22 10:16:55', '[RESIGN] Siska Harmelia Merywati Sihaloho ( Creative )'),
 (64, 'Joel Hudson Saiman', '(IT - Web Developer Staff)', 'joel@haimotion.com', 'joelhudson.haimotion@gmail.com', '4a8dd925b861919feef34450e7171f0b', 'ava_6a41d05f98e675.69200637_avatar.png', '2026-06-29 08:49:50', 'HMBOWD0006', 'Kerja kerja kerja', false, 'active', 1, '2026-06-29 08:49:50', 'Joel Hudson Saiman (IT - Web Developer Staff)'),
 (65, 'Ghathfan Radithya', '(PKL - Graphic Designer)', 'afan@haimotion.com', 'afan.haimotion@gmail.com', '9671500446f7ea04cbb70c3074405c22', 'ava_6a475809e124e6.99399210_avatar.png', '2026-07-03 13:13:19', 'HMHOD0008', 'hi everyone, u can call me afan.', false, 'active', 3, '2026-07-03 13:13:19', 'Ghathfan Radithya (PKL - Graphic Designer)'),
-(66, 'Ardianus caesar emanual ruicosta du\'u', '(IT - Web Developer Staff)', 'costa@haimotion.com', 'costa.haimotion@gmail.com', 'b086fc11a2977ed92ef83f637b156a37', 'ava_6a59eedb9286f5.57419487_avatar.png', '2026-07-15 22:05:59', 'minta sama refin', 'bikin sendiri', false, 'active', 1, '2026-07-15 22:05:59', 'Ardianus caesar emanual ruicosta du\\'u (IT - Web Developer Staff)'),
+(66, 'Ardianus caesar emanual ruicosta du\'u', '(IT - Web Developer Staff)', 'costa@haimotion.com', 'costa.haimotion@gmail.com', 'b086fc11a2977ed92ef83f637b156a37', 'ava_6a59eedb9286f5.57419487_avatar.png', '2026-07-15 22:05:59', 'minta sama refin', 'bikin sendiri', false, 'active', 1, '2026-07-15 22:05:59', 'Ardianus caesar emanual ruicosta du''u (IT - Web Developer Staff)'),
 (67, 'PT Pradana Nusa Energi', '( Client )', 'client@pradana.com', 'nusaenergi999@gmail.com', 'e807f1fcf82d132f9bb018ca6738a19f', 'ava_6a6239095e6f19.17633096_avatar.png', '2026-07-22 16:55:39', 'Client20250801', 'Akun khusus Monitoring Marketing Operasional', false, 'active', 4, '2026-07-22 16:55:39', 'PT Pradana Nusa Energi ( Client )'),
 (68, 'shafira', '(Creative - Customer Wervice)', 'shafira@haimotion.com', 'shafira.haimotion@gmail.com', '235f8da71824d4251aa29a59ef2a9e40', 'ava_6a701b705686f1.04127244_avatar.png', '2026-08-03 11:00:41', '-', '-', false, 'active', 3, '2026-08-03 11:00:41', 'shafira (Creative - Customer Wervice)'),
 (69, 'Soneng Windi', '(Creative - Social Media Specialist)', 'windi@haimotion.com', 'windi.haimotion@gmail.com', '16e07886cbb21edbece54fbe941c0018', 'ava_6a701a1d4773a2.25438363_avatar.png', '2026-08-03 11:03:25', '-', '-', false, 'active', 2, '2026-08-03 11:03:25', 'Soneng Windi (Creative - Social Media Specialist)'),
