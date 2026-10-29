@@ -145,7 +145,8 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'roles-permissions': 'Roles & Permissions',
         'user-management': 'User Management',
         'activity-log': 'Activity Log',
-        'account-settings': 'Account Settings'
+        'account-settings': 'Account Settings',
+        'file-manager': 'File Manager'
       }
       initialSection = topLevelRouteMap[rawSlug] || 'Dashboard'
     }
