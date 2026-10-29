@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { uploadFile } from '@/lib/storage/minio';
+import { uploadFile } from '@/lib/storage';
 import crypto from 'crypto';
 import { checkAccess } from '@/lib/file-auth';
 

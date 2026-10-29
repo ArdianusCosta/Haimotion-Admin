@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getFileUrl } from '@/lib/storage/minio';
+import { getFileUrl } from '@/lib/storage';
 import { requireAuth } from '@/lib/auth/authorization';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { deleteFile as deleteMinioFile } from '@/lib/storage/minio';
+import { deleteFile as deleteMinioFile } from '@/lib/storage';
 import { checkAccess } from '@/lib/file-auth';
 import { requireAuth } from '@/lib/auth/authorization';
 

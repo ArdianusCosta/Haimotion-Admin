@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getFileStream } from '@/lib/storage/minio'
+import { getFileStream } from '@/lib/storage'
 
 export async function GET(req: Request) {
   try {
