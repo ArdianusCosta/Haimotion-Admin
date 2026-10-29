@@ -92,11 +92,14 @@ export async function globalSearch(query: string): Promise<{ success: boolean; d
 
     // 5. Users
     const users = await prisma.user.findMany({
-      where: { OR: [
-        { firstname: { contains: query } },
-        { lastname: { contains: query } },
-        { email: { contains: query } }
-      ]},
+      where: {
+        status: { not: 'resign' },
+        OR: [
+          { firstname: { contains: query } },
+          { lastname: { contains: query } },
+          { email: { contains: query } }
+        ]
+      },
       take: 5
     })
     users.forEach(u => {

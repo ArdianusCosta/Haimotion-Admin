@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     // Manual join to User table since schema might not have relations defined for activity_log
     const userIds = Array.from(new Set(logs.map(log => Number(log.user_id)).filter(id => !isNaN(id) && id > 0)));
     const users = await prisma.user.findMany({
-      where: { id: { in: userIds } },
+      where: { id: { in: userIds }, status: { not: 'resign' } },
       select: { id: true, firstname: true, lastname: true, name: true, email: true, avatar: true }
     });
     const userMap = new Map(users.map(u => [Number(u.id), u]));

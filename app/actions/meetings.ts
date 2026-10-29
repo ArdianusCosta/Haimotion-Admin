@@ -277,6 +277,7 @@ export async function getMeetingFormData() {
 
     const [users, projects, tasks, moduleFlows] = await Promise.all([
       prisma.user.findMany({
+        where: { status: { not: 'resign' } },
         select: { id: true, firstname: true, lastname: true, name: true, avatar: true, email: true },
         orderBy: { firstname: 'asc' }
       }),

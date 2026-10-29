@@ -198,6 +198,7 @@ export async function getKpiPerformanceData(
 
   // ─── 3. Fetch all users ─────────────────────────────────────────────────────
   const users = await prisma.user.findMany({
+    where: { status: { not: 'resign' } },
     select: { id: true, firstname: true, lastname: true, name: true, avatar: true },
     orderBy: { firstname: 'asc' }
   })

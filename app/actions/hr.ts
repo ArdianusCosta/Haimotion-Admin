@@ -30,7 +30,7 @@ export async function getHrOverview() {
 export async function getEmployees(filters?: { search?: string }) {
   await requireAuth()
   
-  const where: any = {}
+  const where: any = { status: { not: 'resign' } }
   if (filters?.search) {
     where.OR = [
       { name: { contains: filters.search } },

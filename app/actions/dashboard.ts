@@ -127,6 +127,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
         orderBy: { date_created: 'desc' }
       }),
       prisma.user.findMany({
+        where: { status: { not: 'resign' } },
         select: {
           id: true,
           firstname: true,
@@ -584,7 +585,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     let additionalUsers: any[] = [];
     if (missingUserIds.length > 0) {
       additionalUsers = await prisma.user.findMany({
-        where: { id: { in: missingUserIds } },
+        where: { id: { in: missingUserIds }, status: { not: 'resign' } },
         select: {
           id: true,
           firstname: true,

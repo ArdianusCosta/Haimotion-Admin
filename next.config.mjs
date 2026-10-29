@@ -17,6 +17,7 @@ const nextConfig = {
   experimental: {
     cpus: 1,
   },
+  turbopack: {},
   webpack: (config) => {
     config.cache = false
     config.parallelism = 1

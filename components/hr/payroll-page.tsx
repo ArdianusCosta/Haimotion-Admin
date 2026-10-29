@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { usePayrolls, useCreatePayroll, useUpdatePayroll, useDeletePayroll, useEmployees } from './queries';
 import { exportPayrollsCsv } from '@/app/actions/hr';
 import { HRPageHeader } from './components';
-import { PayrollModal, UpdatePayrollModal, ProofPreviewModal } from './components/modals';
+import { PayrollModal, UpdatePayrollModal, ProofPreviewModal, ConfirmActionModal } from './components/modals';
 import { Search, Download, Plus, Edit3, Trash2, Paperclip, CheckCircle2, Clock, Eye, AlertCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ export function PayrollPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPayroll, setEditingPayroll] = useState<any | null>(null);
   const [previewProofPayroll, setPreviewProofPayroll] = useState<any | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
 
   const handleSave = (data: any) => {
     createPayroll.mutate(data, {
@@ -49,16 +50,21 @@ export function PayrollPage() {
   };
 
   const handleDelete = (payroll: any) => {
-    if (confirm(`Apakah kamu yakin ingin menghapus payroll untuk ${payroll.employee?.name} periode ${payroll.period}?`)) {
-      deletePayroll.mutate(payroll.id, {
-        onSuccess: () => {
-          toast.success('Data payroll berhasil dihapus.');
-        },
-        onError: (err: any) => {
-          toast.error(err?.message || 'Gagal menghapus data payroll');
-        }
-      });
-    }
+    setDeleteConfirm(payroll);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirm) return;
+    deletePayroll.mutate(deleteConfirm.id, {
+      onSuccess: () => {
+        toast.success('Data payroll berhasil dihapus.');
+        setDeleteConfirm(null);
+      },
+      onError: (err: any) => {
+        toast.error(err?.message || 'Gagal menghapus data payroll');
+        setDeleteConfirm(null);
+      }
+    });
   };
 
   const handleExport = async () => {
@@ -278,6 +284,16 @@ export function PayrollPage() {
         proofUrl={previewProofPayroll?.payment_proof || null}
         employeeName={previewProofPayroll?.employee?.name}
         period={previewProofPayroll?.period}
+      />
+
+      {/* Modal Konfirmasi Delete */}
+      <ConfirmActionModal
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={confirmDelete}
+        title={t('Delete Payroll')}
+        description={`${t('Are you sure you want to delete payroll for')} ${deleteConfirm?.employee?.name || ''} ${t('period')} ${deleteConfirm?.period || ''}?`}
+        isDestructive
       />
     </div>
   );

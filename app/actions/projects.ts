@@ -20,6 +20,7 @@ export async function getProjects() {
     
     // Fetch all users to map manager (members are already included)
     const users = await prisma.user.findMany({
+      where: { status: { not: 'resign' } },
       select: {
         id: true,
         firstname: true,
@@ -106,6 +107,7 @@ export async function getProjectById(id: number) {
     if (!project) return { success: false, error: 'Project not found' }
     
     const users = await prisma.user.findMany({
+      where: { status: { not: 'resign' } },
       select: {
         id: true,
         firstname: true,

@@ -386,6 +386,7 @@ export async function searchUsers(query: string, currentUserId: number) {
   return await prisma.user.findMany({
     where: {
       id: { not: currentUserId },
+      status: { not: 'resign' },
       OR: [
         { firstname: { contains: query } },
         { lastname: { contains: query } },

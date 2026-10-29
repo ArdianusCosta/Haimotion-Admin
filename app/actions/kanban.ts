@@ -44,6 +44,7 @@ export async function getKanbanTasks() {
     })
     
     const users = await prisma.user.findMany({
+      where: { status: { not: 'resign' } },
       select: { id: true, firstname: true, lastname: true, avatar: true }
     })
     

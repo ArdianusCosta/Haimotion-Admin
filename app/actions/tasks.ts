@@ -61,6 +61,7 @@ export async function getTasksData() {
     })
     
     const users = await prisma.user.findMany({
+      where: { status: { not: 'resign' } },
       select: { id: true, firstname: true, lastname: true, avatar: true }
     })
     

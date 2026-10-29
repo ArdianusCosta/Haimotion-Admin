@@ -12,6 +12,7 @@ export async function GET(req: Request) {
     }
 
     const whereClause: any = {
+      status: { not: 'resign' },
       OR: [
         { firstname: { contains: query } },
         { lastname: { contains: query } },
