@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth/authorization'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 
 export async function getDashboardData(dateRangeStr: string, projectFilter?: string) {
   const now = new Date();
@@ -82,7 +82,8 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
   }
 
   try {
-    await requireAuth();
+    const user = await requireAuth();
+    requirePermission(user, 'dashboard.view')
 
     // 1. Parallel queries for maximum performance
     const [

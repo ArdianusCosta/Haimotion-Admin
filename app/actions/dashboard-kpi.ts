@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth/authorization'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 
 /**
  * Task Status Map (matches types/tasks.ts)
@@ -153,7 +153,8 @@ export async function getKpiPerformanceData(
   projectFilter?: string,
   memberFilter?: string
 ): Promise<KpiPerformanceData> {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'dashboard.view')
 
   const { startDate, endDate, label } = buildPeriodDates(dateRangeStr)
   const now = new Date()

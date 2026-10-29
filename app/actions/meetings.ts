@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { requireAuth } from '@/lib/auth/authorization'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
 
 // Generate a short, readable meeting code like "7KX92P"
@@ -31,6 +31,7 @@ async function getUniqueMeetingCode(): Promise<string> {
 export async function getMeetings() {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.view')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const meetings = await prisma.meeting.findMany({
@@ -99,6 +100,7 @@ export async function createMeeting(data: {
 }) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.create')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const meetingStartTime = new Date(data.isoDateTime);
@@ -162,6 +164,7 @@ export async function updateMeeting(id: number, data: {
 }) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.update')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const meeting = await prisma.meeting.findUnique({ where: { id } });
@@ -200,6 +203,7 @@ export async function updateMeeting(id: number, data: {
 export async function cancelMeeting(id: number) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.update')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const meeting = await prisma.meeting.findUnique({ where: { id } });
@@ -228,6 +232,7 @@ export async function cancelMeeting(id: number) {
 export async function deleteMeeting(id: number) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.delete')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const meeting = await prisma.meeting.findUnique({ where: { id } });
@@ -253,6 +258,7 @@ export async function deleteMeeting(id: number) {
 export async function updateMeetingStatus(id: number, status: string) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.update')
 
     const meeting = await prisma.meeting.findUnique({ where: { id } });
     if (!meeting) throw new Error("Meeting not found");
@@ -273,6 +279,7 @@ export async function updateMeetingStatus(id: number, status: string) {
 export async function getMeetingFormData() {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.view')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const [users, projects, tasks, moduleFlows] = await Promise.all([
@@ -307,6 +314,7 @@ export async function getMeetingFormData() {
 export async function admitParticipant(participantId: number) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.update')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const participant = await prisma.meetingParticipant.findUnique({
@@ -332,6 +340,7 @@ export async function admitParticipant(participantId: number) {
 export async function rejectParticipant(participantId: number) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'meetings.update')
     const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id
 
     const participant = await prisma.meetingParticipant.findUnique({

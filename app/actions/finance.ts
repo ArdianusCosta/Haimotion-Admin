@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth/authorization'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
 
 /**
@@ -127,7 +127,8 @@ async function resolveCategoryId(name: string): Promise<number | null> {
 // OVERVIEW & SUMMARY
 // -----------------------------------------------------------------------------
 export async function getFinanceSummary() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
 
   const today = startOfToday()
   const year = new Date().getFullYear()
@@ -243,7 +244,8 @@ export async function getFinanceSummary() {
 // INVOICES (faktur penjualan & pembelian)
 // -----------------------------------------------------------------------------
 export async function getInvoices(filters?: { type?: InvoiceType | string; status?: string; search?: string }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
 
   const conditions: any[] = [{ type: normalizeType(filters?.type) }]
 
@@ -296,6 +298,7 @@ export async function getInvoices(filters?: { type?: InvoiceType | string; statu
 }
 
 export async function createInvoice(data: any) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.create')
   const uid = await currentUserId()
   const type = normalizeType(data.type)
 
@@ -380,6 +383,7 @@ export async function createInvoice(data: any) {
 }
 
 export async function updateInvoice(id: number, data: any) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.update')
   const uid = await currentUserId()
   const existing = await prisma.financeInvoice.findUnique({
     where: { id },
@@ -481,6 +485,7 @@ export async function updateInvoice(id: number, data: any) {
 }
 
 export async function deleteInvoice(id: number) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.delete')
   const uid = await currentUserId()
 
   const invoice = await prisma.financeInvoice.findUnique({ where: { id } })
@@ -516,7 +521,8 @@ export async function deleteInvoice(id: number) {
 }
 
 export async function exportInvoicesCsv(type?: InvoiceType | string) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.export')
   const invoiceType = normalizeType(type)
   const invoices = await prisma.financeInvoice.findMany({
     where: { type: invoiceType },
@@ -560,6 +566,7 @@ export async function recordInvoicePayment(data: {
   notes?: string
   accountId?: number | null
 }) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.update')
   const uid = await currentUserId()
   const amount = round2(Number(data.amount))
 
@@ -655,7 +662,8 @@ export async function recordInvoicePayment(data: {
 // EXPENSES
 // -----------------------------------------------------------------------------
 export async function getExpenses(filters?: { category?: string; search?: string }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
 
   // Auto-sync any existing HR payrolls to Finance Expenses if not yet queued
   try {
@@ -715,6 +723,7 @@ export async function getExpenses(filters?: { category?: string; search?: string
 }
 
 export async function createExpense(data: any) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.create')
   const uid = await currentUserId()
   const amount = round2(Number(data.amount))
   if (!amount || amount <= 0) throw new Error('Jumlah pengeluaran harus lebih besar dari 0.')
@@ -777,6 +786,7 @@ export async function createExpense(data: any) {
 }
 
 export async function updateExpense(id: number, data: any) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.update')
   const uid = await currentUserId()
 
   const existing = await prisma.financeExpense.findUnique({ where: { id } })
@@ -834,6 +844,7 @@ export async function updateExpense(id: number, data: any) {
 }
 
 export async function deleteExpense(id: number) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.delete')
   const uid = await currentUserId()
 
   await prisma.$transaction(async tx => {
@@ -867,6 +878,7 @@ export async function payExpense(data: {
   receiptUrl?: string | null
   notes?: string | null
 }) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.update')
   const uid = await currentUserId()
   const expense = await prisma.financeExpense.findUnique({ where: { id: data.id } })
   if (!expense) throw new Error('Pengeluaran tidak ditemukan.')
@@ -933,7 +945,8 @@ export async function payExpense(data: {
 }
 
 export async function exportExpensesCsv() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.export')
   const expenses = await prisma.financeExpense.findMany({ orderBy: { date: 'desc' } })
 
   const records = expenses.map(e => ({
@@ -949,6 +962,7 @@ export async function exportExpensesCsv() {
 }
 
 export async function importExpensesCsv(csvContent: string) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.create')
   const uid = await currentUserId()
   const records = fromCSV(csvContent)
 
@@ -980,7 +994,8 @@ export async function importExpensesCsv(csvContent: string) {
 // CASH & BANK
 // -----------------------------------------------------------------------------
 export async function getBankAccounts() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
 
   let accounts = await prisma.financeAccount.findMany({ orderBy: { name: 'asc' } })
 
@@ -1001,7 +1016,8 @@ export async function getBankAccounts() {
 }
 
 export async function getTransactions(filters?: { search?: string; accountId?: number }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
 
   const where: any = {}
   if (filters?.search) {
@@ -1020,6 +1036,7 @@ export async function getTransactions(filters?: { search?: string; accountId?: n
 }
 
 export async function createTransaction(data: any) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.create')
   const uid = await currentUserId()
   const amount = round2(Number(data.amount))
   if (!amount || amount <= 0) throw new Error('Jumlah transaksi harus lebih besar dari 0.')
@@ -1069,6 +1086,7 @@ export async function createTransaction(data: any) {
  * pencatatan pengeluaran) harus dihapus dari dokumen sumbernya agar saldo tetap konsisten.
  */
 export async function deleteTransaction(id: number) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.delete')
   const uid = await currentUserId()
 
   const transaction = await prisma.financeTransaction.findUnique({ where: { id } })
@@ -1104,7 +1122,8 @@ export async function deleteTransaction(id: number) {
 // CONTACTS (pelanggan & pemasok)
 // -----------------------------------------------------------------------------
 export async function getContacts(filters?: { type?: string; search?: string }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
   const where: any = {}
   if (filters?.type && filters.type !== 'All') {
     where.type = filters.type
@@ -1119,7 +1138,8 @@ export async function getContacts(filters?: { type?: string; search?: string }) 
 }
 
 export async function createContact(data: any) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.create')
   const name = (data.name || '').trim()
   if (!name) throw new Error('Nama wajib diisi.')
 
@@ -1135,7 +1155,8 @@ export async function createContact(data: any) {
 }
 
 export async function updateContact(id: number, data: any) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.update')
   const name = (data.name || '').trim()
   if (!name) throw new Error('Nama wajib diisi.')
 
@@ -1152,7 +1173,8 @@ export async function updateContact(id: number, data: any) {
 }
 
 export async function deleteContact(id: number) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.delete')
   return prisma.financeContact.delete({ where: { id } })
 }
 
@@ -1160,7 +1182,8 @@ export async function deleteContact(id: number) {
 // PRODUCTS & SERVICES
 // -----------------------------------------------------------------------------
 export async function getProductsServices(filters?: { type?: string; search?: string }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
   const where: any = {}
   if (filters?.type && filters.type !== 'All') {
     where.type = filters.type
@@ -1175,7 +1198,8 @@ export async function getProductsServices(filters?: { type?: string; search?: st
 }
 
 export async function createProductService(data: any) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.create')
   try {
     return await prisma.financeProductService.create({
       data: {
@@ -1196,7 +1220,8 @@ export async function createProductService(data: any) {
 }
 
 export async function updateProductService(id: number, data: any) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.update')
   try {
     return await prisma.financeProductService.update({
       where: { id },
@@ -1218,7 +1243,8 @@ export async function updateProductService(id: number, data: any) {
 }
 
 export async function deleteProductService(id: number) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.delete')
   return prisma.financeProductService.delete({ where: { id } })
 }
 
@@ -1226,7 +1252,8 @@ export async function deleteProductService(id: number) {
 // CHART OF ACCOUNTS
 // -----------------------------------------------------------------------------
 export async function getChartOfAccounts(filters?: { search?: string }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
   const where: any = {}
   if (filters?.search) {
     where.OR = [
@@ -1238,7 +1265,8 @@ export async function getChartOfAccounts(filters?: { search?: string }) {
 }
 
 export async function createAccount(data: any) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.create')
   const name = (data.name || '').trim()
   if (!name) throw new Error('Nama akun wajib diisi.')
 
@@ -1255,7 +1283,8 @@ export async function createAccount(data: any) {
 }
 
 export async function updateAccount(id: number, data: any) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.update')
   const name = (data.name || '').trim()
   if (!name) throw new Error('Nama akun wajib diisi.')
 
@@ -1272,7 +1301,8 @@ export async function updateAccount(id: number, data: any) {
 }
 
 export async function deleteAccount(id: number) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.delete')
   const used = await prisma.financeTransaction.count({ where: { account_id: id } })
   if (used > 0) {
     throw new Error(`Akun tidak bisa dihapus karena sudah dipakai pada ${used} transaksi.`)
@@ -1295,7 +1325,8 @@ async function ensureDefaultCategories() {
 }
 
 export async function getFinanceCategories() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
   try {
     await ensureDefaultCategories()
     const categories = await prisma.financeCategory.findMany({ orderBy: { name: 'asc' } })
@@ -1306,7 +1337,8 @@ export async function getFinanceCategories() {
 }
 
 export async function getFinanceBudgets(projectId?: number) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
   try {
     const where = projectId ? { project_id: projectId } : {}
     const budgets = await prisma.financeBudget.findMany({
@@ -1321,7 +1353,8 @@ export async function getFinanceBudgets(projectId?: number) {
 }
 
 export async function createFinanceBudget(data: { name: string; amount: number; start_date: string; end_date: string; category_id?: number; project_id?: number }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.create')
   try {
     const budget = await prisma.financeBudget.create({
       data: {
@@ -1363,7 +1396,8 @@ export async function getFinanceReport(params: {
   from?: string
   to?: string
 }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'finance.view')
   const { start, end } = resolveRange(params.from, params.to)
   const report = params.report as FinanceReportKind
 

@@ -1,15 +1,15 @@
 'use server'
 
 import prisma from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth/authorization'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
 
 // -----------------------------------------------------------------------------
 // OVERVIEW & SUMMARY
 // -----------------------------------------------------------------------------
 export async function getHrOverview() {
-  await requireAuth()
-  
+  const user = await requireAuth()
+  requirePermission(user, 'hr.view')
   const [employeesCount, pendingLeaves, newCandidates] = await Promise.all([
     prisma.user.count(),
     prisma.hrLeaveRequest.count({ where: { status: 'Pending' } }),
@@ -28,7 +28,8 @@ export async function getHrOverview() {
 // EMPLOYEES (using existing users table)
 // -----------------------------------------------------------------------------
 export async function getEmployees(filters?: { search?: string }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.view')
   
   const where: any = { status: { not: 'resign' } }
   if (filters?.search) {
@@ -65,7 +66,8 @@ export async function createEmployee(_data: any) {
 }
 
 export async function updateEmployee(id: number, data: any) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.update')
   return prisma.user.update({
     where: { id },
     data: {
@@ -83,7 +85,8 @@ export async function deleteEmployee(_id: number) {
 // ATTENDANCE & LEAVES (FULL CRUD & APPROVALS)
 // -----------------------------------------------------------------------------
 export async function getAttendances() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.view')
   return prisma.hrAttendance.findMany({
     orderBy: { date: 'desc' },
     include: { employee: true }
@@ -101,6 +104,7 @@ export async function createAttendance(data: {
   notes?: string | null
 }) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.create')
   const uid = parseInt(auth.id, 10)
 
   const attendance = await prisma.hrAttendance.create({
@@ -137,6 +141,7 @@ export async function updateAttendance(id: number, data: {
   notes?: string | null
 }) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
 
   const updateData: any = {}
@@ -166,6 +171,7 @@ export async function updateAttendance(id: number, data: {
 
 export async function updateAttendanceApproval(id: number, approval_status: string) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
 
   const attendance = await prisma.hrAttendance.update({
@@ -185,6 +191,7 @@ export async function updateAttendanceApproval(id: number, approval_status: stri
 
 export async function deleteAttendance(id: number) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.delete')
   const uid = parseInt(auth.id, 10)
 
   await prisma.hrAttendance.delete({
@@ -202,6 +209,7 @@ export async function deleteAttendance(id: number) {
 
 export async function importAttendances(data: any[]) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.create')
   
   const mapped = data.map(item => ({
     employee_id: parseInt(String(item.employee_id)),
@@ -230,7 +238,8 @@ export async function importAttendances(data: any[]) {
 // ATTENDANCE SUMMARY CRUD
 // -----------------------------------------------------------------------------
 export async function getAttendanceSummaries() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.view')
   return prisma.hrAttendanceSummary.findMany({
     orderBy: { created_at: 'desc' },
     include: { employee: true }
@@ -239,6 +248,7 @@ export async function getAttendanceSummaries() {
 
 export async function createAttendanceSummary(data: any) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.create')
   const uid = parseInt(auth.id, 10)
 
   const summary = await prisma.hrAttendanceSummary.create({
@@ -277,6 +287,7 @@ export async function createAttendanceSummary(data: any) {
 
 export async function updateAttendanceSummary(id: number, data: any) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
 
   const updateData: any = {}
@@ -317,6 +328,7 @@ export async function updateAttendanceSummary(id: number, data: any) {
 
 export async function deleteAttendanceSummary(id: number) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.delete')
   const uid = parseInt(auth.id, 10)
 
   await prisma.hrAttendanceSummary.delete({
@@ -333,7 +345,8 @@ export async function deleteAttendanceSummary(id: number) {
 }
 
 export async function importAttendanceSummaries(data: any[]) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.create')
   
   const mapped = data.map(item => ({
     employee_id: parseInt(String(item.employee_id)),
@@ -365,7 +378,8 @@ export async function importAttendanceSummaries(data: any[]) {
 // LEAVE REQUESTS (FULL CRUD & APPROVALS)
 // -----------------------------------------------------------------------------
 export async function getLeaves() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.view')
   return prisma.hrLeaveRequest.findMany({
     orderBy: { start_date: 'desc' },
     include: { employee: true }
@@ -382,6 +396,7 @@ export async function createLeaveRequest(data: {
   status?: string
 }) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.create')
   const uid = parseInt(auth.id, 10)
 
   const leave = await prisma.hrLeaveRequest.create({
@@ -416,6 +431,7 @@ export async function updateLeaveRequest(id: number, data: {
   status?: string
 }) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
 
   const updateData: any = {}
@@ -444,6 +460,7 @@ export async function updateLeaveRequest(id: number, data: {
 
 export async function updateLeaveStatus(id: number, status: string) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
 
   const leave = await prisma.hrLeaveRequest.update({
@@ -463,6 +480,7 @@ export async function updateLeaveStatus(id: number, status: string) {
 
 export async function deleteLeaveRequest(id: number) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.delete')
   const uid = parseInt(auth.id, 10)
 
   await prisma.hrLeaveRequest.delete({
@@ -482,7 +500,8 @@ export async function deleteLeaveRequest(id: number) {
 // PAYROLL
 // -----------------------------------------------------------------------------
 export async function getPayrolls() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.view')
   return prisma.hrPayroll.findMany({
     orderBy: { created_at: 'desc' },
     include: { employee: true }
@@ -491,6 +510,7 @@ export async function getPayrolls() {
 
 export async function createPayroll(data: any) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.create')
   const uid = parseInt(auth.id, 10)
 
   const employee = await prisma.user.findUnique({
@@ -552,6 +572,7 @@ export async function updatePayroll(data: {
   syncToFinance?: boolean
 }) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
 
   const existing = await prisma.hrPayroll.findUnique({
@@ -614,6 +635,7 @@ export async function updatePayroll(data: {
 
 export async function deletePayroll(id: number) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.delete')
   const uid = parseInt(auth.id, 10)
 
   const existing = await prisma.hrPayroll.findUnique({
@@ -639,7 +661,8 @@ export async function deletePayroll(id: number) {
 }
 
 export async function exportPayrollsCsv() {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.export')
   const payrolls = await prisma.hrPayroll.findMany({
     orderBy: { created_at: 'desc' },
     include: { employee: true }
@@ -657,7 +680,8 @@ export async function exportPayrollsCsv() {
 // RECRUITMENT (ATS)
 // -----------------------------------------------------------------------------
 export async function getCandidates(filters?: { search?: string }) {
-  await requireAuth()
+  const user = await requireAuth()
+  requirePermission(user, 'hr.view')
   
   const where: any = {}
   if (filters?.search) {
@@ -675,6 +699,7 @@ export async function getCandidates(filters?: { search?: string }) {
 
 export async function updateCandidateStatus(id: number, status: string) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.update')
   const candidate = await prisma.hrCandidate.update({
     where: { id },
     data: { status }
@@ -691,6 +716,7 @@ export async function updateCandidateStatus(id: number, status: string) {
 
 export async function createCandidate(data: any) {
   const auth = await requireAuth()
+  requirePermission(auth, 'hr.create')
   const candidate = await prisma.hrCandidate.create({
     data: {
       name: data.name,

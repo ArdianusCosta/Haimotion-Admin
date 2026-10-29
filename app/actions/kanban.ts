@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { requireAuth } from '@/lib/auth/authorization'
+import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
 import { pusherServer } from '@/lib/pusher'
 
@@ -153,6 +153,7 @@ export async function getKanbanTasks() {
 export async function updateTaskStatus(id: number, newStatus: number) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'tasks.update')
     await prisma.task_list.update({
       where: { id },
       data: { status: newStatus }
@@ -173,6 +174,7 @@ export async function updateTaskStatus(id: number, newStatus: number) {
 export async function createTask(data: { title: string; description: string; status: number; assignees: number[] }) {
   try {
     const user = await requireAuth();
+    requirePermission(user, 'tasks.create')
     // Need a default project_id for this table since it's required
     const firstProject = await prisma.project_list.findFirst()
     const projectId = firstProject?.id || 1 // Fallback to 1 if no projects exist
@@ -220,6 +222,7 @@ export async function updateTask(id: number, data: { title: string; description:
     });
     
     const user = await requireAuth();
+    requirePermission(user, 'tasks.update')
     await logActivity({
       userId: user.id,
       activityType: 'update',
@@ -243,6 +246,7 @@ export async function deleteTask(id: number) {
     })
     
     const user = await requireAuth();
+    requirePermission(user, 'tasks.delete')
     await logActivity({
       userId: user.id,
       activityType: 'delete',
