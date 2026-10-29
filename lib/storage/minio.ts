@@ -12,9 +12,9 @@ const BUCKET_NAME = process.env.MINIO_BUCKET || 'haimotion-files'
 
 export async function ensureBucketExists() {
   try {
-    const exists = await minioClient.bucketExists()
+    const exists = await minioClient.bucketExists(BUCKET_NAME)
     if (!exists) {
-      await minioClient.makeBucket()
+      await minioClient.makeBucket(BUCKET_NAME)
     }
   } catch (error) {
     console.error('Error ensuring MinIO bucket exists:', error)

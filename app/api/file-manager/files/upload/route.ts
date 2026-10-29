@@ -4,6 +4,14 @@ import { uploadFile } from '@/lib/storage/minio';
 import crypto from 'crypto';
 import { checkAccess } from '@/lib/file-auth';
 
+// Disable Next.js body size limit so large files can be uploaded
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: false,
+  },
+}
+
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
@@ -64,6 +72,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ files: uploadedFiles }, { status: 201 });
   } catch (error: any) {
     console.error('Failed to upload files:', error);
-    return NextResponse.json({ error: 'Failed to upload files' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to upload files', detail: error?.message || String(error) }, { status: 500 });
   }
 }

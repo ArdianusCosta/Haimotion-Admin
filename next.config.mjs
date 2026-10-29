@@ -11,7 +11,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  serverExternalPackages: ['@prisma/client', 'prisma'],
+  serverExternalPackages: ['@prisma/client', 'prisma', 'minio'],
   allowedDevOrigins: ['192.168.0.33', '192.168.0.29', '192.168.7.21'],
   productionBrowserSourceMaps: false,
   experimental: {
