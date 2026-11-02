@@ -2,6 +2,7 @@
 
 import { Clock, Activity, Folder, UserCheck, MessageSquare, AlertCircle } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useLanguage } from '@/components/language-provider'
 
 interface RecentActivitiesCardProps {
   data: any
@@ -9,6 +10,8 @@ interface RecentActivitiesCardProps {
 
 export function RecentActivitiesCard({ data }: RecentActivitiesCardProps) {
   const activities = data.recentActivity || []
+  const { language } = useLanguage()
+  const isId = language === 'id'
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-xs flex flex-col h-full">
@@ -19,8 +22,8 @@ export function RecentActivitiesCard({ data }: RecentActivitiesCardProps) {
             <Activity className="size-5" />
           </div>
           <div>
-            <h2 className="font-semibold text-base text-foreground">Recent Activities</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Aktivitas terbaru tim & pembaruan tugas</p>
+            <h2 className="font-semibold text-base text-foreground">{isId ? 'Aktivitas Terkini' : 'Recent Activities'}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{isId ? 'Aktivitas terbaru tim & pembaruan tugas' : 'Latest team activity & task updates'}</p>
           </div>
         </div>
       </div>
@@ -55,7 +58,7 @@ export function RecentActivitiesCard({ data }: RecentActivitiesCardProps) {
                       )}
                     </p>
                     <span className="text-[10px] text-muted-foreground shrink-0 font-medium whitespace-nowrap">
-                      {act.timeAgo || 'Baru saja'}
+                      {act.timeAgo || (isId ? 'Baru saja' : 'Just now')}
                     </span>
                   </div>
 
@@ -67,7 +70,7 @@ export function RecentActivitiesCard({ data }: RecentActivitiesCardProps) {
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
                         <Folder className="size-2.5" />
-                        Project: {act.projectName}
+                        {isId ? 'Proyek' : 'Project'}: {act.projectName}
                       </span>
                     </div>
                   )}
@@ -78,8 +81,8 @@ export function RecentActivitiesCard({ data }: RecentActivitiesCardProps) {
         ) : (
           <div className="h-48 flex flex-col items-center justify-center text-center text-muted-foreground">
             <Clock className="size-7 mb-2 opacity-50" />
-            <p className="text-xs font-medium">Belum ada aktivitas terbaru</p>
-            <p className="text-[11px] mt-0.5 text-muted-foreground">Log aktivitas akan tercatat otomatis saat ada pembaruan</p>
+            <p className="text-xs font-medium">{isId ? 'Belum ada aktivitas terbaru' : 'No recent activities yet'}</p>
+            <p className="text-[11px] mt-0.5 text-muted-foreground">{isId ? 'Log aktivitas akan tercatat otomatis saat ada pembaruan' : 'Activity logs are recorded automatically on updates'}</p>
           </div>
         )}
       </div>

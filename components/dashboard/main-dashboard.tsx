@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Calendar, Briefcase, SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { useLanguage } from '@/components/language-provider'
 import { KpiSummaryCards } from './components/kpi-summary-cards'
@@ -104,34 +105,47 @@ export function MainDashboard({ user }: { user: any }) {
     </div>
   )
 
-  const userName = user?.name || `${user?.firstname || ''} ${user?.lastname || ''}`.trim() || 'User'
-  const userRoleOrDivision = user?.role?.name || user?.address || 'IT - Web Developer Staff'
+  const userName = user?.firstname || user?.name?.split(' ')[0] || 'User'
+  const userInitials = ((user?.firstname?.[0] || user?.name?.[0] || 'U') + (user?.lastname?.[0] || '')).toUpperCase()
+  let avatarUrl = user?.avatar || ''
+  if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('/')) {
+    avatarUrl = `/avatars/${avatarUrl}`
+  }
+  const userBio = user?.address?.trim() || user?.bio?.trim() || dailyQuote
 
   return (
     <div className="space-y-6 pb-12 max-w-full">
-      {/* 1. HEADER SECTION (Greeting on left, Filter Controls on Far Right) */}
+      {/* 1. HEADER SECTION (Profile & Greeting on left, Filter Controls on Far Right) */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            {greeting}, <span className="text-primary">{userName}</span>{' '}
-            <span className="text-sm sm:text-base font-medium text-muted-foreground">
-              ({userRoleOrDivision})
-            </span>{' '}
-            👋
-          </h1>
-          <p className="text-muted-foreground mt-1 text-xs sm:text-sm">{dailyQuote}</p>
+        <div className="flex items-center gap-3.5 sm:gap-4">
+          <Avatar className="size-14 sm:size-16 ring-2 ring-primary/20 border-2 border-background shadow-md shrink-0">
+            <AvatarImage src={avatarUrl || undefined} alt={userName} />
+            <AvatarFallback className="bg-primary/10 text-primary font-bold text-base sm:text-lg">
+              {userInitials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight text-foreground truncate">
+              {greeting},{' '}
+              <span className="text-primary">{userName}</span>{' '}
+              👋
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2 max-w-2xl leading-relaxed">
+              {userBio}
+            </p>
+          </div>
         </div>
 
-        {/* Filter Controls Pinned to Far Right */}
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-center bg-card/70 backdrop-blur-md border border-border/70 p-1.5 px-2.5 rounded-2xl shadow-xs">
+        {/* Filter Controls Pinned to Far Right (Responsive for mobile) */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto bg-card/70 backdrop-blur-md border border-border/70 p-1.5 px-2.5 rounded-2xl shadow-xs">
           {/* Periode Capsule */}
-          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5">
+          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5 flex-1 sm:flex-initial min-w-[130px]">
             <Calendar className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-[11px] font-medium text-muted-foreground select-none">
+            <span className="text-[11px] font-medium text-muted-foreground select-none shrink-0">
               {isId ? 'Periode:' : 'Period:'}
             </span>
-            <Select value={range} onValueChange={setRange}>
-              <SelectTrigger className="h-7 w-[140px] sm:w-[170px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
+            <Select value={range} onValueChange={(val: any) => val && setRange(val)}>
+              <SelectTrigger className="h-7 w-full sm:w-[155px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
                 <SelectValue placeholder={isId ? 'Pilih Periode' : 'Select Period'} />
               </SelectTrigger>
               <SelectContent align="end" className="max-h-[340px] overflow-y-auto">
@@ -164,13 +178,13 @@ export function MainDashboard({ user }: { user: any }) {
           </div>
 
           {/* Project Capsule */}
-          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5">
+          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5 flex-1 sm:flex-initial min-w-[140px]">
             <Briefcase className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-[11px] font-medium text-muted-foreground select-none">
+            <span className="text-[11px] font-medium text-muted-foreground select-none shrink-0">
               {isId ? 'Project:' : 'Project:'}
             </span>
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger className="h-7 w-[150px] sm:w-[185px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
+            <Select value={projectFilter} onValueChange={(val: any) => val && setProjectFilter(val)}>
+              <SelectTrigger className="h-7 w-full sm:w-[170px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
                 <SelectValue placeholder={isId ? 'Pilih Project' : 'Select Project'} />
               </SelectTrigger>
               <SelectContent align="end">

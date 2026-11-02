@@ -1,12 +1,15 @@
 import { useRouter } from 'next/navigation'
 import { FolderKanban, CheckCircle2, Clock, AlertCircle, TrendingUp, ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { useLanguage } from '@/components/language-provider'
 
 export function KpiCards({ data }: { data: any }) {
   const router = useRouter()
+  const { language } = useLanguage()
+  const isId = language === 'id'
   
   const kpis = [
     {
-      label: 'Total Project',
+      label: isId ? 'Total Proyek' : 'Total Projects',
       value: data.kpis.totalProjects.value,
       prev: data.kpis.totalProjects.prev,
       icon: FolderKanban,
@@ -15,7 +18,7 @@ export function KpiCards({ data }: { data: any }) {
       link: '/projects'
     },
     {
-      label: 'Task Selesai',
+      label: isId ? 'Tugas Selesai' : 'Tasks Done',
       value: data.kpis.tasksCompleted.value,
       prev: data.kpis.tasksCompleted.prev,
       icon: CheckCircle2,
@@ -24,7 +27,7 @@ export function KpiCards({ data }: { data: any }) {
       link: '/tasks'
     },
     {
-      label: 'Task Pending',
+      label: isId ? 'Tugas Pending' : 'Tasks Pending',
       value: data.kpis.tasksPending.value,
       prev: data.kpis.tasksPending.prev,
       icon: Clock,
@@ -33,7 +36,7 @@ export function KpiCards({ data }: { data: any }) {
       link: '/tasks'
     },
     {
-      label: 'Task Overdue',
+      label: isId ? 'Tugas Terlambat' : 'Tasks Overdue',
       value: data.kpis.tasksOverdue.value,
       prev: data.kpis.tasksOverdue.prev,
       icon: AlertCircle,
@@ -42,7 +45,7 @@ export function KpiCards({ data }: { data: any }) {
       link: '/tasks'
     },
     {
-      label: 'Completion Rate',
+      label: isId ? 'Tingkat Selesai' : 'Completion Rate',
       value: data.kpis.completionRate.value + '%',
       prev: null,
       icon: TrendingUp,
@@ -80,7 +83,7 @@ export function KpiCards({ data }: { data: any }) {
               <p className="text-sm font-medium text-muted-foreground mb-1">{kpi.label}</p>
               <p className="text-3xl font-bold text-foreground tracking-tight">{kpi.value}</p>
               {kpi.prev !== null && (
-                <p className="text-xs text-muted-foreground mt-2">vs. periode sebelumnya</p>
+                <p className="text-xs text-muted-foreground mt-2">{isId ? 'vs. periode sebelumnya' : 'vs. previous period'}</p>
               )}
             </div>
           </div>

@@ -316,7 +316,7 @@ export function TeamKpiSection({
         const rate = m.completionRate || 0
         const workloadScore = Math.min(assigned / 10, 1) * 100
         const overdue = m.overdue || 0
-        const timelinessScore = done > 0 ? Math.max(0, 100 - (overdue / done) * 50) : 100
+        const timelinessScore = done > 0 ? Math.max(0, 100 - (overdue / done) * 50) : 0
         score = Math.round(((rate * 0.50) + (workloadScore * 0.30) + (timelinessScore * 0.20)) * 10) / 10
       }
 
@@ -330,10 +330,15 @@ export function TeamKpiSection({
 
   // Ranked members for Leaderboard
   const rankedMembers = useMemo(() => {
-    const list = [...enrichedTeamData]
+    const list = enrichedTeamData.filter((m: any) => !m.isResigned)
     return list
       .sort((a, b) => {
+        const aHasDone = (a.done || 0) > 0 ? 1 : 0
+        const bHasDone = (b.done || 0) > 0 ? 1 : 0
+        if (bHasDone !== aHasDone) return bHasDone - aHasDone
+
         if (b.score !== a.score) return b.score - a.score
+        if ((b.done || 0) !== (a.done || 0)) return (b.done || 0) - (a.done || 0)
         if (b.completionRate !== a.completionRate) return b.completionRate - a.completionRate
         if (b.assigned !== a.assigned) return b.assigned - a.assigned
         return a.name.localeCompare(b.name)
@@ -341,8 +346,54 @@ export function TeamKpiSection({
       .map((m, idx) => ({ ...m, rank: idx + 1 }))
   }, [enrichedTeamData])
 
-  // Summary Metrics calculated live
+  // Summary Metrics calculated live (Distinct Unique Tasks)
   const summaryMetrics = useMemo(() => {
+    const uniqueTaskMap = new Map<number, { status: number; overdue: boolean }>()
+
+    enrichedTeamData.forEach((m: any) => {
+      (m.projects || []).forEach((p: any) => {
+        (p.tasks || []).forEach((t: any) => {
+          if (!t.id) return
+          if (!uniqueTaskMap.has(t.id)) {
+            uniqueTaskMap.set(t.id, {
+              status: t.status,
+              overdue: t.status === 8 || t.statusLabel === 'Overdue'
+            })
+          }
+        })
+      })
+    })
+
+    if (uniqueTaskMap.size > 0) {
+      let totalAssigned = uniqueTaskMap.size
+      let totalDone = 0
+      let totalInProgress = 0
+      let totalRevised = 0
+      let totalOverdue = 0
+
+      uniqueTaskMap.forEach(({ status, overdue }) => {
+        if (status === 5) totalDone++
+        else if ([2, 6].includes(status)) totalInProgress++
+        else if (status === 4) totalRevised++
+        if (overdue) totalOverdue++
+      })
+
+      const avgRate = totalAssigned > 0 ? Math.round((totalDone / totalAssigned) * 1000) / 10 : 0
+      return { totalAssigned, totalDone, totalInProgress, totalRevised, totalOverdue, avgRate }
+    }
+
+    if (kpiData?.globalKpi) {
+      const g = kpiData.globalKpi
+      return {
+        totalAssigned: g.totalTasks,
+        totalDone: g.completedTasks,
+        totalInProgress: g.inProgressTasks,
+        totalRevised: 0,
+        totalOverdue: g.overdueTasks,
+        avgRate: g.completionRate
+      }
+    }
+
     const totals = enrichedTeamData.reduce(
       (acc, curr) => {
         acc.totalAssigned += curr.assigned || 0
@@ -361,7 +412,7 @@ export function TeamKpiSection({
         : 0
 
     return { ...totals, avgRate }
-  }, [enrichedTeamData])
+  }, [enrichedTeamData, kpiData])
 
   const toggleProject = (projectId: number) => {
     setExpandedProjects(prev => ({
@@ -755,7 +806,7 @@ export function TeamKpiSection({
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[620px]">
                 <thead className="bg-muted/40 border-b border-border text-muted-foreground font-semibold uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="py-3 px-4 w-16 text-center">RANK</th>
@@ -770,7 +821,7 @@ export function TeamKpiSection({
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {rankedMembers.map((member) => {
-                    const isFirst = member.rank === 1
+                    const isFirst = member.rank === 1 && (member.done || 0) > 0 && (member.score || 0) > 0
 
                     return (
                       <tr

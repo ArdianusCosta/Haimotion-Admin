@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { usePushNotifications, useForegroundMessages } from '@/hooks/use-push-notifications'
 import { toast } from 'sonner'
+import { pusherClient } from '@/lib/pusher-client'
 
 interface Notification {
   id: number
@@ -92,6 +93,32 @@ export function NotificationProvider({
     // Poll every 30 seconds for new notifications
     const interval = setInterval(fetchNotifications, 30000)
     return () => clearInterval(interval)
+  }, [userId, fetchNotifications])
+
+  // Real-time in-app notification via Pusher
+  useEffect(() => {
+    if (!userId) return
+    const channelName = `private-user-${userId}`
+    const channel = pusherClient.subscribe(channelName)
+    channel.bind('notification:new', (notif: any) => {
+      toast(notif.title || 'Notifikasi Baru', {
+        description: notif.body || '',
+        action: notif.link
+          ? {
+              label: 'Buka',
+              onClick: () => {
+                window.location.href = notif.link
+              },
+            }
+          : undefined,
+        duration: 8000,
+      })
+      setUnreadCount((prev) => prev + 1)
+      fetchNotifications()
+    })
+    return () => {
+      channel.unbind('notification:new')
+    }
   }, [userId, fetchNotifications])
 
   // Handle foreground messages — show toast and update state

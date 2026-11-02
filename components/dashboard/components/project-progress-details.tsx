@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, PieChart as PieIcon, Calendar, CheckCircle2 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
+import { useLanguage } from '@/components/language-provider'
 
 interface ProjectProgressDetailsProps {
   data: any
@@ -17,6 +18,8 @@ export function ProjectProgressDetails({
 }: ProjectProgressDetailsProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const projects = data.projectProgressDetails || []
+  const { language } = useLanguage()
+  const isId = language === 'id'
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -26,12 +29,12 @@ export function ProjectProgressDetails({
   }
 
   const legendItems = [
-    { label: 'Pending', bg: 'bg-slate-800 text-white dark:bg-slate-700' },
+    { label: isId ? 'Menunggu' : 'Pending', bg: 'bg-slate-800 text-white dark:bg-slate-700' },
     { label: 'Review', bg: 'bg-cyan-500 text-white' },
-    { label: 'In-Progress', bg: 'bg-blue-600 text-white' },
-    { label: 'OnHold', bg: 'bg-orange-500 text-white' },
-    { label: 'Cancelled', bg: 'bg-rose-500 text-white' },
-    { label: 'Done', bg: 'bg-emerald-600 text-white' }
+    { label: isId ? 'Dikerjakan' : 'In-Progress', bg: 'bg-blue-600 text-white' },
+    { label: isId ? 'Ditunda' : 'OnHold', bg: 'bg-orange-500 text-white' },
+    { label: isId ? 'Dibatalkan' : 'Cancelled', bg: 'bg-rose-500 text-white' },
+    { label: isId ? 'Selesai' : 'Done', bg: 'bg-emerald-600 text-white' }
   ]
 
   return (
@@ -39,9 +42,9 @@ export function ProjectProgressDetails({
       {/* Header with Title, Legend & Navigation Arrows */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="font-semibold text-base text-foreground">Project Progress Details</h2>
+          <h2 className="font-semibold text-base text-foreground">{isId ? 'Detail Progress Proyek' : 'Project Progress Details'}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Ringkasan status tugas untuk tiap project yang sedang berjalan
+            {isId ? 'Ringkasan status tugas untuk tiap project yang sedang berjalan' : 'Task status summary for each active project'}
           </p>
         </div>
 
@@ -107,8 +110,8 @@ export function ProjectProgressDetails({
                     {cleanProjectName || proj.name}
                   </h3>
                   <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-1">
-                    <span>{proj.totalTasks} Tasks</span>
-                    <span className="font-semibold text-foreground">{proj.completionRate}% Done</span>
+                    <span>{proj.totalTasks} {isId ? 'Tugas' : 'Tasks'}</span>
+                    <span className="font-semibold text-foreground">{proj.completionRate}% {isId ? 'Selesai' : 'Done'}</span>
                   </div>
                 </div>
 
@@ -153,7 +156,7 @@ export function ProjectProgressDetails({
                 <div className="pt-2 border-t border-border/60 flex items-center justify-between text-[10px] text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Calendar className="size-3" />
-                    Due:
+                    {isId ? 'Tenggat:' : 'Due:'}
                   </span>
                   <span className="font-medium text-foreground">{proj.formattedDueDate}</span>
                 </div>
@@ -164,7 +167,7 @@ export function ProjectProgressDetails({
       ) : (
         <div className="h-40 flex flex-col items-center justify-center text-center text-muted-foreground border border-dashed border-border rounded-lg">
           <PieIcon className="size-7 mb-2 opacity-50" />
-          <p className="text-xs font-medium">Belum ada project aktif dengan tugas terdaftar</p>
+          <p className="text-xs font-medium">{isId ? 'Belum ada project aktif dengan tugas terdaftar' : 'No active projects with registered tasks'}</p>
         </div>
       )}
     </div>

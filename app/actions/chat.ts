@@ -178,7 +178,7 @@ export async function getConversations(userId: number | string) {
       type: 'group' as const,
       name: group.name,
       initials,
-      avatar: group.avatar || null,
+      avatar: (group as any).avatar || null,
       preview,
       time: lastMsg?.created_at || group.last_message_at || group.date_created,
       groupId: group.id,
@@ -199,10 +199,10 @@ export async function getConversations(userId: number | string) {
 
 export async function markThreadAsRead(threadId: number) {
   const user = await requireAuth();
-  const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+  const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
 
   // Mark all unread messages in the thread not sent by current user as read
-  await prisma.chatMessage.updateMany({
+  const result = await prisma.chatMessage.updateMany({
     where: {
       thread_id: threadId,
       sender_id: { not: uid },
@@ -211,9 +211,15 @@ export async function markThreadAsRead(threadId: number) {
     data: { is_read: true }
   });
 
-  // Notify sender that their messages were read
-  await pusherServer.trigger(`private-thread-${threadId}`, 'thread:read', { threadId, readerId: uid });
-  return { success: true };
+  // Notify sender that their messages were read only if messages were actually updated
+  if (result.count > 0) {
+    try {
+      await pusherServer.trigger(`private-thread-${threadId}`, 'thread:read', { threadId, readerId: uid });
+    } catch (pushErr) {
+      console.warn('Pusher thread:read event failed:', pushErr);
+    }
+  }
+  return { success: true, count: result.count };
 }
 
 export async function triggerTyping(threadId: number) {
@@ -764,7 +770,7 @@ export async function updateChatGroup(
       groupId: gid,
       name: updated.name,
       description: updated.description,
-      avatar: updated.avatar,
+      avatar: (updated as any).avatar,
     });
   } catch {}
 
@@ -907,4 +913,32 @@ async function _getGroupMembers(gid: number) {
       role: position,
     };
   });
+}
+
+export async function createGroupCallSession(groupId: number, callerId: number, type: 'voice' | 'video') {
+  const user = await requireAuth();
+  const roomName = `group-call-${groupId}-${Date.now()}`;
+
+  // Get all group members
+  const members = await prisma.group_members.findMany({
+    where: { group_id: groupId },
+    select: { user_id: true }
+  });
+
+  const callerName = `${user.firstname} ${user.lastname || ''}`.trim();
+  const receiverIds = members.map((m: any) => m.user_id).filter((id: number) => id !== callerId);
+
+  await Promise.allSettled(
+    receiverIds.map((uid: number) =>
+      pusherServer.trigger(`private-user-${uid}`, 'call:incoming', {
+        id: groupId,
+        room_name: roomName,
+        type,
+        callerName,
+        isGroup: true
+      })
+    )
+  );
+
+  return { room_name: roomName, type };
 }

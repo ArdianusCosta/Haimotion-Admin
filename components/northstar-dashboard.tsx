@@ -56,7 +56,7 @@ import { pusherClient } from '@/lib/pusher-client'
 import { LiveKitCallUI } from './livekit-call'
 import { NotificationProvider } from '@/components/notifications/notification-provider'
 import { NotificationBell } from '@/components/notifications/notification-bell'
-import { createCallSession, endCallSession, getUnreadChatCount } from '@/app/actions/chat'
+import {createCallSession, endCallSession, getUnreadChatCount, createGroupCallSession} from '@/app/actions/chat'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -136,6 +136,77 @@ const administration = [
   { label: 'Activity Log', icon: List },
 ]
 
+// ─── Client-side Permission Helpers ───────────────────────────────────────────
+function clientHasPermission(user: any, permId: string): boolean {
+  if (!user) return false
+  // Admin: role_id === 1, role name 'Administrator', or type === 1 → full access
+  const roleName = (user.role?.name || '').toLowerCase()
+  if (user.role_id === 1 || roleName === 'administrator' || roleName === 'admin' || user.type === 1) return true
+  if (!user.role?.permissions) return false
+  return user.role.permissions.some((p: any) => p.permission === permId)
+}
+
+// Maps sidebar section labels → the required permission ID
+const sectionPermissionMap: Record<string, string> = {
+  // Work
+  'Project': 'projects.view',
+  'Kanban': 'tasks.view',
+  'Tasks': 'tasks.view',
+  'Calendar': 'calendar.view',
+  'Meetings': 'meetings.view',
+  // Finance (all finance sections require finance.view)
+  'Beranda': 'finance.view',
+  'Kas & Bank': 'finance.view',
+  'Akun Perkiraan': 'finance.view',
+  'Penjualan': 'finance.view',
+  'Faktur Penjualan': 'finance.view',
+  'Pelanggan': 'finance.view',
+  'Pembelian': 'finance.view',
+  'Faktur Pembelian': 'finance.view',
+  'Pemasok': 'finance.view',
+  'Pengeluaran': 'finance.view',
+  'Barang & Jasa': 'finance.view',
+  'Laporan': 'finance.view',
+  // HR
+  'HR Overview': 'hr.view',
+  'Employees': 'hr.view',
+  'Attendance & Leave': 'hr.view',
+  'Payroll': 'hr.view',
+  'Recruitment': 'hr.view',
+  // CRM
+  'CRM Overview': 'crm.view',
+  'Leads': 'crm.view',
+  'Clients': 'crm.view',
+  'Pipeline': 'crm.view',
+  'Follow Ups': 'crm.view',
+  'Activities': 'crm.view',
+  'Broadcast': 'crm.view',
+  // Administration
+  'Roles & Permissions': 'roles.view',
+  'User Management': 'users.view',
+  'Activity Log': 'activity_log.view',
+  // File Manager
+  'File Manager': 'files.view',
+}
+
+function clientCanAccess(user: any, sectionLabel: string): boolean {
+  const permId = sectionPermissionMap[sectionLabel]
+  if (!permId) return true // No restriction defined → accessible
+  return clientHasPermission(user, permId)
+}
+
+function AccessDenied({ section }: { section: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-[60vh] text-center gap-4">
+      <ShieldAlert className="size-16 text-muted-foreground/40" />
+      <div>
+        <h2 className="text-xl font-bold text-foreground">Akses Ditolak</h2>
+        <p className="text-muted-foreground mt-1 text-sm">Kamu tidak punya izin untuk mengakses <strong>{section}</strong>.</p>
+        <p className="text-xs text-muted-foreground mt-1">Hubungi Administrator untuk mendapatkan akses.</p>
+      </div>
+    </div>
+  )
+}
 
 function Icon({ icon: I, className = '' }: { icon: React.ElementType; className?: string }) { return <I className={className} aria-hidden="true" /> }
 
@@ -172,12 +243,17 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
   const [activeCall, setActiveCall] = useState<{ roomName: string, type: 'voice' | 'video', startedAt: number } | null>(null)
   const [incomingCall, setIncomingCall] = useState<{ id: number, room_name: string, type: 'voice' | 'video', callerName: string } | null>(null)
 
-  const handleStartCall = async (threadId: number, type: 'voice' | 'video') => {
+  const handleStartCall = async (threadId: number, type: 'voice' | 'video', isGroup?: boolean, groupId?: number) => {
     if (!user) return
     try {
       const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
-      const call = await createCallSession(threadId, userId, type)
-      setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
+      if (isGroup && groupId) {
+        const call = await createGroupCallSession(groupId, userId, type)
+        setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
+      } else {
+        const call = await createCallSession(threadId, userId, type)
+        setActiveCall({ roomName: call.room_name, type, startedAt: Date.now() })
+      }
     } catch (err: any) {
       console.error('Failed to start call:', err)
       // Import toast dynamically to avoid circular dep
@@ -652,8 +728,10 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
                 )
               })}
             </div>
+            {/* Work menu - only show items user can access */}
+            {workMenu.some(({ label }) => clientCanAccess(user, label)) && (
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Work')}</p>
-              {workMenu.map(({ label, icon, badge }) => {
+              {workMenu.filter(({ label }) => clientCanAccess(user, label)).map(({ label, icon, badge }) => {
                 return (
                   <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}>
                     <Icon icon={icon} className="size-4 shrink-0" />
@@ -667,6 +745,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
                 )
               })}
             </div>
+            )}
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Apps')}</p>
               {apps.map(({ label, icon, badge }) => {
                 return (
@@ -682,11 +761,12 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
                 )
               })}
             </div>
+                        {/* Finance menu - hide entire section if no access */}
+            {clientCanAccess(user, 'Beranda') && (
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Finance')}</p>
               {financeMenu.map(({ label, icon, subItems }) => {
                 const isOpen = openGroups[label] || false;
                 const isSubActive = subItems?.some(s => s.label === section) ?? false;
-                // Parent hanya aktif kalau section-nya tepat label itu, atau ada sub-item yang dipilih
                 const isGroupActive = !subItems ? section === label : isSubActive;
                 return (
                   <div key={label} className="flex flex-col gap-1">
@@ -717,15 +797,22 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
                 )
               })}
             </div>
+            )}
+                        {/* HR menu - hide if no hr.view permission */}
+            {clientCanAccess(user, 'HR Overview') && (
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Human Resources')}</p>
               {hrMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
+            )}
+            {/* CRM menu - hide if no crm.view permission */}
+            {clientCanAccess(user, 'CRM Overview') && (
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('CRM')}</p>
               {crmMenu.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
+            )}
 
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Administration')}</p>
-              {administration.map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
+              {administration.filter(({ label }) => clientCanAccess(user, label)).map(({ label, icon }) => <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === label ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{!effectiveCollapsed && <span className="flex-1 text-left">{t(label)}</span>}</button>)}
             </div>
             <div className="flex flex-col gap-1"><p className={`px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground ${effectiveCollapsed ? 'sr-only' : ''}`}>{t('Folder & Settings')}</p><button onClick={() => handleNavigate('File Manager')} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isFiles ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><FolderOpen className="size-4 shrink-0" />{!effectiveCollapsed && <span>{t('File Manager')}</span>}</button><button onClick={() => handleNavigate('Settings')} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${section === 'Settings' ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'}`}><Settings className="size-4 shrink-0" />{!effectiveCollapsed && <span>{t('Settings')}</span>}</button></div>
           </div>
@@ -845,48 +932,48 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Beranda': return <FinanceOverviewPage user={user} />
               case 'Kas & Bank': return <CashBankPage />
               case 'Cash & Bank': return <CashBankPage />
-              case 'Akun Perkiraan': return <AkunPerkiraanPage />
-              case 'Chart of Accounts': return <AkunPerkiraanPage />
+              case 'Akun Perkiraan': return clientCanAccess(user, 'Beranda') ? <AkunPerkiraanPage /> : <AccessDenied section="Akun Perkiraan" />
+              case 'Chart of Accounts': return clientCanAccess(user, 'Beranda') ? <AkunPerkiraanPage /> : <AccessDenied section="Chart of Accounts" />
 
-              case 'Penjualan': return <FakturPenjualanPage />
-              case 'Sales': return <FakturPenjualanPage />
-              case 'Faktur Penjualan': return <FakturPenjualanPage />
-              case 'Sales Invoice': return <FakturPenjualanPage />
-              case 'Pelanggan': return <PelangganPage />
-              case 'Customers': return <PelangganPage />
+              case 'Penjualan': return clientCanAccess(user, 'Beranda') ? <FakturPenjualanPage /> : <AccessDenied section="Penjualan" />
+              case 'Sales': return clientCanAccess(user, 'Beranda') ? <FakturPenjualanPage /> : <AccessDenied section="Sales" />
+              case 'Faktur Penjualan': return clientCanAccess(user, 'Beranda') ? <FakturPenjualanPage /> : <AccessDenied section="Faktur Penjualan" />
+              case 'Sales Invoice': return clientCanAccess(user, 'Beranda') ? <FakturPenjualanPage /> : <AccessDenied section="Sales Invoice" />
+              case 'Pelanggan': return clientCanAccess(user, 'Beranda') ? <PelangganPage /> : <AccessDenied section="Pelanggan" />
+              case 'Customers': return clientCanAccess(user, 'Beranda') ? <PelangganPage /> : <AccessDenied section="Customers" />
 
-              case 'Pembelian': return <FakturPembelianPage />
-              case 'Purchases': return <FakturPembelianPage />
-              case 'Faktur Pembelian': return <FakturPembelianPage />
-              case 'Purchase Invoice': return <FakturPembelianPage />
-              case 'Pemasok': return <PemasokPage />
-              case 'Suppliers': return <PemasokPage />
+              case 'Pembelian': return clientCanAccess(user, 'Beranda') ? <FakturPembelianPage /> : <AccessDenied section="Pembelian" />
+              case 'Purchases': return clientCanAccess(user, 'Beranda') ? <FakturPembelianPage /> : <AccessDenied section="Purchases" />
+              case 'Faktur Pembelian': return clientCanAccess(user, 'Beranda') ? <FakturPembelianPage /> : <AccessDenied section="Faktur Pembelian" />
+              case 'Purchase Invoice': return clientCanAccess(user, 'Beranda') ? <FakturPembelianPage /> : <AccessDenied section="Purchase Invoice" />
+              case 'Pemasok': return clientCanAccess(user, 'Beranda') ? <PemasokPage /> : <AccessDenied section="Pemasok" />
+              case 'Suppliers': return clientCanAccess(user, 'Beranda') ? <PemasokPage /> : <AccessDenied section="Suppliers" />
 
-              case 'Barang & Jasa': return <BarangJasaPage />
-              case 'Products & Services': return <BarangJasaPage />
+              case 'Barang & Jasa': return clientCanAccess(user, 'Beranda') ? <BarangJasaPage /> : <AccessDenied section="Barang & Jasa" />
+              case 'Products & Services': return clientCanAccess(user, 'Beranda') ? <BarangJasaPage /> : <AccessDenied section="Products & Services" />
 
-              case 'Pengeluaran': return <ExpensesPage />
-              case 'Expenses': return <ExpensesPage />
-              case 'Laporan': return <ReportsPage />
-              case 'Reports': return <ReportsPage />
-              case 'HR Overview': return <HROverviewPage />
-              case 'Employees': return <EmployeesPage />
-              case 'Attendance & Leave': return <AttendancePage />
-              case 'Payroll': return <PayrollPage />
-              case 'Recruitment': return <RecruitmentPage />
+              case 'Pengeluaran': return clientCanAccess(user, 'Beranda') ? <ExpensesPage /> : <AccessDenied section="Pengeluaran" />
+              case 'Expenses': return clientCanAccess(user, 'Beranda') ? <ExpensesPage /> : <AccessDenied section="Expenses" />
+              case 'Laporan': return clientCanAccess(user, 'Beranda') ? <ReportsPage /> : <AccessDenied section="Laporan" />
+              case 'Reports': return clientCanAccess(user, 'Beranda') ? <ReportsPage /> : <AccessDenied section="Reports" />
+              case 'HR Overview': return clientCanAccess(user, 'HR Overview') ? <HROverviewPage /> : <AccessDenied section="HR Overview" />
+              case 'Employees': return clientCanAccess(user, 'HR Overview') ? <EmployeesPage /> : <AccessDenied section="Employees" />
+              case 'Attendance & Leave': return clientCanAccess(user, 'HR Overview') ? <AttendancePage /> : <AccessDenied section="Attendance & Leave" />
+              case 'Payroll': return clientCanAccess(user, 'HR Overview') ? <PayrollPage /> : <AccessDenied section="Payroll" />
+              case 'Recruitment': return clientCanAccess(user, 'HR Overview') ? <RecruitmentPage /> : <AccessDenied section="Recruitment" />
 
               // CRM Routes
-              case 'CRM Overview': return <CrmOverviewPage />
-              case 'Leads': return <CrmLeadsPage />
-              case 'Clients': return <CrmClientsPage />
-              case 'Pipeline': return <CrmPipelinePage />
-              case 'Follow Ups': return <CrmFollowUpsPage />
-              case 'Activities': return <CrmActivitiesPage />
-              case 'Broadcast': return <CrmBroadcastPage />
+              case 'CRM Overview': return clientCanAccess(user, 'CRM Overview') ? <CrmOverviewPage /> : <AccessDenied section="CRM Overview" />
+              case 'Leads': return clientCanAccess(user, 'CRM Overview') ? <CrmLeadsPage /> : <AccessDenied section="Leads" />
+              case 'Clients': return clientCanAccess(user, 'CRM Overview') ? <CrmClientsPage /> : <AccessDenied section="Clients" />
+              case 'Pipeline': return clientCanAccess(user, 'CRM Overview') ? <CrmPipelinePage /> : <AccessDenied section="Pipeline" />
+              case 'Follow Ups': return clientCanAccess(user, 'CRM Overview') ? <CrmFollowUpsPage /> : <AccessDenied section="Follow Ups" />
+              case 'Activities': return clientCanAccess(user, 'CRM Overview') ? <CrmActivitiesPage /> : <AccessDenied section="Activities" />
+              case 'Broadcast': return clientCanAccess(user, 'CRM Overview') ? <CrmBroadcastPage /> : <AccessDenied section="Broadcast" />
 
-              case 'Roles & Permissions': return <RolesPermissionsPage />
-              case 'User Management': return <UsersPage />
-              case 'Activity Log': return <ActivityLogPage />
+              case 'Roles & Permissions': return clientCanAccess(user, 'Roles & Permissions') ? <RolesPermissionsPage /> : <AccessDenied section="Roles & Permissions" />
+              case 'User Management': return clientCanAccess(user, 'User Management') ? <UsersPage /> : <AccessDenied section="User Management" />
+              case 'Activity Log': return clientCanAccess(user, 'Activity Log') ? <ActivityLogPage /> : <AccessDenied section="Activity Log" />
               case 'Account Settings': return (
                 <div className="relative min-h-[85vh] w-full">
                   {/* Background Bubbles */}

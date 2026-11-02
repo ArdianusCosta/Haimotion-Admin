@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { Folder, ExternalLink, Plus, Users, Layers, Tag, CheckCircle2 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useLanguage } from '@/components/language-provider'
 
 interface ProjectDetailInspectorProps {
   project: any
@@ -11,6 +12,8 @@ interface ProjectDetailInspectorProps {
 
 export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps) {
   const router = useRouter()
+  const { language } = useLanguage()
+  const isId = language === 'id'
 
   if (!project) return null
 
@@ -55,9 +58,9 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Client: <span className="font-medium text-foreground">{project.client}</span> • Deadline:{' '}
+              {isId ? 'Klien' : 'Client'}: <span className="font-medium text-foreground">{project.client}</span> • {isId ? 'Tenggat' : 'Deadline'}:{' '}
               <span className="font-medium text-foreground">{project.formattedDueDate}</span> • Progress:{' '}
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">{project.completionRate}% Done</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">{project.completionRate}% {isId ? 'Selesai' : 'Done'}</span>
             </p>
           </div>
         </div>
@@ -68,7 +71,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
             onClick={() => router.push(`/projects/${project.id}`)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors"
           >
-            <span>Buka Project</span>
+            <span>{isId ? 'Buka Proyek' : 'Open Project'}</span>
             <ExternalLink className="size-3.5" />
           </button>
 
@@ -77,7 +80,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
             type="button"
             onClick={() => router.push(`/tasks?new=true&projectId=${project.id}`)}
             className="size-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-md transition-transform hover:scale-105 active:scale-95"
-            title="Tambah Task Baru"
+            title={isId ? 'Tambah Task Baru' : 'Add New Task'}
           >
             <Plus className="size-4 stroke-[2.5]" />
           </button>
@@ -130,11 +133,11 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
 
           <div className="space-y-1 text-xs pt-2 border-t border-border/50">
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" /> Done</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-emerald-500" /> {isId ? 'Selesai' : 'Done'}</span>
               <span className="font-bold text-foreground">{project.counts?.done || 0}</span>
             </div>
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600" /> In-Progress</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-blue-600" /> {isId ? 'Dikerjakan' : 'In-Progress'}</span>
               <span className="font-bold text-foreground">{project.counts?.onProgress || 0}</span>
             </div>
             <div className="flex items-center justify-between text-muted-foreground">
@@ -142,11 +145,11 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
               <span className="font-bold text-foreground">{project.counts?.review || 0}</span>
             </div>
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-orange-500" /> Hold</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-orange-500" /> {isId ? 'Ditunda' : 'Hold'}</span>
               <span className="font-bold text-foreground">{project.counts?.hold || 0}</span>
             </div>
             <div className="flex items-center justify-between text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-500" /> Pending</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-slate-500" /> {isId ? 'Menunggu' : 'Pending'}</span>
               <span className="font-bold text-foreground">{project.counts?.pending || 0}</span>
             </div>
           </div>
@@ -157,7 +160,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
           <div>
             <h4 className="text-xs font-bold text-foreground mb-3 flex items-center gap-1.5 uppercase tracking-wide">
               <Tag className="size-3.5 text-amber-500" />
-              Task Type
+              Task {isId ? 'Tipe' : 'Type'}
             </h4>
 
             {taskTypeData.length > 0 ? (
@@ -191,7 +194,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
               </div>
             ) : (
               <div className="h-28 flex items-center justify-center text-xs text-muted-foreground">
-                Tipe tugas umum
+                {isId ? 'Tipe tugas umum' : 'General task type'}
               </div>
             )}
           </div>
@@ -252,7 +255,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
               </div>
             ) : (
               <div className="h-28 flex items-center justify-center text-xs text-muted-foreground">
-                Platform umum
+                {isId ? 'Platform umum' : 'General platform'}
               </div>
             )}
           </div>
@@ -283,7 +286,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
                 Assignments
               </h4>
               <span className="text-[11px] font-semibold text-muted-foreground">
-                {assignments.length} Anggota
+                {assignments.length} {isId ? 'Anggota' : 'Members'}
               </span>
             </div>
 
@@ -317,15 +320,15 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
               ) : (
                 <div className="h-28 flex flex-col items-center justify-center text-center text-muted-foreground">
                   <Users className="size-6 mb-1 opacity-40" />
-                  <p className="text-xs">Belum ada anggota ditugaskan</p>
+                  <p className="text-xs">{isId ? 'Belum ada anggota ditugaskan' : 'No members assigned yet'}</p>
                 </div>
               )}
             </div>
           </div>
 
           <div className="pt-2 border-t border-border/50 text-[11px] text-muted-foreground flex items-center justify-between">
-            <span>Total Beban Tugas:</span>
-            <span className="font-bold text-foreground">{project.totalTasks} tugas</span>
+            <span>{isId ? 'Total Beban Tugas:' : 'Total Task Load:'}</span>
+            <span className="font-bold text-foreground">{project.totalTasks} {isId ? 'tugas' : 'tasks'}</span>
           </div>
         </div>
 

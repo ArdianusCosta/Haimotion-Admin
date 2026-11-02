@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, DatabaseZap, CheckCircle2, AlertCircle } from 'lucide-react'
 import { 
   useRoles, 
   usePermissions, 
@@ -34,6 +34,8 @@ export function RolesPermissionsPage() {
   const [deleteRoleConfirm, setDeleteRoleConfirm] = useState<DeleteRoleConfirmState>({ open: false, id: -1, name: '' })
   const [addCategoryModal, setAddCategoryModal] = useState({ open: false, name: '' })
   const [assignUsersModal, setAssignUsersModal] = useState({ open: false })
+  const [seedStatus, setSeedStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [seedMessage, setSeedMessage] = useState('')
 
   // Data fetching
   const { data: rolesData, isLoading: rolesLoading } = useRoles()
@@ -90,6 +92,29 @@ export function RolesPermissionsPage() {
   })
   const assignUserMutation = useAssignUserRole()
 
+  // Seed handler
+  const handleSeed = async () => {
+    setSeedStatus('loading')
+    setSeedMessage('')
+    try {
+      const res = await fetch('/api/roles/seed')
+      const data = await res.json()
+      if (data.success) {
+        setSeedStatus('success')
+        setSeedMessage(`Berhasil! ${data.data?.permissionsSeeded} permissions, ${data.data?.adminEmail}`)
+        setTimeout(() => setSeedStatus('idle'), 5000)
+      } else {
+        setSeedStatus('error')
+        setSeedMessage(data.error || 'Gagal menjalankan seed')
+        setTimeout(() => setSeedStatus('idle'), 7000)
+      }
+    } catch (e: any) {
+      setSeedStatus('error')
+      setSeedMessage(e.message || 'Tidak bisa menghubungi server')
+      setTimeout(() => setSeedStatus('idle'), 7000)
+    }
+  }
+
   // Handlers
   const togglePermission = (permId: string) => {
     if (!activeRole) return
@@ -144,11 +169,44 @@ export function RolesPermissionsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
           <p className="text-muted-foreground mt-1">Manage access control and security policies for your workspace.</p>
         </div>
-        <button onClick={() => setRoleModal({ open: true, mode: 'add', name: '', desc: '' })} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm w-fit">
-          <Plus className="size-4" />
-          Create Custom Role
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Seed Button */}
+          <button
+            onClick={handleSeed}
+            disabled={seedStatus === 'loading'}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium border transition-all duration-200 ${
+              seedStatus === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
+                : seedStatus === 'error'
+                ? 'bg-red-500/10 border-red-500/30 text-red-600'
+                : 'bg-muted border-border hover:border-primary/50 text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {seedStatus === 'loading' ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : seedStatus === 'success' ? (
+              <CheckCircle2 className="size-4" />
+            ) : seedStatus === 'error' ? (
+              <AlertCircle className="size-4" />
+            ) : (
+              <DatabaseZap className="size-4" />
+            )}
+            {seedStatus === 'loading' ? 'Seeding...' : seedStatus === 'success' ? 'Seeded!' : seedStatus === 'error' ? 'Error' : 'Seed Database'}
+          </button>
+          {/* Create Role Button */}
+          <button onClick={() => setRoleModal({ open: true, mode: 'add', name: '', desc: '' })} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm w-fit">
+            <Plus className="size-4" />
+            Create Custom Role
+          </button>
+        </div>
       </div>
+      {seedMessage && (
+        <div className={`mb-2 px-4 py-2 rounded-lg text-xs font-medium ${
+          seedStatus === 'success' ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-red-500/10 text-red-700 border border-red-500/20'
+        }`}>
+          {seedMessage}
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-6">
         <RolesSidebar 

@@ -143,7 +143,7 @@ function computePerformanceScore(totalAssigned: number, completed: number, onTim
   if (totalAssigned === 0) return 0
   const completionRate = (completed / totalAssigned) * 100
   const workloadScore = Math.min(totalAssigned / 10, 1) * 100
-  const timelinessScore = completed > 0 ? (onTimeCount / completed) * 100 : 100
+  const timelinessScore = completed > 0 ? (onTimeCount / completed) * 100 : 0
   const score = (completionRate * 0.50) + (workloadScore * 0.30) + (timelinessScore * 0.20)
   return Math.round(score * 10) / 10
 }
@@ -198,10 +198,18 @@ export async function getKpiPerformanceData(
   })
 
   // ─── 3. Fetch all users ─────────────────────────────────────────────────────
-  const users = await prisma.user.findMany({
+  const rawUsers = await prisma.user.findMany({
     where: { status: { not: 'resign' } },
-    select: { id: true, firstname: true, lastname: true, name: true, avatar: true },
+    select: { id: true, firstname: true, lastname: true, name: true, avatar: true, status: true, role: { select: { name: true } } },
     orderBy: { firstname: 'asc' }
+  })
+
+  const users = rawUsers.filter(u => {
+    const isResigned = (u.firstname || '').toLowerCase().includes('[resign]') || (u as any).status === 'resign';
+    const isClient = ((u as any).role?.name || '').toLowerCase().includes('client') ||
+                     (u.firstname || '').toLowerCase().includes('client') ||
+                     (u.firstname || '').toLowerCase().includes('toko');
+    return !isResigned && !isClient;
   })
 
   // ─── 4. Fetch projects ──────────────────────────────────────────────────────
@@ -305,7 +313,11 @@ export async function getKpiPerformanceData(
 
   // Sort with documented tie-break rules
   memberKpisRaw.sort((a, b) => {
+    const aHasDone = a.completed > 0 ? 1 : 0
+    const bHasDone = b.completed > 0 ? 1 : 0
+    if (bHasDone !== aHasDone) return bHasDone - aHasDone
     if (b.performanceScore !== a.performanceScore) return b.performanceScore - a.performanceScore
+    if (b.completed !== a.completed) return b.completed - a.completed
     if (b.completionRate !== a.completionRate) return b.completionRate - a.completionRate
     if (b.onTimeCount !== a.onTimeCount) return b.onTimeCount - a.onTimeCount
     if (b.totalAssigned !== a.totalAssigned) return b.totalAssigned - a.totalAssigned

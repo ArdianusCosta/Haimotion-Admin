@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 const defaultPermissions = [
   // Dashboard
@@ -76,11 +77,17 @@ const defaultPermissions = [
   { id: 'meetings.create', category: 'Meetings', name: 'Create Meetings', description: 'Can schedule new meetings and invite participants' },
   { id: 'meetings.update', category: 'Meetings', name: 'Update Meetings', description: 'Can edit meeting details and manage participants' },
   { id: 'meetings.delete', category: 'Meetings', name: 'Delete Meetings', description: 'Can cancel and delete meetings' },
+  // Activity Log
+  { id: 'activity_log.view', category: 'Activity Log', name: 'View Activity Log', description: 'Can view system activity logs' },
+  { id: 'activity_log.export', category: 'Activity Log', name: 'Export Activity Log', description: 'Can export activity log data' },
+  // Settings
+  { id: 'settings.view', category: 'Settings', name: 'View Settings', description: 'Can view workspace settings' },
+  { id: 'settings.update', category: 'Settings', name: 'Update Settings', description: 'Can edit workspace settings' },
 ];
 
 export async function GET() {
   try {
-    // 1. Seed SystemPermissions
+    // 1. Seed SystemPermissions (upsert so it's safe to re-run)
     for (const perm of defaultPermissions) {
       await prisma.systemPermission.upsert({
         where: { id: perm.id },
@@ -114,25 +121,68 @@ export async function GET() {
       create: { name: 'Viewer', description: 'Read-only access to specific project data.' },
     });
 
-    // 3. Assign all permissions to Administrator
-    const existingAdminPerms = await prisma.rolePermission.findMany({
-      where: { role_id: adminRole.id }
+    await prisma.role.upsert({
+      where: { name: 'Staff' },
+      update: {},
+      create: { name: 'Staff', description: 'Standard staff access for day-to-day operations.' },
     });
-    
-    const existingPermIds = new Set(existingAdminPerms.map(p => p.permission));
 
-    const permsToAssign = defaultPermissions.filter(p => !existingPermIds.has(p.id));
+    // 3. Assign ALL permissions to Administrator role
+    await prisma.rolePermission.deleteMany({ where: { role_id: adminRole.id } });
+    await prisma.rolePermission.createMany({
+      data: defaultPermissions.map(p => ({
+        role_id: adminRole.id,
+        permission: p.id
+      }))
+    });
 
-    if (permsToAssign.length > 0) {
-      await prisma.rolePermission.createMany({
-        data: permsToAssign.map(p => ({
-          role_id: adminRole.id,
-          permission: p.id
-        }))
+    // 4. Create / upsert the Admin user account
+    const adminEmail = 'admin@haimotion.com';
+    const hashedPassword = await bcrypt.hash('Admin@123', 12);
+
+    const adminUser = await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {
+        role_id: adminRole.id,
+        status: 'active',
+      },
+      create: {
+        email: adminEmail,
+        firstname: 'Admin',
+        lastname: 'HaiMotion',
+        name: 'Admin HaiMotion',
+        password: hashedPassword,
+        avatar: '',
+        status: 'active',
+        role_id: adminRole.id,
+      }
+    });
+
+    // 5. Also assign the first existing user to Administrator (if not already)
+    const firstUser = await prisma.user.findFirst({
+      where: { status: { not: 'resign' } },
+      orderBy: { id: 'asc' },
+    });
+
+    if (firstUser && firstUser.id !== adminUser.id) {
+      await prisma.user.update({
+        where: { id: firstUser.id },
+        data: { role_id: adminRole.id }
       });
     }
 
-    return NextResponse.json({ success: true, message: 'Database seeded successfully' });
+    return NextResponse.json({
+      success: true,
+      message: 'Database seeded successfully',
+      data: {
+        permissionsSeeded: defaultPermissions.length,
+        adminRoleId: adminRole.id,
+        adminUserId: adminUser.id,
+        adminEmail,
+        adminPassword: 'Admin@123',
+        firstUserAssigned: firstUser ? { id: firstUser.id, email: firstUser.email } : null
+      }
+    });
   } catch (error: any) {
     console.error('Seeding error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

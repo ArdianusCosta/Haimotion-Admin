@@ -11,7 +11,11 @@
     "db:push": "node scripts/prepare-prisma.js db push",
     "db:studio": "node scripts/prepare-prisma.js studio",
     "db:migrate-data": "node scripts/generate-migration-clients.js && npx tsx scripts/run-migration.ts",
-    "clean:resign-users": "node scripts/clean-resign-users.js"
+    "clean:resign-users": "node scripts/clean-resign-users.js",
+    "db:seed": "npx tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

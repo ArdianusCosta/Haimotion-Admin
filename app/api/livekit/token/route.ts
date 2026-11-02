@@ -16,23 +16,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Room name is required' }, { status: 400 });
     }
 
-    // Determine if it's a direct call or a meeting
+    const uid = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id;
+
+    // Determine if user has permission to join this room
     let isAuthorized = false;
 
-    // Check if it's a Messenger Call
-    const call = await prisma.call.findUnique({
-      where: { room_name: roomName },
-      include: { thread: true }
-    });
-
-    if (call) {
-      const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
-      if (call.thread.user1_id === uid || call.thread.user2_id === uid) {
-        isAuthorized = true;
+    // 1. Check if it's a Group Call (e.g. group-call-123-timestamp)
+    if (roomName.startsWith('group-call-')) {
+      const parts = roomName.split('-');
+      const gid = parseInt(parts[2], 10);
+      if (!isNaN(gid)) {
+        const membership = await prisma.group_members.findFirst({
+          where: { group_id: gid, user_id: uid }
+        });
+        if (membership) {
+          isAuthorized = true;
+        }
       }
-    } else {
-      // Check if it's a Meeting
-      const uid = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+    }
+
+    // 2. Check if it's a Messenger Direct Call
+    if (!isAuthorized) {
+      const call = await prisma.call.findUnique({
+        where: { room_name: roomName },
+        include: { thread: true }
+      });
+
+      if (call) {
+        if (call.thread.user1_id === uid || call.thread.user2_id === uid) {
+          isAuthorized = true;
+        }
+      }
+    }
+
+    // 3. Check if it's a Scheduled Meeting
+    if (!isAuthorized) {
       const meeting = await prisma.meeting.findFirst({
         where: { room_name: roomName },
         include: { participants: true }
@@ -59,7 +77,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'LiveKit credentials not configured' }, { status: 500 });
     }
 
-    const participantName = `${user.firstname} ${user.lastname}`;
+    const participantName = `${user.firstname} ${user.lastname || ''}`.trim() || 'User';
     const participantIdentity = `hm-user-${user.id}`;
 
     const at = new AccessToken(apiKey, apiSecret, {
@@ -70,7 +88,6 @@ export async function POST(req: NextRequest) {
     at.addGrant({ roomJoin: true, room: roomName, canPublish: true, canSubscribe: true });
 
     const token = await at.toJwt();
-
     const serverUrl = process.env.LIVEKIT_URL;
 
     return NextResponse.json({ token, serverUrl });

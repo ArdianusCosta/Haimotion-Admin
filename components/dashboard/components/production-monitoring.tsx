@@ -1,6 +1,9 @@
 import { FolderKanban } from 'lucide-react'
+import { useLanguage } from '@/components/language-provider'
 
 export function ProductionMonitoring({ data }: { data: any }) {
+  const { language } = useLanguage()
+  const isId = language === 'id'
   return (
     <section className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col">
       <div className="flex items-center gap-3 mb-6">
@@ -8,8 +11,8 @@ export function ProductionMonitoring({ data }: { data: any }) {
           <FolderKanban className="size-5 text-blue-600" />
         </div>
         <div>
-          <h2 className="font-semibold text-base">Production Monitoring</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">Progress produksi berdasarkan tahapan</p>
+          <h2 className="font-semibold text-base">{isId ? 'Monitoring Produksi' : 'Production Monitoring'}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{isId ? 'Progress produksi berdasarkan tahapan' : 'Production progress by stage'}</p>
         </div>
       </div>
       
@@ -22,10 +25,10 @@ export function ProductionMonitoring({ data }: { data: any }) {
           const completedCount = data.pipeline.find((p: any) => p.status === 5)?._count.status || 0;
           
           return [
-            { label: 'Pending', value: pendingCount, total: totalProjects, color: 'bg-primary', textColor: 'text-primary' },
-            { label: 'Active', value: activeCount, total: totalProjects, color: 'bg-chart-4', textColor: 'text-chart-4' },
-            { label: 'In Review', value: reviewCount, total: totalProjects, color: 'bg-chart-3', textColor: 'text-chart-3' },
-            { label: 'Completed', value: completedCount, total: totalProjects, color: 'bg-chart-1', textColor: 'text-chart-1' },
+            { label: isId ? 'Menunggu' : 'Pending', value: pendingCount, total: totalProjects, color: 'bg-primary', textColor: 'text-primary' },
+            { label: isId ? 'Aktif' : 'Active', value: activeCount, total: totalProjects, color: 'bg-chart-4', textColor: 'text-chart-4' },
+            { label: isId ? 'Dalam Review' : 'In Review', value: reviewCount, total: totalProjects, color: 'bg-chart-3', textColor: 'text-chart-3' },
+            { label: isId ? 'Selesai' : 'Completed', value: completedCount, total: totalProjects, color: 'bg-chart-1', textColor: 'text-chart-1' },
           ];
         })().map((stage, idx) => (
           <div key={idx} className="flex items-center justify-between gap-4">

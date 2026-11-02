@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { MessageCircle, MoreHorizontal, Paperclip, Phone, Search, Send, Smile, Video, UserPlus, Reply, Download, X, Check, CheckCheck, Clock, ChevronLeft, User, Mail, FileText, ExternalLink, Copy, Shield, UserCheck, UserX, PanelRight, Users, Plus, Settings } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -35,7 +35,7 @@ import { UserProfileSheet } from '@/components/chat/user-profile-sheet'
 import { CreateGroupDialog } from '@/components/chat/create-group-dialog'
 import { GroupSettingsSheet } from '@/components/chat/group-settings-sheet'
 
-export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, type: 'voice' | 'video') => void }) {
+export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, type: 'voice' | 'video', isGroup?: boolean, groupId?: number) => void }) {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [activeThreadId, setActiveThreadId] = useState<number | null>(null)
   const [activeChatKey, setActiveChatKey] = useState<string | null>(null)
@@ -100,14 +100,80 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
     enabled: !!currentUser?.id,
   })
 
-  const activeConversation = conversations.find((c: any) => c.key === activeChatKey || c.id === activeThreadId) || (conversations.length > 0 ? conversations[0] : null)
+  // Explicit conversation only: NO auto-selection on Desktop or Mobile
+  const activeConversation = (activeChatKey || activeThreadId)
+    ? (conversations.find((c: any) => c.key === activeChatKey || c.id === activeThreadId) || null)
+    : null
 
+  // Reference hooks to eliminate race conditions and stale closures
+  const activeConversationRef = useRef<any>(null)
   useEffect(() => {
-    if (conversations.length > 0 && !activeChatKey && !searchQuery) {
-      setActiveChatKey(conversations[0].key)
-      setActiveThreadId(conversations[0].id)
+    activeConversationRef.current = activeConversation
+  }, [activeConversation])
+
+  const isMobileListVisibleRef = useRef<boolean>(isMobileListVisible)
+  useEffect(() => {
+    isMobileListVisibleRef.current = isMobileListVisible
+  }, [isMobileListVisible])
+
+  // Strict function to mark only the currently active conversation as read
+  const markActiveConversationAsRead = useCallback(async (convToRead?: any) => {
+    const target = convToRead || activeConversationRef.current
+    if (!target || !target.id) return
+    if (typeof document !== 'undefined' && document.hidden) return
+    if (isMobileListVisibleRef.current) return
+
+    // Race condition guard: verify target is STILL the currently active conversation
+    if (activeConversationRef.current?.id !== target.id || activeConversationRef.current?.type !== target.type) {
+      return
     }
-  }, [conversations, activeChatKey, searchQuery])
+
+    try {
+      if (target.type === 'group') {
+        await markGroupAsRead(target.id)
+      } else {
+        await markThreadAsRead(target.id)
+      }
+
+      // Optimistically clear unread count for this target in conversations query
+      queryClient.setQueryData(['conversations', currentUser?.id], (old: any[] = []) => {
+        if (!old) return old
+        return old.map((c: any) => {
+          if (c.key === target.key || (c.id === target.id && c.type === target.type)) {
+            return { ...c, unreadCount: 0 }
+          }
+          return c
+        })
+      })
+
+      // Invalidate global unread count in navbar
+      queryClient.invalidateQueries({ queryKey: ['unreadChatCount'] })
+    } catch (err) {
+      console.error('Failed to mark conversation as read:', err)
+    }
+  }, [currentUser?.id, queryClient])
+
+  // Mark as read ONLY when user explicitly opens a conversation
+  useEffect(() => {
+    if (activeConversation && !isMobileListVisible && typeof document !== 'undefined' && !document.hidden) {
+      markActiveConversationAsRead(activeConversation)
+    }
+  }, [activeConversation?.key, isMobileListVisible, markActiveConversationAsRead])
+
+  // Listen to tab visibility & window focus: if user comes back to an active conversation, mark as read
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && !document.hidden && activeConversationRef.current && !isMobileListVisibleRef.current) {
+        markActiveConversationAsRead(activeConversationRef.current)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus)
+    window.addEventListener('focus', handleVisibilityOrFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus)
+      window.removeEventListener('focus', handleVisibilityOrFocus)
+    }
+  }, [markActiveConversationAsRead])
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<any[]>({
     queryKey: ['messages', activeConversation?.key],
@@ -159,26 +225,33 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
 
     // Listen on personal channel for incoming messages from ANY thread
     personalChannel.bind('chat:message', (data: any) => {
+      const currentActive = activeConversationRef.current
+      const isCurrentActiveThread = currentActive && currentActive.type === 'thread' && currentActive.id === data.threadId
+
       // If belongs to currently open active thread, append to messages
-      if (activeConversation && activeConversation.type === 'thread' && activeConversation.id === data.threadId) {
-        queryClient.setQueryData(['messages', activeConversation.key], (oldData: any[] = []) => {
+      if (isCurrentActiveThread) {
+        queryClient.setQueryData(['messages', currentActive.key], (oldData: any[] = []) => {
           if (oldData.find((m: any) => m.id === data.message.id)) return oldData
           return [...oldData, data.message]
         })
         setTimeout(() => scrollToBottom(), 50)
-        markThreadAsRead(data.threadId)
+
+        // ONLY mark as read if currently looking at this active conversation
+        if (typeof document !== 'undefined' && !document.hidden && !isMobileListVisibleRef.current) {
+          markActiveConversationAsRead(currentActive)
+        }
       }
 
       // Update sidebar conversation preview and unread count in real-time
       queryClient.setQueryData(['conversations', currentUser.id], (oldConversations: any[] = []) => {
-        return oldConversations.map((c: any) => {
+        return (oldConversations || []).map((c: any) => {
           if (c.id === data.threadId && c.type === 'thread') {
-            const isCurrentlyActive = activeConversation?.id === data.threadId && activeConversation?.type === 'thread'
+            const isViewing = isCurrentActiveThread && typeof document !== 'undefined' && !document.hidden && !isMobileListVisibleRef.current
             return {
               ...c,
               preview: data.message?.message_content || (data.message?.attachment ? 'Sent an attachment' : 'New message'),
               time: data.message?.created_at || new Date().toISOString(),
-              unreadCount: isCurrentlyActive ? 0 : (c.unreadCount || 0) + 1
+              unreadCount: isViewing ? 0 : (c.unreadCount || 0) + 1
             }
           }
           return c
@@ -231,12 +304,11 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
           }).sort((a: any, b: any) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime())
         })
         
-        // If the message is from someone else, mark as read
+        // If the message is from someone else, only mark as read if currently looking at this active conversation
         if (newMessage.sender_id !== currentUser.id) {
-          if (activeConversation.type === 'group') {
-            markGroupAsRead(activeConversation.id)
-          } else {
-            markThreadAsRead(activeConversation.id)
+          const currentActive = activeConversationRef.current
+          if (currentActive && typeof document !== 'undefined' && !document.hidden && !isMobileListVisibleRef.current) {
+            markActiveConversationAsRead(currentActive)
           }
         }
       })
@@ -270,9 +342,6 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
           })
         })
 
-        markThreadAsRead(activeConversation.id)
-      } else {
-        markGroupAsRead(activeConversation.id)
       }
     }
 
@@ -455,9 +524,10 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
   }
 
   const startCall = async (type: 'voice' | 'video') => {
-    if (!activeConversation || activeConversation.type !== 'thread' || !currentUser) return
+    if (!activeConversation || !currentUser) return
     if (onStartCall) {
-      onStartCall(activeConversation.id, type)
+      const isGroup = activeConversation.type === 'group'
+      onStartCall(activeConversation.id, type, isGroup, isGroup ? activeConversation.id : undefined)
     }
   }
 
@@ -504,7 +574,7 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
       </div>
       
       <div className={`flex flex-col lg:grid h-[640px] min-h-0 overflow-hidden rounded-2xl border border-border bg-card relative ${
-        isDetailsPanelOpen 
+        isDetailsPanelOpen && activeConversation 
           ? 'lg:grid-cols-[290px_minmax(0,1fr)_300px]' 
           : 'lg:grid-cols-[290px_minmax(0,1fr)]'
       }`}>
@@ -703,7 +773,15 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                 </div>
               ) : activeConversation ? (
                 <>
-                  <button onClick={() => setIsMobileListVisible(true)} className="lg:hidden p-2 -ml-2 text-muted-foreground hover:bg-muted rounded-lg">
+                  <button 
+                    onClick={() => {
+                      setIsMobileListVisible(true);
+                      setActiveChatKey(null);
+                      setActiveThreadId(null);
+                    }} 
+                    className="lg:hidden p-2 -ml-2 text-muted-foreground hover:bg-muted rounded-lg"
+                    aria-label="Kembali ke daftar percakapan"
+                  >
                     <ChevronLeft className="size-5" />
                   </button>
                   {activeConversation.type === 'group' ? (
@@ -774,18 +852,18 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
               <div className="flex items-center gap-1 shrink-0">
                 <button 
                   onClick={() => startCall('voice')} 
-                  disabled={!activeConversation || activeConversation.type === 'group'} 
+                  disabled={!activeConversation} 
                   className="rounded-lg p-2 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed" 
-                  title={activeConversation?.type === 'group' ? "Voice call tidak didukung di grup" : "Start call"}
+                  title={activeConversation?.type === 'group' ? "Group voice call" : "Start call"}
                   aria-label="Start call"
                 >
                   <Phone className="size-4" />
                 </button>
                 <button 
                   onClick={() => startCall('video')} 
-                  disabled={!activeConversation || activeConversation.type === 'group'} 
+                  disabled={!activeConversation} 
                   className="rounded-lg p-2 text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed" 
-                  title={activeConversation?.type === 'group' ? "Video call tidak didukung di grup" : "Start video call"}
+                  title={activeConversation?.type === 'group' ? "Group video call" : "Start video call"}
                   aria-label="Start video call"
                 >
                   <Video className="size-4" />
@@ -840,7 +918,17 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
           </header>
           
           <div className="flex flex-1 flex-col gap-5 overflow-auto p-5">
-            {isLoadingMessages ? (
+            {!activeConversation ? (
+              <div className="flex flex-1 flex-col items-center justify-center text-center p-8 select-none">
+                <div className="size-16 rounded-2xl bg-muted/60 flex items-center justify-center text-primary mb-4 border border-border/50">
+                  <MessageCircle className="size-8 opacity-70" />
+                </div>
+                <h3 className="font-semibold text-lg text-foreground">Pilih Percakapan</h3>
+                <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                  Pilih salah satu percakapan di sebelah kiri untuk membaca atau mengirim pesan.
+                </p>
+              </div>
+            ) : isLoadingMessages ? (
               <div className="flex flex-col gap-5">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className={`flex items-end gap-2 animate-in fade-in duration-500 ${i % 2 === 0 ? 'flex-row' : 'flex-row-reverse'}`}>
@@ -904,7 +992,7 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                       {item.message_content}
                       {item.attachment && (
                         <div className="mt-2 overflow-hidden rounded-xl bg-background/10">
-                          {decodeURIComponent(item.attachment).includes('type=image') ? (
+                          {/\.(png|jpg|jpeg|gif|webp|svg)$/i.test(item.attachment) ? (
                             <img 
                               src={item.attachment} 
                               alt="Attachment" 
@@ -1020,7 +1108,11 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                 {selectedFile && (
                   <div className="flex justify-between items-center bg-background rounded-lg p-2 border">
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+                      {/\.(png|jpg|jpeg|gif|webp|svg)$/i.test(selectedFile.name) ? (
+                        <img src={URL.createObjectURL(selectedFile)} alt="preview" className="h-12 w-12 rounded object-cover shrink-0" />
+                      ) : (
+                        <Paperclip className="size-4 shrink-0 text-muted-foreground" />
+                      )}
                       <p className="text-xs font-medium truncate max-w-[200px]">{selectedFile.name}</p>
                     </div>
                     <button onClick={() => {
@@ -1032,7 +1124,9 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
               </div>
             )}
 
-            <div className="flex items-end gap-2 rounded-xl border border-border bg-background p-2">
+            {activeConversation ? (
+              <>
+                <div className="flex items-end gap-2 rounded-xl border border-border bg-background p-2">
               <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -1067,6 +1161,19 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                     }
                   }
                 }} 
+                onPaste={(e) => {
+                  const items = Array.from(e.clipboardData?.items || []);
+                  const imageItem = items.find(i => i.type.startsWith('image/'));
+                  if (imageItem) {
+                    e.preventDefault();
+                    const file = imageItem.getAsFile();
+                    if (file) {
+                      const ext = file.type.split('/')[1] || 'png';
+                      const namedFile = new File([file], `pasted-image-${Date.now()}.${ext}`, { type: file.type });
+                      setSelectedFile(namedFile);
+                    }
+                  }
+                }}
                 onKeyDown={(event) => { 
                   if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { 
                     event.preventDefault(); 
@@ -1094,7 +1201,13 @@ export function ChatPage({ onStartCall }: { onStartCall?: (threadId: number, typ
                 <Send className="size-4" />
               </button>
             </div>
-            <p className="mt-2 px-1 text-[10px] text-muted-foreground">Press Enter to send · Shift + Enter for a new line</p>
+                <p className="mt-2 px-1 text-[10px] text-muted-foreground">Press Enter to send · Shift + Enter for a new line</p>
+              </>
+            ) : (
+              <div className="py-2.5 text-center text-xs text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/60">
+                Pilih percakapan untuk mulai mengetik pesan
+              </div>
+            )}
           </div>
         </section>
 

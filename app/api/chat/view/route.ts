@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     
     // Determine MIME type based on extension
     const ext = path.extname(absolutePath).toLowerCase()
-    let mimeType = 'text/plain' // default to text/plain so it renders in browser instead of downloading
+    let mimeType = 'text/plain'
     
     if (ext === '.pdf') mimeType = 'application/pdf'
     if (ext === '.json') mimeType = 'application/json'
@@ -33,11 +33,12 @@ export async function GET(req: Request) {
     if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg'
     if (ext === '.gif') mimeType = 'image/gif'
     if (ext === '.svg') mimeType = 'image/svg+xml'
+    if (ext === '.webp') mimeType = 'image/webp'
 
     return new NextResponse(fileBuffer, {
       headers: {
         'Content-Type': mimeType,
-        'Content-Disposition': 'inline', // This forces the browser to display it in a new tab!
+        'Content-Disposition': 'inline',
       }
     })
   } catch (error) {

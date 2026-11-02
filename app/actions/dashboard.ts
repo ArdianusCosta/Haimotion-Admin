@@ -88,6 +88,8 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     // 1. Parallel queries for maximum performance
     const [
       totalUsersCount,
+      activeUsersCount,
+      inactiveUsersCount,
       totalProjectsCount,
       totalTasksCount,
       allTasksInRange,
@@ -99,8 +101,10 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
       productivity
     ] = await Promise.all([
       prisma.user.count({ where: { status: { not: 'resign' } } }),
+      prisma.user.count({ where: { status: 'active' } }),
+      prisma.user.count({ where: { status: { notIn: ['active', 'resign'] } } }),
       prisma.project_list.count({ where: { is_archived: false } }),
-      prisma.task_list.count(),
+      prisma.task_list.count({ where: taskWhere }),
       prisma.task_list.findMany({
         where: taskWhere,
         select: {
@@ -688,7 +692,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     });
 
     const kpis = {
-      totalUsers: { value: totalUsersCount, prev: null },
+      totalUsers: { value: totalUsersCount, activeCount: activeUsersCount, inactiveCount: inactiveUsersCount, prev: null },
       totalProjects: { value: totalProjectsCount, prev: prevProjects },
       totalTasks: { value: totalTasksCount, prev: null },
       tasksCompleted: { value: tasksCompleted, prev: prevTasksCompleted },
@@ -752,7 +756,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
 
     return {
       kpis: {
-        totalUsers: { value: 54, prev: null },
+        totalUsers: { value: 54, activeCount: 48, inactiveCount: 6, prev: null },
         totalProjects: { value: 28, prev: 24 },
         totalTasks: { value: 1315, prev: 1200 },
         tasksCompleted: { value: 1256, prev: 1100 },

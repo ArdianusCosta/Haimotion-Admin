@@ -1,6 +1,9 @@
 import { PieChart } from 'lucide-react'
+import { useLanguage } from '@/components/language-provider'
 
 export function ProjectOverview({ data }: { data: any }) {
+  const { language } = useLanguage()
+  const isId = language === 'id'
   return (
     <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
       <div className="flex items-center gap-3 mb-6">
@@ -8,8 +11,8 @@ export function ProjectOverview({ data }: { data: any }) {
           <PieChart className="size-5 text-orange-600" />
         </div>
         <div>
-          <h2 className="font-semibold text-base">Progress Project (Overview)</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">Status project saat ini</p>
+          <h2 className="font-semibold text-base">{isId ? 'Progress Proyek (Overview)' : 'Project Progress (Overview)'}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{isId ? 'Status project saat ini' : 'Current project status'}</p>
         </div>
       </div>
       
@@ -23,11 +26,11 @@ export function ProjectOverview({ data }: { data: any }) {
           const holdCount = data.pipeline.find((p: any) => p.status === 0)?._count.status || 0;
 
           return [
-            { label: 'Pending', count: pendingCount, value: Math.round((pendingCount/totalProjects)*100), color: 'var(--chart-4)' },
-            { label: 'Active', count: activeCount, value: Math.round((activeCount/totalProjects)*100), color: 'var(--primary)' },
-            { label: 'In Review', count: reviewCount, value: Math.round((reviewCount/totalProjects)*100), color: 'var(--chart-3)' },
-            { label: 'Completed', count: completedCount, value: Math.round((completedCount/totalProjects)*100), color: 'var(--chart-1)' },
-            { label: 'On Hold', count: holdCount, value: Math.round((holdCount/totalProjects)*100), color: 'var(--chart-5)' },
+            { label: isId ? 'Menunggu' : 'Pending', count: pendingCount, value: Math.round((pendingCount/totalProjects)*100), color: 'var(--chart-4)' },
+            { label: isId ? 'Aktif' : 'Active', count: activeCount, value: Math.round((activeCount/totalProjects)*100), color: 'var(--primary)' },
+            { label: isId ? 'Dalam Review' : 'In Review', count: reviewCount, value: Math.round((reviewCount/totalProjects)*100), color: 'var(--chart-3)' },
+            { label: isId ? 'Selesai' : 'Completed', count: completedCount, value: Math.round((completedCount/totalProjects)*100), color: 'var(--chart-1)' },
+            { label: isId ? 'Ditunda' : 'On Hold', count: holdCount, value: Math.round((holdCount/totalProjects)*100), color: 'var(--chart-5)' },
           ];
         })().map((stage, idx) => (
           <div key={idx} className="flex flex-col items-center gap-3 shrink-0">
@@ -50,7 +53,7 @@ export function ProjectOverview({ data }: { data: any }) {
             </div>
             <div className="text-center">
               <p className="text-sm font-medium text-foreground">{stage.label}</p>
-              <p className="text-xs text-muted-foreground">{stage.count} project</p>
+              <p className="text-xs text-muted-foreground">{stage.count} {isId ? 'proyek' : 'project'}</p>
             </div>
           </div>
         ))}

@@ -1,6 +1,7 @@
 'use server'
 
 import prisma from '@/lib/prisma'
+import { pusherServer } from '@/lib/pusher'
 import { sendPushNotification } from '@/lib/firebase/firebase-admin'
 
 // ============ NOTIFICATION TYPES ============
@@ -57,6 +58,23 @@ export async function sendNotification({
         data: data ? JSON.stringify(data) : null,
       })),
     })
+
+    // 1b. Real-time broadcast via Pusher
+    try {
+      await Promise.allSettled(
+        userIds.map((uid) =>
+          pusherServer.trigger(`private-user-${uid}`, 'notification:new', {
+            title,
+            body,
+            link: link || '/chat',
+            type,
+            created_at: new Date().toISOString()
+          })
+        )
+      )
+    } catch (pushErr) {
+      console.warn('Pusher notification broadcast skipped/failed:', pushErr)
+    }
 
     // 2. Get FCM tokens for all target users
     const subscriptions = await prisma.pushSubscription.findMany({
