@@ -21,6 +21,21 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
       setError(initialError)
     }
   }, [initialError])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlError = params.get('error');
+      if (urlError) {
+        if (urlError === 'access_denied') {
+          setError('Login Google dibatalkan atau akses ditolak.');
+        } else {
+          setError(`Login Google gagal: ${decodeURIComponent(urlError)}`);
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [])
   
   const [showPassword, setShowPassword] = useState(false)
   const [view, setView] = useState<'login' | 'forgot-password'>('login')
@@ -123,7 +138,7 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
     setError('')
     setSuccessMsg('')
     try {
-      const { error: resetError } = await authClient.forgetPassword({
+      const { error: resetError } = await (authClient as any).forgetPassword({
         email,
         redirectTo: window.location.origin + '/reset-password'
       })

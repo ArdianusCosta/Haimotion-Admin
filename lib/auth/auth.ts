@@ -7,53 +7,101 @@ import { passkey } from "@better-auth/passkey";
 
 const prismaWithHooks = prisma.$extends({
   query: {
-    passkey: {
-      async findMany({ args, query }) {
-        if (args.where?.credentialID) {
-          if (typeof args.where.credentialID === 'string') {
-            args.where.credentialID = args.where.credentialID.replace(/=+$/, '');
-          } else if (typeof args.where.credentialID.equals === 'string') {
-            args.where.credentialID.equals = args.where.credentialID.equals.replace(/=+$/, '');
-          }
-        }
-        if (args.where?.userId && typeof args.where.userId === 'string') {
-          args.where.userId = Number(args.where.userId);
-        }
-        if (args.where?.userId?.equals && typeof args.where.userId.equals === 'string') {
-          args.where.userId.equals = Number(args.where.userId.equals);
+    account: {
+      async create({ args, query }) {
+        const data = args.data as any;
+        if (data?.userId && typeof data.userId === 'string') {
+          data.userId = Number(data.userId);
         }
         return query(args);
       },
       async findFirst({ args, query }) {
-        console.log("findFirst called with:", JSON.stringify(args));
-        if (args.where?.credentialID) {
-          if (typeof args.where.credentialID === 'string') {
-            args.where.credentialID = args.where.credentialID.replace(/=+$/, '');
-          } else if (typeof args.where.credentialID.equals === 'string') {
-            args.where.credentialID.equals = args.where.credentialID.equals.replace(/=+$/, '');
+        const where = args.where as any;
+        if (where?.userId && typeof where.userId === 'string') {
+          where.userId = Number(where.userId);
+        }
+        return query(args);
+      },
+      async findMany({ args, query }) {
+        const where = args.where as any;
+        if (where?.userId && typeof where.userId === 'string') {
+          where.userId = Number(where.userId);
+        }
+        return query(args);
+      }
+    },
+    session: {
+      async create({ args, query }) {
+        const data = args.data as any;
+        if (data?.userId && typeof data.userId === 'string') {
+          data.userId = Number(data.userId);
+        }
+        return query(args);
+      },
+      async findFirst({ args, query }) {
+        const where = args.where as any;
+        if (where?.userId && typeof where.userId === 'string') {
+          where.userId = Number(where.userId);
+        }
+        return query(args);
+      },
+      async findMany({ args, query }) {
+        const where = args.where as any;
+        if (where?.userId && typeof where.userId === 'string') {
+          where.userId = Number(where.userId);
+        }
+        return query(args);
+      }
+    },
+    passkey: {
+      async findMany({ args, query }) {
+        const where = args.where as any;
+        if (where?.credentialID) {
+          if (typeof where.credentialID === 'string') {
+            where.credentialID = where.credentialID.replace(/=+$/, '');
+          } else if (typeof where.credentialID.equals === 'string') {
+            where.credentialID.equals = where.credentialID.equals.replace(/=+$/, '');
           }
         }
-        if (args.where?.userId && typeof args.where.userId === 'string') {
-          args.where.userId = Number(args.where.userId);
+        if (where?.userId && typeof where.userId === 'string') {
+          where.userId = Number(where.userId);
         }
-        if (args.where?.userId?.equals && typeof args.where.userId.equals === 'string') {
-          args.where.userId.equals = Number(args.where.userId.equals);
+        if (where?.userId?.equals && typeof where.userId.equals === 'string') {
+          where.userId.equals = Number(where.userId.equals);
+        }
+        return query(args);
+      },
+      async findFirst({ args, query }) {
+        const where = args.where as any;
+        if (where?.credentialID) {
+          if (typeof where.credentialID === 'string') {
+            where.credentialID = where.credentialID.replace(/=+$/, '');
+          } else if (typeof where.credentialID.equals === 'string') {
+            where.credentialID.equals = where.credentialID.equals.replace(/=+$/, '');
+          }
+        }
+        if (where?.userId && typeof where.userId === 'string') {
+          where.userId = Number(where.userId);
+        }
+        if (where?.userId?.equals && typeof where.userId.equals === 'string') {
+          where.userId.equals = Number(where.userId.equals);
         }
         return query(args);
       },
       async findUnique({ args, query }) {
-        console.log("findUnique called with:", JSON.stringify(args));
         return query(args);
       },
       async create({ args, query }) {
-        if (args.data.userId && typeof args.data.userId === 'string') {
-          args.data.userId = Number(args.data.userId);
+        const data = args.data as any;
+        if (data?.userId && typeof data.userId === 'string') {
+          data.userId = Number(data.userId);
         }
         return query(args);
       },
       async update({ args, query }) {
-        if (args.data.userId && typeof args.data.userId === 'string') {
-          args.data.userId = Number(args.data.userId);
+        const data = args.data as any;
+        if (data?.userId && typeof data.userId === 'string') {
+          data.userId = Number(data.userId);
         }
         return query(args);
       }
@@ -77,6 +125,8 @@ const getTrustedOrigins = () => {
     "http://192.168.0.29:3000",
     "http://192.168.7.21:3000",
     "http://localhost:3000",
+    "https://dashboardv2.haimotion.com",
+    "http://dashboardv2.haimotion.com",
   ];
   if (process.env.BETTER_AUTH_URL) origins.push(process.env.BETTER_AUTH_URL);
   if (process.env.NEXT_PUBLIC_APP_URL) origins.push(process.env.NEXT_PUBLIC_APP_URL);
@@ -97,20 +147,46 @@ export const auth = betterAuth({
   database: prismaAdapter(prismaWithHooks as any, {
     provider: dbProvider,
   }),
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+    }
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      enabled: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
     }
   },
   databaseHooks: {
     user: {
       create: {
         before: async (user) => {
-          const email = (user.email || "").toLowerCase();
-          if (!email.endsWith("haimotion@gmail.com") && !email.endsWith("@haimotion.com")) {
-            throw new Error("Akses ditolak: Login Google hanya diizinkan untuk email yang berkahiran .haimotion@gmail.com");
-          }
+          const email = (user.email || "").toLowerCase().trim();
+          
+          // Split full name or email username into firstname & lastname
+          const fullName = (user.name || "").trim();
+          const parts = fullName ? fullName.split(/\s+/) : [email.split('@')[0] || "User"];
+          const firstname = (user as any).firstname || parts[0] || "User";
+          const lastname = (user as any).lastname || (parts.length > 1 ? parts.slice(1).join(" ") : "");
+          const avatar = (user as any).avatar || (user as any).image || "";
+          const password = (user as any).password || "";
+
+          return {
+            data: {
+              ...user,
+              email,
+              name: fullName || `${firstname} ${lastname}`.trim(),
+              firstname,
+              lastname,
+              avatar,
+              password,
+              status: (user as any).status || "active",
+              emailVerified: true
+            }
+          };
         }
       }
     }
