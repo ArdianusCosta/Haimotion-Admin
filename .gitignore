@@ -19,3 +19,7 @@ node_modules
 # Firebase Service Account (SENSITIVE - never commit!)
 lib/firebase/service-account.json
 *-firebase-adminsdk-*.json
+
+# Google Drive Storage Encrypted Credentials
+.gdrive-token.enc
+*.enc

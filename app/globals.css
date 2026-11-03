@@ -117,7 +117,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) {
+  :root:not(.light):not(.cewek):not(.hacker) {
     color-scheme: dark;
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
@@ -208,34 +208,87 @@
   --sidebar-ring: oklch(0.85 0.25 150);
 }
 
+:root.cewek,
+html.cewek,
+body.cewek,
 .cewek {
-  color-scheme: light;
-  --background: oklch(0.98 0.05 350);
-  --foreground: oklch(0.4 0.15 350);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.4 0.15 350);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.4 0.15 350);
-  --primary: oklch(0.65 0.2 350);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.93 0.1 350);
-  --secondary-foreground: oklch(0.4 0.15 350);
-  --muted: oklch(0.95 0.05 350);
-  --muted-foreground: oklch(0.6 0.1 350);
-  --accent: oklch(0.93 0.1 350);
-  --accent-foreground: oklch(0.4 0.15 350);
-  --destructive: oklch(0.6 0.2 25);
-  --border: oklch(0.85 0.1 350);
-  --input: oklch(0.85 0.1 350);
-  --ring: oklch(0.65 0.2 350);
-  --sidebar: oklch(0.98 0.05 350);
-  --sidebar-foreground: oklch(0.4 0.15 350);
-  --sidebar-primary: oklch(0.65 0.2 350);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.93 0.1 350);
-  --sidebar-accent-foreground: oklch(0.4 0.15 350);
-  --sidebar-border: oklch(0.85 0.1 350);
-  --sidebar-ring: oklch(0.65 0.2 350);
+  color-scheme: light !important;
+  --background: oklch(0.98 0.05 350) !important;
+  --foreground: oklch(0.35 0.14 350) !important;
+  --card: oklch(1 0 0) !important;
+  --card-foreground: oklch(0.35 0.14 350) !important;
+  --popover: oklch(1 0 0) !important;
+  --popover-foreground: oklch(0.35 0.14 350) !important;
+  --primary: oklch(0.65 0.2 350) !important;
+  --primary-foreground: oklch(1 0 0) !important;
+  --secondary: oklch(0.94 0.08 350) !important;
+  --secondary-foreground: oklch(0.35 0.14 350) !important;
+  --muted: oklch(0.95 0.05 350) !important;
+  --muted-foreground: oklch(0.55 0.1 350) !important;
+  --accent: oklch(0.93 0.08 350) !important;
+  --accent-foreground: oklch(0.35 0.14 350) !important;
+  --destructive: oklch(0.6 0.2 25) !important;
+  --border: oklch(0.88 0.08 350) !important;
+  --input: oklch(0.88 0.08 350) !important;
+  --ring: oklch(0.65 0.2 350) !important;
+  --sidebar: oklch(0.985 0.04 350) !important;
+  --sidebar-foreground: oklch(0.35 0.14 350) !important;
+  --sidebar-primary: oklch(0.65 0.2 350) !important;
+  --sidebar-primary-foreground: oklch(1 0 0) !important;
+  --sidebar-accent: oklch(0.94 0.08 350) !important;
+  --sidebar-accent-foreground: oklch(0.35 0.14 350) !important;
+  --sidebar-border: oklch(0.88 0.08 350) !important;
+  --sidebar-ring: oklch(0.65 0.2 350) !important;
+}
+
+/* Ensure all Dialogs, Dropdowns, Popovers, and Modals render in crisp white & pink in Cewek mode */
+html.cewek [data-slot="dialog-content"],
+body.cewek [data-slot="dialog-content"],
+.cewek [data-slot="dialog-content"] {
+  background-color: oklch(1 0 0) !important;
+  color: oklch(0.35 0.14 350) !important;
+  border-color: oklch(0.88 0.08 350) !important;
+  box-shadow: 0 20px 40px -15px oklch(0.65 0.2 350 / 0.18) !important;
+}
+
+html.cewek [data-slot="dropdown-menu-content"],
+body.cewek [data-slot="dropdown-menu-content"],
+.cewek [data-slot="dropdown-menu-content"],
+html.cewek [data-slot="select-content"],
+body.cewek [data-slot="select-content"],
+.cewek [data-slot="select-content"],
+html.cewek [data-slot="popover-content"],
+body.cewek [data-slot="popover-content"],
+.cewek [data-slot="popover-content"] {
+  background-color: oklch(1 0 0) !important;
+  color: oklch(0.35 0.14 350) !important;
+  border-color: oklch(0.88 0.08 350) !important;
+  box-shadow: 0 12px 30px -8px oklch(0.65 0.2 350 / 0.15) !important;
+}
+
+html.cewek [data-slot="select-item"]:focus,
+body.cewek [data-slot="select-item"]:focus,
+.cewek [data-slot="select-item"]:focus {
+  background-color: oklch(0.93 0.08 350) !important;
+  color: oklch(0.35 0.14 350) !important;
+}
+
+html.cewek [data-slot="dropdown-menu-item"]:focus,
+body.cewek [data-slot="dropdown-menu-item"]:focus,
+.cewek [data-slot="dropdown-menu-item"]:focus {
+  background-color: oklch(0.93 0.08 350) !important;
+  color: oklch(0.35 0.14 350) !important;
+}
+
+html.cewek [data-slot="dialog-content"] input,
+html.cewek [data-slot="dialog-content"] select,
+html.cewek [data-slot="dialog-content"] textarea,
+body.cewek [data-slot="dialog-content"] input,
+body.cewek [data-slot="dialog-content"] select,
+body.cewek [data-slot="dialog-content"] textarea {
+  border-color: oklch(0.88 0.08 350) !important;
+  background-color: oklch(1 0 0) !important;
+  color: oklch(0.35 0.14 350) !important;
 }
 
 /* Decorative Elements for Themes */

@@ -160,11 +160,11 @@ export function ActivityLogExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] p-0 overflow-hidden flex flex-col bg-background border shadow-2xl">
+      <DialogContent className="w-[96vw] max-w-5xl sm:max-w-5xl max-h-[92vh] p-0 overflow-hidden flex flex-col bg-background border shadow-2xl">
         {/* Header */}
-        <div className="px-6 py-4 border-b flex items-center justify-between bg-card shrink-0">
+        <div className="px-6 py-4 border-b flex flex-col sm:flex-row sm:items-center justify-between bg-card shrink-0 gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
               <FileText className="size-5" />
             </div>
             <div>
@@ -175,13 +175,13 @@ export function ActivityLogExportDialog({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
               size="sm"
               onClick={handleExportExcel}
               disabled={isExportingExcel || isExportingPdf}
-              className="gap-2 text-xs"
+              className="gap-2 text-xs cursor-pointer shadow-2xs"
             >
               {isExportingExcel ? <Loader2 className="size-3.5 animate-spin" /> : <FileSpreadsheet className="size-3.5 text-emerald-600" />}
               Excel (.xlsx)
@@ -191,7 +191,7 @@ export function ActivityLogExportDialog({
               size="sm"
               onClick={handlePrint}
               disabled={isExportingPdf}
-              className="gap-2 text-xs"
+              className="gap-2 text-xs cursor-pointer shadow-2xs"
             >
               <Printer className="size-3.5" />
               Cetak (Print)
@@ -200,7 +200,7 @@ export function ActivityLogExportDialog({
               size="sm"
               onClick={handleExportPdf}
               disabled={isExportingPdf || isExportingExcel}
-              className="gap-2 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+              className="gap-2 text-xs bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-2xs"
             >
               {isExportingPdf ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
               Unduh PDF Resmi

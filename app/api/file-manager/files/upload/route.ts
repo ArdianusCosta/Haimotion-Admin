@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { uploadFile } from '@/lib/storage';
+import { uploadFile, deleteFile } from '@/lib/storage';
 import crypto from 'crypto';
 import { checkAccess } from '@/lib/file-auth';
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     if (folderId) {
       const hasAccess = await checkAccess(userId, folderId, 'folder', 'editor');
       if (!hasAccess) {
-         return NextResponse.json({ error: 'Unauthorized to upload to this folder' }, { status: 403 });
+        return NextResponse.json({ error: 'Unauthorized to upload to this folder' }, { status: 403 });
       }
     }
     const uploadedFiles = [];
@@ -42,36 +42,50 @@ export async function POST(req: Request) {
       const extension = originalName.split('.').pop() || '';
       
       const storageKey = `users/${userId}/${crypto.randomUUID()}-${originalName}`;
+      let effectiveStorageKey: string | null = null;
       
-      // Upload to MinIO
-      await uploadFile(buffer, storageKey, size, {
-        'Content-Type': mimeType,
-        'Original-Name': originalName,
-      });
+      try {
+        // Upload using storage adapter (handles Google Drive Resumable/Multipart or MinIO/Local)
+        effectiveStorageKey = await uploadFile(buffer, storageKey, size, {
+          'Content-Type': mimeType,
+          'Original-Name': originalName,
+        });
 
-      // Save to database
-      const newFile = await prisma.file.create({
-        data: {
-          name: originalName,
-          original_name: originalName,
-          storage_key: storageKey,
-          mime_type: mimeType,
-          extension: extension,
-          size: size,
-          folder_id: folderId,
-          owner_id: userId,
+        // Save metadata to database
+        const newFile = await prisma.file.create({
+          data: {
+            name: originalName,
+            original_name: originalName,
+            storage_key: effectiveStorageKey || storageKey,
+            mime_type: mimeType,
+            extension: extension,
+            size: size,
+            folder_id: folderId,
+            owner_id: userId,
+          }
+        });
+        
+        uploadedFiles.push({
+          ...newFile,
+          size: newFile.size.toString()
+        });
+      } catch (uploadOrDbError: any) {
+        // Compensation: If file was created in Google Drive or storage, but database creation failed, clean up immediately
+        if (effectiveStorageKey) {
+          try {
+            console.warn(`[Compensation] Deleting orphaned storage file: ${effectiveStorageKey}`);
+            await deleteFile(effectiveStorageKey);
+          } catch (cleanupErr) {
+            console.error('[Compensation] Failed to delete orphaned file:', cleanupErr);
+          }
         }
-      });
-      
-      uploadedFiles.push({
-        ...newFile,
-        size: newFile.size.toString()
-      });
+        throw uploadOrDbError;
+      }
     }
 
     return NextResponse.json({ files: uploadedFiles }, { status: 201 });
   } catch (error: any) {
-    console.error('Failed to upload files:', error);
+    console.error('[Upload Error] Failed to upload files:', error?.message || error);
     return NextResponse.json({ error: 'Failed to upload files', detail: error?.message || String(error) }, { status: 500 });
   }
 }

@@ -601,6 +601,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handleChange = () => {
       document.documentElement.classList.remove('light', 'dark', 'hacker', 'cewek')
+      document.body.classList.remove('light', 'dark', 'hacker', 'cewek')
 
       if (themeMode === 'system') {
         const isDark = mediaQuery.matches
@@ -611,7 +612,8 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
         document.documentElement.classList.add('hacker')
       } else if (themeMode === 'cewek') {
         setResolvedDark(false)
-        document.documentElement.classList.add('cewek')
+        document.documentElement.classList.add('cewek', 'light')
+        document.body.classList.add('cewek', 'light')
       } else {
         const isDark = themeMode === 'dark'
         setResolvedDark(isDark)
@@ -641,14 +643,18 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
   }), [])
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--primary', colorPresets[activeColor]);
+    if (themeMode === 'cewek') {
+      document.documentElement.style.removeProperty('--primary');
+    } else {
+      document.documentElement.style.setProperty('--primary', colorPresets[activeColor]);
+    }
     document.documentElement.style.setProperty('--radius', `${activeRadius}rem`);
-  }, [activeColor, activeRadius, colorPresets])
+  }, [activeColor, activeRadius, colorPresets, themeMode])
 
   return <div
     className={`h-screen bg-background overflow-hidden ${themeMode === 'hacker' ? 'hacker' : themeMode === 'cewek' ? 'cewek' : resolvedDark ? 'dark' : ''}`}
     style={{
-      '--primary': colorPresets[activeColor],
+      ...(themeMode !== 'cewek' ? { '--primary': colorPresets[activeColor] } : {}),
       '--radius': `${activeRadius}rem`,
       fontFamily: `var(--font-${activeFont.toLowerCase().replace(' ', '-')})`
     } as React.CSSProperties}

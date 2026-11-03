@@ -164,7 +164,12 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
         }
       }),
       prisma.activity_log.findMany({
-        take: 20,
+        where: {
+          activity_type: {
+            notIn: ['login', 'logout', 'Login', 'Logout']
+          }
+        },
+        take: 35,
         orderBy: { created_at: 'desc' }
       }),
       prisma.task_comments.findMany({
@@ -612,14 +617,43 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     });
 
     let formattedActivity: any[] = [];
+
+    // Resolve project IDs for any tasks in activities so clicking navigates directly
+    const taskIdsToResolve = Array.from(new Set([
+      ...activityLogs.map(a => a.task_id).filter((id): id is number => typeof id === 'number' && id > 0),
+      ...taskComments.map(c => c.task_id).filter((id): id is number => typeof id === 'number' && id > 0)
+    ]));
+
+    const taskProjectMap = new Map<number, number>();
+    if (taskIdsToResolve.length > 0) {
+      const foundTasks = await prisma.task_list.findMany({
+        where: { id: { in: taskIdsToResolve } },
+        select: { id: true, project_id: true }
+      });
+      foundTasks.forEach(t => taskProjectMap.set(t.id, t.project_id));
+    }
     
     // Combine logs and task comments for rich activities
     const combinedActs: any[] = [];
     activityLogs.forEach(a => {
+      const typeLower = (a.activity_type || '').toLowerCase();
+      const descLower = (a.description || '').toLowerCase();
+      // Exclude login and logout from Recent Activities feed
+      if (
+        typeLower.includes('login') ||
+        typeLower.includes('logout') ||
+        descLower.includes('logged in') ||
+        descLower.includes('logged out')
+      ) {
+        return;
+      }
+
+      const resolvedPrjId = a.project_id || (a.task_id ? taskProjectMap.get(a.task_id) : null) || null;
+
       combinedActs.push({
         id: `log-${a.id}`,
         userId: a.user_id,
-        projectId: a.project_id,
+        projectId: resolvedPrjId,
         taskId: a.task_id,
         description: a.description,
         type: a.activity_type,
@@ -628,10 +662,11 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     });
 
     taskComments.forEach(c => {
+      const resolvedPrjId = taskProjectMap.get(c.task_id) || null;
       combinedActs.push({
         id: `com-${c.id}`,
         userId: c.user_id,
-        projectId: null,
+        projectId: resolvedPrjId,
         taskId: c.task_id,
         description: `Komentar: "${c.comment.length > 50 ? c.comment.substring(0, 50) + '...' : c.comment}"`,
         type: 'comment',
@@ -671,6 +706,33 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
 
       const roleName = u?.role?.name || (u?.address && u.address !== '--' ? u.address : '');
 
+      // Determine target navigation URL
+      let targetUrl = '';
+      const typeLower = (act.type || '').toLowerCase();
+      const descLower = (act.description || '').toLowerCase();
+
+      if (act.projectId) {
+        targetUrl = `/project/${act.projectId}`;
+      } else if (act.taskId) {
+        targetUrl = '/tasks';
+      } else if (typeLower.includes('finance') || descLower.includes('transaksi') || descLower.includes('invoice') || descLower.includes('kas')) {
+        targetUrl = '/finance/overview';
+      } else if (typeLower.includes('hr') || descLower.includes('cuti') || descLower.includes('absensi') || descLower.includes('payroll') || descLower.includes('karyawan')) {
+        targetUrl = '/hr';
+      } else if (typeLower.includes('meet') || descLower.includes('meeting')) {
+        targetUrl = '/calendar';
+      } else if (typeLower.includes('kanban')) {
+        targetUrl = '/kanban';
+      } else if (typeLower.includes('crm') || descLower.includes('client') || descLower.includes('lead') || descLower.includes('deal')) {
+        targetUrl = '/crm';
+      } else if (typeLower.includes('file') || descLower.includes('file') || descLower.includes('dokumen')) {
+        targetUrl = '/files';
+      } else if (typeLower.includes('project') || descLower.includes('project') || descLower.includes('proyek')) {
+        targetUrl = '/projects';
+      } else if (typeLower.includes('task') || descLower.includes('task') || descLower.includes('tugas')) {
+        targetUrl = '/tasks';
+      }
+
       return {
         id: act.id,
         user: userName,
@@ -678,6 +740,9 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
         avatar: avatarUrl,
         description: act.description,
         projectName: projectName || 'General',
+        projectId: act.projectId || null,
+        taskId: act.taskId || null,
+        targetUrl: targetUrl || (act.projectId ? `/project/${act.projectId}` : '/projects'),
         type: act.type,
         time: act.created_at,
         timeAgo: getRelativeTime(act.created_at)
