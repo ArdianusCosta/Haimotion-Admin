@@ -33,7 +33,7 @@ export function RecentActivitiesCard({ data }: RecentActivitiesCardProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-xs flex flex-col h-full">
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col h-full min-w-0 max-w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">

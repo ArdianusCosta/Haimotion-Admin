@@ -46,18 +46,18 @@ export function ProjectProgressTrends({ data, range, setRange }: ProjectProgress
   const currentData = activeTab === 'status' ? statusTrendData : perfTrendData
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-xs flex flex-col justify-between">
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col justify-between min-w-0 max-w-full">
       {/* Header with Title and Mode Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
             <TrendingUp className="size-5" />
           </div>
-          <div>
-            <h2 className="font-semibold text-base text-foreground">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-base text-foreground truncate">
               {activeTab === 'status' ? 'Project Progress Trends' : t('Tren Performa')}
             </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
               {activeTab === 'status'
                 ? 'Pergerakan status task (Pending, Revised, On-Progress, Overdue, Cancelled, Done)'
                 : 'Perkembangan project dan task yang diselesaikan'}
@@ -66,7 +66,7 @@ export function ProjectProgressTrends({ data, range, setRange }: ProjectProgress
         </div>
 
         {/* View Mode Toggle: Status Progress vs Tren Performa */}
-        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border self-start sm:self-auto">
+        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border self-start md:self-auto shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('status')}
@@ -94,7 +94,7 @@ export function ProjectProgressTrends({ data, range, setRange }: ProjectProgress
 
       {/* Chart Section */}
       {currentData.length > 0 ? (
-        <div className="h-[320px] w-full">
+        <div className="h-[320px] w-full min-w-0 overflow-hidden">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={currentData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />

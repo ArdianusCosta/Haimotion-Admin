@@ -114,18 +114,18 @@ export function MainDashboard({ user }: { user: any }) {
   const userBio = user?.address?.trim() || user?.bio?.trim() || dailyQuote
 
   return (
-    <div className="space-y-6 pb-12 max-w-full">
+    <div className="space-y-6 pb-12 w-full max-w-full min-w-0 overflow-hidden">
       {/* 1. HEADER SECTION (Profile & Greeting on left, Filter Controls on Far Right) */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3.5 sm:gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 min-w-0">
+        <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
           <Avatar className="size-14 sm:size-16 ring-2 ring-primary/20 border-2 border-background shadow-md shrink-0">
             <AvatarImage src={avatarUrl || undefined} alt={userName} />
             <AvatarFallback className="bg-primary/10 text-primary font-bold text-base sm:text-lg">
               {userInitials}
             </AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight text-foreground truncate">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-foreground truncate">
               {greeting},{' '}
               <span className="text-primary">{userName}</span>{' '}
               👋
@@ -137,15 +137,15 @@ export function MainDashboard({ user }: { user: any }) {
         </div>
 
         {/* Filter Controls Pinned to Far Right (Responsive for mobile) */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full md:w-auto bg-card/70 backdrop-blur-md border border-border/70 p-1.5 px-2.5 rounded-2xl shadow-xs">
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto bg-card/70 backdrop-blur-md border border-border/70 p-1.5 px-2.5 rounded-2xl shadow-xs">
           {/* Periode Capsule */}
-          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5 flex-1 sm:flex-initial min-w-[130px]">
+          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5 flex-1 sm:flex-initial">
             <Calendar className="size-3.5 text-muted-foreground shrink-0" />
             <span className="text-[11px] font-medium text-muted-foreground select-none shrink-0">
               {isId ? 'Periode:' : 'Period:'}
             </span>
             <Select value={range} onValueChange={(val: any) => val && setRange(val)}>
-              <SelectTrigger className="h-7 w-full sm:w-[155px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
+              <SelectTrigger className="h-7 w-full sm:w-[130px] md:w-[155px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
                 <SelectValue placeholder={isId ? 'Pilih Periode' : 'Select Period'} />
               </SelectTrigger>
               <SelectContent align="end" className="max-h-[340px] overflow-y-auto">
@@ -178,13 +178,13 @@ export function MainDashboard({ user }: { user: any }) {
           </div>
 
           {/* Project Capsule */}
-          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5 flex-1 sm:flex-initial min-w-[140px]">
+          <div className="flex items-center gap-1.5 bg-background/80 hover:bg-background border border-border/60 hover:border-border transition-all rounded-xl pl-2.5 pr-1 py-0.5 flex-1 sm:flex-initial">
             <Briefcase className="size-3.5 text-muted-foreground shrink-0" />
             <span className="text-[11px] font-medium text-muted-foreground select-none shrink-0">
               {isId ? 'Project:' : 'Project:'}
             </span>
             <Select value={projectFilter} onValueChange={(val: any) => val && setProjectFilter(val)}>
-              <SelectTrigger className="h-7 w-full sm:w-[170px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
+              <SelectTrigger className="h-7 w-full sm:w-[140px] md:w-[170px] border-0 bg-transparent shadow-none text-xs font-semibold focus:ring-0 focus-visible:ring-0 px-1 hover:text-primary transition-colors truncate">
                 <SelectValue placeholder={isId ? 'Pilih Project' : 'Select Project'} />
               </SelectTrigger>
               <SelectContent align="end">
@@ -218,9 +218,13 @@ export function MainDashboard({ user }: { user: any }) {
       <KpiSummaryCards data={data} />
 
       {/* 3. ROW: PROJECT PROGRESS TRENDS & RECENT ACTIVITIES (Matches screenshot!) */}
-      <div className="grid gap-6 lg:grid-cols-[7fr_5fr]">
-        <ProjectProgressTrends data={data} range={range} setRange={setRange} />
-        <RecentActivitiesCard data={data} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-w-0">
+        <div className="min-w-0">
+          <ProjectProgressTrends data={data} range={range} setRange={setRange} />
+        </div>
+        <div className="min-w-0">
+          <RecentActivitiesCard data={data} />
+        </div>
       </div>
 
       {/* 4. TEAM KPI & PRODUKTIVITAS TIM (Unified: Overview Grafik, Leaderboard, Kartu Performa, Distribusi Project) */}
@@ -237,9 +241,13 @@ export function MainDashboard({ user }: { user: any }) {
       {selectedProject && <ProjectDetailInspector project={selectedProject} />}
 
       {/* 7. PARETO ANALYSIS & PRODUCTION MONITORING (Preserves Pareto & Pipeline as explicitly instructed) */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ParetoChart data={data} />
-        <ProductionMonitoring data={data} />
+      <div className="grid gap-6 xl:grid-cols-2 min-w-0">
+        <div className="min-w-0">
+          <ParetoChart data={data} />
+        </div>
+        <div className="min-w-0">
+          <ProductionMonitoring data={data} />
+        </div>
       </div>
 
       {/* 8. PROJECT OVERVIEW STAGES */}

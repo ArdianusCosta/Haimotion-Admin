@@ -38,7 +38,7 @@ export function ProjectProgressDetails({
   ]
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-xs space-y-5">
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-5 min-w-0 max-w-full overflow-hidden">
       {/* Header with Title, Legend & Navigation Arrows */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>

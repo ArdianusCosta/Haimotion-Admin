@@ -42,7 +42,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
   const assignments: any[] = project.assignments || []
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-xs space-y-5">
+    <div className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-xs space-y-5 min-w-0 max-w-full overflow-hidden">
       {/* Header Banner with Project Name, Meta, and Action Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
@@ -88,7 +88,7 @@ export function ProjectDetailInspector({ project }: ProjectDetailInspectorProps)
       </div>
 
       {/* 4 Columns Breakdown matching PHP Dashboard: Task Status, Task Type, Platform, Assignments */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-1 min-w-0">
         
         {/* Column 1: Task Status */}
         <div className="rounded-xl border border-border/80 bg-muted/20 p-4 flex flex-col justify-between">

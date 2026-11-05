@@ -5,7 +5,7 @@ export function ProductionMonitoring({ data }: { data: any }) {
   const { language } = useLanguage()
   const isId = language === 'id'
   return (
-    <section className="rounded-xl border border-border bg-card p-6 shadow-sm flex flex-col">
+    <section className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-sm flex flex-col min-w-0 max-w-full overflow-hidden">
       <div className="flex items-center gap-3 mb-6">
         <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
           <FolderKanban className="size-5 text-blue-600" />

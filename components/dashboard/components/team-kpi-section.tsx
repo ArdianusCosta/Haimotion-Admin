@@ -451,7 +451,7 @@ export function TeamKpiSection({
   ] as const
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col space-y-6">
+    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-xs flex flex-col space-y-6 min-w-0 max-w-full overflow-hidden">
       {/* ─── 1. Header Toolbar (Title, Filters, SOP Guide) ─── */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -538,7 +538,7 @@ export function TeamKpiSection({
       </div>
 
       {/* ─── 2. Unified Live KPI Summary Metric Cards (5 Cards) ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 min-w-0">
         <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 sm:p-3.5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-blue-600 dark:text-blue-400">
             <span className="text-[11px] font-semibold">Total Ditugaskan</span>

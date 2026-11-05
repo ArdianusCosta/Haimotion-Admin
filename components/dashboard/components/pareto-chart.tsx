@@ -8,7 +8,7 @@ export function ParetoChart({ data }: { data: any }) {
   const totalPareto = data.paretoData?.reduce((acc: number, curr: any) => acc + curr.value, 0) || 1
 
   return (
-    <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
+    <section className="rounded-xl border border-border bg-card p-5 sm:p-6 shadow-sm min-w-0 max-w-full overflow-hidden">
       <div className="flex items-center gap-3 mb-6">
         <div className="size-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
           <BarChart3 className="size-5 text-rose-600" />

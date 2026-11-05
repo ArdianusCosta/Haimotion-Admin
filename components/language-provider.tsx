@@ -118,7 +118,9 @@ const dictionaries: Record<Language, Translations> = {
     'Growth': 'Growth',
     // HR
     'Employees': 'Employees',
-    'Attendance': 'Attendance',
+    'Attendance': 'Attendance & Leave',
+    'Pengajuan Cuti & Izin': 'Leave & Permit Requests',
+    'Kelola permohonan cuti tahunan, izin kerja, dan surat sakit karyawan.': 'Manage annual leaves, work permits, and employee sick notes.',
     'Payroll': 'Payroll',
     'Recruitment': 'Recruitment',
     'HR Overview': 'HR Overview',
@@ -518,7 +520,9 @@ const dictionaries: Record<Language, Translations> = {
     'Growth': 'Pertumbuhan',
     // HR
     'Employees': 'Karyawan',
-    'Attendance': 'Kehadiran',
+    'Attendance': 'Cuti & Perizinan',
+    'Pengajuan Cuti & Izin': 'Pengajuan Cuti & Izin',
+    'Kelola permohonan cuti tahunan, izin kerja, dan surat sakit karyawan.': 'Kelola permohonan cuti tahunan, izin kerja, dan surat sakit karyawan.',
     'Payroll': 'Penggajian',
     'Recruitment': 'Rekrutmen',
     'HR Overview': 'Ikhtisar SDM',

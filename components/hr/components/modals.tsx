@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/components/language-provider';
-import { Upload, FileText, CheckCircle, ExternalLink, Eye, Loader2, X, Trash2, CreditCard, Wallet, Calendar, ArrowUpRight, CheckCircle2, AlertCircle, RefreshCw, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, ExternalLink, Eye, Loader2, X, Trash2, CreditCard, Wallet, Calendar, ArrowUpRight, CheckCircle2, AlertCircle, RefreshCw, Download, Clock, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 
@@ -386,10 +386,10 @@ export function UpdatePayrollModal({
                     value={status}
                     onChange={e => setStatus(e.target.value)}
                   >
-                    <option value="Pending">🟡 Pending (Menunggu Pembayaran)</option>
-                    <option value="Processing">🔵 Processing (Sedang Diproses)</option>
-                    <option value="Paid">🟢 Paid (Sudah Ditransfer / Lunas)</option>
-                    <option value="Cancelled">🔴 Cancelled (Dibatalkan)</option>
+                    <option value="Pending">Pending (Menunggu Pembayaran)</option>
+                    <option value="Processing">Processing (Sedang Diproses)</option>
+                    <option value="Paid">Paid (Sudah Ditransfer / Lunas)</option>
+                    <option value="Cancelled">Cancelled (Dibatalkan)</option>
                   </select>
                 </div>
 
@@ -869,7 +869,8 @@ export function AttendanceModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  🟡 Pending
+                  <Clock className="size-3.5" />
+                  Pending
                 </button>
                 <button
                   type="button"
@@ -880,7 +881,8 @@ export function AttendanceModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  🟢 Disetujui
+                  <CheckCircle2 className="size-3.5" />
+                  Disetujui
                 </button>
                 <button
                   type="button"
@@ -891,7 +893,8 @@ export function AttendanceModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  🔴 Ditolak
+                  <XCircle className="size-3.5" />
+                  Ditolak
                 </button>
               </div>
             </div>
@@ -1363,10 +1366,10 @@ export function LeaveRequestModal({
                 onChange={e => setType(e.target.value)}
                 className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-foreground font-medium"
               >
-                <option value="Sakit">🏥 Sakit (Dengan Surat Dokter)</option>
-                <option value="Izin">📄 Izin Keperluan Mendesak / Keluarga</option>
-                <option value="Cuti Tahunan">🏖️ Cuti Tahunan (Annual Leave)</option>
-                <option value="Cuti Khusus">💍 Cuti Khusus (Menikah, Melahirkan, Duka)</option>
+                <option value="Sakit">Sakit (Dengan Surat Dokter)</option>
+                <option value="Izin">Izin Keperluan Mendesak / Keluarga</option>
+                <option value="Cuti Tahunan">Cuti Tahunan (Annual Leave)</option>
+                <option value="Cuti Khusus">Cuti Khusus (Menikah, Melahirkan, Duka)</option>
               </select>
             </div>
 
@@ -1405,7 +1408,7 @@ export function LeaveRequestModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  🟡 Pending
+                  <Clock className="size-3.5" /> Pending
                 </button>
                 <button
                   type="button"
@@ -1416,7 +1419,7 @@ export function LeaveRequestModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  🟢 Disetujui
+                  <CheckCircle2 className="size-3.5" /> Disetujui
                 </button>
                 <button
                   type="button"
@@ -1427,7 +1430,7 @@ export function LeaveRequestModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  🔴 Ditolak
+                  <XCircle className="size-3.5" /> Ditolak
                 </button>
               </div>
             </div>

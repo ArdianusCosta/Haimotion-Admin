@@ -631,7 +631,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
   const isSidebarMini = sidebarStyle === 'icon' || collapsed
   const effectiveCollapsed = isSidebarMini && !mobileMenuOpen
 
-  const asideClasses = `${mobileMenuOpen ? 'flex flex-col absolute z-50' : 'hidden'} transition-all duration-300 md:flex md:relative md:flex-col bg-sidebar ${sidebarStyle === 'offcanvas' ? '!hidden' : ''} ${sidebarStyle === 'floating' ? 'm-4 rounded-xl border border-sidebar-border shadow-sm h-[calc(100vh-2rem)]' : 'border-r border-sidebar-border h-screen'} ${effectiveCollapsed && !mobileMenuOpen ? 'w-20' : 'w-64'}`
+  const asideClasses = `${mobileMenuOpen ? 'flex flex-col absolute z-50' : 'hidden'} transition-all duration-300 md:flex md:relative md:flex-col bg-sidebar shrink-0 ${sidebarStyle === 'offcanvas' ? '!hidden' : ''} ${sidebarStyle === 'floating' ? 'm-4 rounded-xl border border-sidebar-border shadow-sm h-[calc(100vh-2rem)]' : 'border-r border-sidebar-border h-screen'} ${effectiveCollapsed && !mobileMenuOpen ? 'w-20' : 'w-64'}`
   const headerClasses = `relative flex shrink-0 items-center justify-between border-border bg-card/70 px-4 backdrop-blur md:px-8 z-10 ${headerStyle === 'sticky' ? 'h-16 border-b sticky top-0' : ''} ${headerStyle === 'scroll' ? 'h-16 border-b' : ''} ${headerStyle === 'inset' ? 'h-14 mx-4 mt-4 rounded-xl border sticky top-4' : ''}`
 
   const colorPresets: Record<string, string> = useMemo(() => ({
@@ -846,7 +846,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
           </div>
         </aside>
       )}
-      <main className="min-w-0 flex-1 h-screen overflow-y-auto relative">
+      <main className="min-w-0 flex-1 h-screen overflow-y-auto overflow-x-hidden relative">
         <header className={headerClasses}>
           <div className="flex items-center gap-3">
             {!isTopnav && <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-lg p-2 hover:bg-muted md:hidden" aria-label="Open menu"><Menu className="size-5" /></button>}
@@ -868,7 +868,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
           </div>
 
           {/* Center Clock */}
-          <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex flex-col items-center select-none pointer-events-none">
+          <div className="absolute left-1/2 -translate-x-1/2 hidden xl:flex flex-col items-center select-none pointer-events-none">
             <span className="text-sm font-semibold tabular-nums tracking-widest text-foreground font-mono">
               {clockTime}
             </span>
@@ -921,7 +921,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
             </div>
           </div>
         </header>
-        <div className={`p-4 md:p-8 ${contentWidth === 'centered' ? 'w-full' : 'w-full max-w-none'}`}>
+        <div className={`p-4 md:p-8 ${contentWidth === 'centered' ? 'w-full' : 'w-full max-w-full min-w-0'}`}>
           {isFiles ? <FileManager user={user} /> : (() => {
             switch (section) {
               case 'Dashboard': return <MainDashboard user={user} />
