@@ -15,7 +15,7 @@ import {
 } from '@/app/actions/crm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Search, MoreHorizontal, Trash, Calendar, Phone, Mail, CheckCircle2, Clock, AlertTriangle, MessageCircle, Edit } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, Trash, Calendar, Phone, Mail, CheckCircle2, Clock, AlertTriangle, MessageCircle, Edit, Building2, Target, Briefcase } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
@@ -148,7 +148,7 @@ export function CrmFollowUpsPage() {
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number, status: string }) => updateCrmFollowUpStatus(id, status),
     onSuccess: (res) => {
-      if (res.success) {
+      if (res.success && res.data) {
         toast.success(`Follow-up marked as ${res.data.status}`)
         queryClient.invalidateQueries({ queryKey: ['crmFollowUps'] })
         queryClient.invalidateQueries({ queryKey: ['crmStats'] })
@@ -386,10 +386,25 @@ export function CrmFollowUpsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-0.5 text-xs">
-                        {item.client && <span className="font-semibold text-violet-600">🏢 {item.client.company_name}</span>}
-                        {item.lead && <span className="font-medium text-sky-600">🎯 {item.lead.name}</span>}
-                        {item.deal && <span className="text-muted-foreground">💼 {item.deal.title}</span>}
+                      <div className="flex flex-col gap-1 text-xs">
+                        {item.client && (
+                          <span className="font-semibold text-violet-600 flex items-center gap-1">
+                            <Building2 className="size-3 shrink-0" />
+                            {item.client.company_name}
+                          </span>
+                        )}
+                        {item.lead && (
+                          <span className="font-medium text-sky-600 flex items-center gap-1">
+                            <Target className="size-3 shrink-0" />
+                            {item.lead.name}
+                          </span>
+                        )}
+                        {item.deal && (
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Briefcase className="size-3 shrink-0" />
+                            {item.deal.title}
+                          </span>
+                        )}
                         {!item.client && !item.lead && !item.deal && <span className="text-muted-foreground italic">—</span>}
                       </div>
                     </TableCell>
@@ -465,7 +480,7 @@ export function CrmFollowUpsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type *</Label>
-                <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v })}>
+                <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v || 'WhatsApp' })}>
                   <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -480,7 +495,7 @@ export function CrmFollowUpsPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Attach to Client</Label>
-              <Select value={formData.client_id} onValueChange={v => setFormData({ ...formData, client_id: v })}>
+              <Select value={formData.client_id || undefined} onValueChange={v => setFormData({ ...formData, client_id: v || '' })}>
                 <SelectTrigger><SelectValue placeholder="Select client (optional)" /></SelectTrigger>
                 <SelectContent>
                   {clients?.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.company_name}</SelectItem>)}
@@ -491,7 +506,7 @@ export function CrmFollowUpsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Or Attach to Lead</Label>
-                <Select value={formData.lead_id} onValueChange={v => setFormData({ ...formData, lead_id: v })}>
+                <Select value={formData.lead_id || undefined} onValueChange={v => setFormData({ ...formData, lead_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select lead (optional)" /></SelectTrigger>
                   <SelectContent>
                     {leads?.map((l: any) => <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>)}
@@ -500,7 +515,7 @@ export function CrmFollowUpsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Or Attach to Deal</Label>
-                <Select value={formData.deal_id} onValueChange={v => setFormData({ ...formData, deal_id: v })}>
+                <Select value={formData.deal_id || undefined} onValueChange={v => setFormData({ ...formData, deal_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select deal (optional)" /></SelectTrigger>
                   <SelectContent>
                     {deals?.map((d: any) => <SelectItem key={d.id} value={d.id.toString()}>{d.title}</SelectItem>)}
@@ -542,7 +557,7 @@ export function CrmFollowUpsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type *</Label>
-                <Select value={editFormData.type} onValueChange={v => setEditFormData({ ...editFormData, type: v })}>
+                <Select value={editFormData.type} onValueChange={v => setEditFormData({ ...editFormData, type: v || 'WhatsApp' })}>
                   <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     {TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -557,7 +572,7 @@ export function CrmFollowUpsPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</Label>
-              <Select value={editFormData.status} onValueChange={v => setEditFormData({ ...editFormData, status: v })}>
+              <Select value={editFormData.status} onValueChange={v => setEditFormData({ ...editFormData, status: v || 'Pending' })}>
                 <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Pending">Pending</SelectItem>
@@ -569,7 +584,7 @@ export function CrmFollowUpsPage() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Attach Client</Label>
-              <Select value={editFormData.client_id} onValueChange={v => setEditFormData({ ...editFormData, client_id: v })}>
+              <Select value={editFormData.client_id || undefined} onValueChange={v => setEditFormData({ ...editFormData, client_id: v || '' })}>
                 <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
                 <SelectContent>
                   {clients?.map((c: any) => <SelectItem key={c.id} value={c.id.toString()}>{c.company_name}</SelectItem>)}

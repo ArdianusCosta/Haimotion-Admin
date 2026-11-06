@@ -3,7 +3,7 @@ import { usePayrolls, useCreatePayroll, useUpdatePayroll, useDeletePayroll, useE
 import { exportPayrollsCsv } from '@/app/actions/hr';
 import { HRPageHeader } from './components';
 import { PayrollModal, UpdatePayrollModal, ProofPreviewModal, ConfirmActionModal } from './components/modals';
-import { Search, Download, Plus, Edit3, Trash2, Paperclip, CheckCircle2, Clock, Eye, AlertCircle, XCircle } from 'lucide-react';
+import { Search, Download, Plus, Edit3, Trash2, Paperclip, CheckCircle2, Clock, Eye, AlertCircle, XCircle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -190,8 +190,9 @@ export function PayrollPage() {
                       <td className="px-6 py-4 font-medium text-foreground">
                         <div>{payroll.employee?.name}</div>
                         {payroll.notes && (
-                          <div className="text-[11px] text-muted-foreground mt-0.5 max-w-[200px] truncate" title={payroll.notes}>
-                            📝 {payroll.notes}
+                          <div className="text-[11px] text-muted-foreground mt-0.5 max-w-[200px] truncate flex items-center gap-1" title={payroll.notes}>
+                            <FileText className="size-3 text-muted-foreground shrink-0" />
+                            <span>{payroll.notes}</span>
                           </div>
                         )}
                       </td>

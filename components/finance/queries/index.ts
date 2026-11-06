@@ -297,9 +297,14 @@ export function useRecordInvoicePayment() {
       amount: number
       paymentDate?: string
       paymentMethod?: string
+      method?: string
+      reference?: string
       accountId?: number | null
       notes?: string
-    }) => recordInvoicePayment(data),
+    }) => recordInvoicePayment({
+      ...data,
+      method: data.method || data.paymentMethod
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['finance', 'invoices'] })
       queryClient.invalidateQueries({ queryKey: ['finance', 'overview'] })

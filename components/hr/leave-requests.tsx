@@ -62,6 +62,7 @@ export function LeaveRequests() {
     const total = leaves.length;
     const pending = leaves.filter((l: any) => (l.status || 'Pending').toLowerCase() === 'pending').length;
     const approved = leaves.filter((l: any) => (l.status || '').toLowerCase() === 'approved').length;
+    const rejected = leaves.filter((l: any) => (l.status || '').toLowerCase() === 'rejected').length;
     const cuti = leaves.filter((l: any) => {
       const type = (l.type || '').toLowerCase();
       return type.includes('cuti') || type.includes('leave');
@@ -75,18 +76,18 @@ export function LeaveRequests() {
       return type.includes('izin') || type.includes('permit');
     }).length;
 
-    return { total, pending, approved, cuti, sakit, izin };
+    return { total, pending, approved, rejected, cuti, sakit, izin };
   }, [leaves]);
 
   // Tab items configuration
   const tabItems = [
-    { key: 'all', label: 'Semua Permohonan', count: stats.total, icon: FileText },
-    { key: 'pending', label: 'Perlu Persetujuan', count: stats.pending, icon: Clock, badgeVariant: 'warning' },
-    { key: 'cuti', label: 'Cuti Tahunan', count: stats.cuti, icon: CalendarDays },
-    { key: 'izin', label: 'Izin Kerja', count: stats.izin, icon: Briefcase },
-    { key: 'sakit', label: 'Sakit', count: stats.sakit, icon: HeartPulse },
-    { key: 'approved', label: 'Disetujui', icon: CheckCircle2 },
-    { key: 'rejected', label: 'Ditolak', icon: XCircle },
+    { key: 'all', label: t('Semua Permohonan'), count: stats.total, icon: FileText },
+    { key: 'pending', label: t('Perlu Persetujuan'), count: stats.pending, icon: Clock, badgeVariant: 'warning' },
+    { key: 'cuti', label: t('Cuti Tahunan'), count: stats.cuti, icon: CalendarDays },
+    { key: 'izin', label: t('Izin Kerja'), count: stats.izin, icon: Briefcase },
+    { key: 'sakit', label: t('Sakit'), count: stats.sakit, icon: HeartPulse },
+    { key: 'approved', label: t('Disetujui'), count: stats.approved, icon: CheckCircle2 },
+    { key: 'rejected', label: t('Ditolak'), count: stats.rejected, icon: XCircle },
   ] as const;
 
   // Filtered leaves according to tab and search
@@ -254,13 +255,13 @@ export function LeaveRequests() {
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Total Permohonan
+                {t('Total Permohonan')}
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
                 {stats.total}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Semua permohonan diajukan
+                {t('Semua permohonan diajukan')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
@@ -280,7 +281,7 @@ export function LeaveRequests() {
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">
-                  Perlu Review
+                  {t('Perlu Review')}
                 </p>
                 {stats.pending > 0 && (
                   <span className="size-2 rounded-full bg-amber-500 animate-ping inline-block" />
@@ -290,7 +291,7 @@ export function LeaveRequests() {
                 {stats.pending}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Menunggu persetujuan HR
+                {t('Menunggu persetujuan HR')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
@@ -309,13 +310,13 @@ export function LeaveRequests() {
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Cuti Tahunan
+                {t('Cuti Tahunan')}
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
                 {stats.cuti}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Cuti tahunan & khusus
+                {t('Cuti tahunan & khusus')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
@@ -334,13 +335,13 @@ export function LeaveRequests() {
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Izin & Sakit
+                {t('Izin & Sakit')}
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
                 {stats.sakit + stats.izin}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {stats.sakit} sakit · {stats.izin} izin
+                {stats.sakit} {t('sakit')} · {stats.izin} {t('izin')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
@@ -395,7 +396,7 @@ export function LeaveRequests() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input 
             type="text" 
-            placeholder="Cari nama karyawan, jenis, atau alasan..."
+            placeholder={t('Cari nama karyawan, jenis, atau alasan...')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-8 bg-card border-border h-10 rounded-xl text-xs"
@@ -420,7 +421,7 @@ export function LeaveRequests() {
           className="gap-2 h-10 px-5 rounded-xl font-semibold shadow-sm hover:shadow transition-all shrink-0"
         >
           <Plus className="size-4" />
-          <span>Ajukan Izin / Cuti</span>
+          <span>{t('Ajukan Izin / Cuti')}</span>
         </Button>
       </div>
 
@@ -491,7 +492,7 @@ export function LeaveRequests() {
                           <span>{formatDate(leave.end_date)}</span>
                         </div>
                         <p className="text-[11px] text-muted-foreground font-medium">
-                          Total {totalDays} hari kerja
+                          Total {totalDays} {t('hari kerja')}
                         </p>
                       </div>
                     </td>
@@ -517,7 +518,7 @@ export function LeaveRequests() {
                           className="h-7 px-2.5 text-xs gap-1.5 rounded-lg border-primary/30 text-primary hover:bg-primary/10"
                         >
                           <Eye className="size-3.5" />
-                          <span>Lihat Surat</span>
+                          <span>{t('Lihat Surat')}</span>
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground/60">-</span>
@@ -541,7 +542,7 @@ export function LeaveRequests() {
                               onClick={() => handleQuickStatus(leave.id, 'Approved')}
                               disabled={updateStatus.isPending}
                               className="size-8 rounded-lg text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/15"
-                              title="Setujui Permohonan"
+                              title={t('Setujui Permohonan')}
                             >
                               <CheckCircle2 className="size-4" />
                             </Button>
@@ -551,7 +552,7 @@ export function LeaveRequests() {
                               onClick={() => handleQuickStatus(leave.id, 'Rejected')}
                               disabled={updateStatus.isPending}
                               className="size-8 rounded-lg text-rose-600 hover:text-rose-700 hover:bg-rose-500/15"
-                              title="Tolak Permohonan"
+                              title={t('Tolak Permohonan')}
                             >
                               <XCircle className="size-4" />
                             </Button>
@@ -567,7 +568,7 @@ export function LeaveRequests() {
                             setIsModalOpen(true);
                           }}
                           className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-                          title="Edit Permohonan"
+                          title={t('Edit Permohonan')}
                         >
                           <Pencil className="size-3.5" />
                         </Button>
@@ -581,7 +582,7 @@ export function LeaveRequests() {
                             name: `${leave.employee?.name || 'Karyawan'} (${leave.type})`
                           })}
                           className="size-8 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10"
-                          title="Hapus Permohonan"
+                          title={t('Hapus Permohonan')}
                         >
                           <Trash2 className="size-3.5" />
                         </Button>
@@ -597,10 +598,10 @@ export function LeaveRequests() {
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <AlertCircle className="size-8 text-muted-foreground/40" />
                       <p className="text-sm font-medium text-foreground">
-                        Tidak ada data permohonan pada kategori ini
+                        {t('Tidak ada data permohonan pada kategori ini')}
                       </p>
                       <p className="text-xs text-muted-foreground max-w-sm">
-                        Belum ada permohonan izin atau cuti yang diajukan. Klik tombol di bawah untuk membuat pengajuan baru.
+                        {t('Belum ada permohonan izin atau cuti yang diajukan. Klik tombol di bawah untuk membuat pengajuan baru.')}
                       </p>
                       <Button 
                         variant="outline" 
@@ -612,7 +613,7 @@ export function LeaveRequests() {
                         className="mt-2 text-xs gap-1.5"
                       >
                         <Plus className="size-3.5" />
-                        Ajukan Permohonan Baru
+                        {t('Ajukan Permohonan Baru')}
                       </Button>
                     </div>
                   </td>
@@ -643,8 +644,8 @@ export function LeaveRequests() {
           isOpen={!!deleteConfirm}
           onClose={() => setDeleteConfirm(null)}
           onConfirm={handleDelete}
-          title="Hapus Permohonan Izin / Cuti?"
-          description={`Apakah Anda yakin ingin menghapus permohonan untuk ${deleteConfirm.name}? Tindakan ini tidak dapat dibatalkan.`}
+          title={t('Hapus Permohonan Izin / Cuti?')}
+          description={`${t('Apakah Anda yakin ingin menghapus permohonan untuk')} ${deleteConfirm.name}? ${t('Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.')}`}
           isPending={deleteMutation.isPending}
         />
       )}
@@ -656,8 +657,8 @@ export function LeaveRequests() {
           onClose={() => setPreviewAttachment(null)}
           proofUrl={previewAttachment.url}
           employeeName={previewAttachment.name}
-          title={`Surat Dokter / Lampiran ${previewAttachment.type}`}
-          subtitle={`Dokumen pendukung untuk ${previewAttachment.name}`}
+          title={`${t('Surat Dokter / Dokumen Pendukung')} (${previewAttachment.type})`}
+          subtitle={`${t('Dokumen pendukung untuk')} ${previewAttachment.name}`}
         />
       )}
     </div>

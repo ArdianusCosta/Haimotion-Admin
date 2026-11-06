@@ -169,7 +169,7 @@ export function NotificationProvider({
     try {
       const pushToken = await subscribe(true)
       if (pushToken) {
-        toast.success('Push notification berhasil diaktifkan untuk HP ini! 🔔', {
+        toast.success('Push notification berhasil diaktifkan untuk HP ini!', {
           id: 'push-register',
           duration: 5000,
         })

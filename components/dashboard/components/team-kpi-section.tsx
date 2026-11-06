@@ -35,7 +35,11 @@ import {
   ListTodo,
   RotateCcw,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Mail,
+  Folder,
+  Tag,
+  Smartphone
 } from 'lucide-react'
 import {
   Dialog,
@@ -851,7 +855,8 @@ export function TeamKpiSection({
                                 </span>
                                 {isFirst && (
                                   <span className="inline-flex items-center gap-1 bg-amber-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
-                                    ★ BEST EMPLOYEE
+                                    <Award className="size-3 shrink-0" />
+                                    BEST EMPLOYEE
                                   </span>
                                 )}
                               </div>
@@ -1223,11 +1228,13 @@ export function TeamKpiSection({
                         <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                           {selectedMember.email && (
                             <span className="flex items-center gap-1.5">
-                              ✉️ {selectedMember.email}
+                              <Mail className="size-3.5 text-muted-foreground shrink-0" />
+                              {selectedMember.email}
                             </span>
                           )}
                           <span className="flex items-center gap-1 font-medium">
-                            📁 {selectedMember.projectCount || (selectedMember.projects || []).length} Project Aktif
+                            <Folder className="size-3.5 text-muted-foreground shrink-0" />
+                            {selectedMember.projectCount || (selectedMember.projects || []).length} Project Aktif
                           </span>
                         </div>
                       </div>
@@ -1382,12 +1389,14 @@ export function TeamKpiSection({
                                             <div className="flex items-center gap-2 flex-wrap">
                                               {t.pillar && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded font-medium border border-amber-500/20">
-                                                  🏷️ {t.pillar}
+                                                  <Tag className="size-3 text-amber-500 shrink-0" />
+                                                  {t.pillar}
                                                 </span>
                                               )}
                                               {t.platform && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-medium border border-blue-500/20">
-                                                  📱 {t.platform}
+                                                  <Smartphone className="size-3 text-blue-500 shrink-0" />
+                                                  {t.platform}
                                                 </span>
                                               )}
                                             </div>

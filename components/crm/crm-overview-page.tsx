@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Activity, Users, Target, GitPullRequest, TrendingUp, ArrowUpRight, Zap, Star, ChevronRight, Calendar, Briefcase, Phone, MessageCircle } from 'lucide-react'
+import { Activity, Users, Target, GitPullRequest, TrendingUp, ArrowUpRight, Zap, Star, ChevronRight, Calendar, Briefcase, Phone, MessageCircle, Folder } from 'lucide-react'
 import { getCrmOverviewStats } from '@/app/actions/crm'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -237,10 +237,25 @@ export function CrmOverviewPage() {
                     {task.notes && (
                       <p className="text-xs text-muted-foreground line-clamp-1 mb-1">{task.notes}</p>
                     )}
-                    <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
-                      {task.client && <span>📂 {task.client.company_name}</span>}
-                      {task.lead && <span>🎯 {task.lead.name}</span>}
-                      {task.deal && <span>💼 {task.deal.title}</span>}
+                    <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
+                      {task.client && (
+                        <span className="inline-flex items-center gap-1">
+                          <Folder className="size-3 text-muted-foreground shrink-0" />
+                          {task.client.company_name}
+                        </span>
+                      )}
+                      {task.lead && (
+                        <span className="inline-flex items-center gap-1">
+                          <Target className="size-3 text-sky-600 shrink-0" />
+                          {task.lead.name}
+                        </span>
+                      )}
+                      {task.deal && (
+                        <span className="inline-flex items-center gap-1">
+                          <Briefcase className="size-3 text-muted-foreground shrink-0" />
+                          {task.deal.title}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

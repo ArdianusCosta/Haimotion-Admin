@@ -22,8 +22,12 @@ import {
   Clock,
   Check,
   Search,
-  ExternalLink
+  ExternalLink,
+  Target,
+  Zap,
+  Building2
 } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
@@ -41,10 +45,10 @@ import {
 } from '@/components/ui/dialog'
 
 const AUDIENCE_OPTIONS = [
-  { value: 'all_leads', label: 'All Leads', desc: 'Target all leads currently registered in CRM', icon: '🎯' },
-  { value: 'new_leads', label: 'New Leads', desc: 'Only leads with "New" status', icon: '⚡' },
-  { value: 'all_clients', label: 'All Clients', desc: 'Target all registered CRM clients', icon: '🏢' },
-  { value: 'active_clients', label: 'Active Clients', desc: 'Only clients marked as "Active"', icon: '✅' },
+  { value: 'all_leads', label: 'All Leads', desc: 'Target all leads currently registered in CRM', icon: Target },
+  { value: 'new_leads', label: 'New Leads', desc: 'Only leads with "New" status', icon: Zap },
+  { value: 'all_clients', label: 'All Clients', desc: 'Target all registered CRM clients', icon: Building2 },
+  { value: 'active_clients', label: 'Active Clients', desc: 'Only clients marked as "Active"', icon: CheckCircle2 },
 ]
 
 const CHANNEL_OPTIONS = [
@@ -53,12 +57,9 @@ const CHANNEL_OPTIONS = [
 ]
 
 export function CrmBroadcastPage() {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'compose' | 'history'>('compose')
-  const [isSending, setIsSending] = useState(false)
-  const [campaigns, setCampaigns] = useState<any[]>([])
-  const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(false)
   const [deleteCandidate, setDeleteCandidate] = useState<any | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -68,26 +69,59 @@ export function CrmBroadcastPage() {
     message: ''
   })
 
-  const fetchCampaigns = async () => {
-    setIsLoadingCampaigns(true)
-    try {
+  // TanStack Query: Fetch Broadcast Campaigns
+  const { data: campaigns = [], isLoading: isLoadingCampaigns, refetch: refetchCampaigns } = useQuery({
+    queryKey: ['crmBroadcastCampaigns'],
+    queryFn: async () => {
       const res = await getCrmBroadcastCampaigns()
-      if (res.success && res.data) {
-        setCampaigns(res.data)
-      } else {
-        toast.error(res.error || 'Failed to fetch broadcast campaigns')
-      }
-    } catch (err: any) {
-      console.error(err)
-      toast.error('Error loading campaigns')
-    } finally {
-      setIsLoadingCampaigns(false)
+      if (!res.success) throw new Error(res.error || 'Failed to fetch broadcast campaigns')
+      return res.data || []
     }
-  }
+  })
 
-  useEffect(() => {
-    fetchCampaigns()
-  }, [])
+  // TanStack Query: Create Campaign Mutation
+  const createMutation = useMutation({
+    mutationFn: async (payload: { name: string; audience_type: string; channel: string; message: string }) => {
+      const res = await createCrmBroadcastCampaign(payload)
+      if (!res.success) throw new Error(res.error || 'Failed to queue campaign')
+      return res
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['crmBroadcastCampaigns'] })
+      toast.success(`Campaign "${formData.name}" saved! ${res.recipientCount || 0} recipients queued in database.`)
+      setFormData({
+        name: '',
+        audience: 'all_leads',
+        channel: 'whatsapp',
+        subject: '',
+        message: ''
+      })
+      setActiveTab('history')
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Error creating campaign')
+    }
+  })
+
+  // TanStack Query: Delete Campaign Mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await deleteCrmBroadcastCampaign(id)
+      if (!res.success) throw new Error(res.error || 'Failed to delete campaign')
+      return res
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crmBroadcastCampaigns'] })
+      toast.success(`Campaign "${deleteCandidate?.name}" deleted.`)
+      setDeleteCandidate(null)
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Error deleting campaign')
+    }
+  })
+
+  const isSending = createMutation.isPending
+  const isDeleting = deleteMutation.isPending
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,58 +132,23 @@ export function CrmBroadcastPage() {
       return toast.error('Message content is required')
     }
 
-    setIsSending(true)
-    try {
-      const res = await createCrmBroadcastCampaign({
-        name: formData.name,
-        audience_type: formData.audience,
-        channel: formData.channel,
-        message: formData.message
-      })
-
-      if (res.success) {
-        toast.success(`Campaign "${formData.name}" saved! ${res.recipientCount || 0} recipients queued in database.`)
-        setFormData({
-          name: '',
-          audience: 'all_leads',
-          channel: 'whatsapp',
-          subject: '',
-          message: ''
-        })
-        await fetchCampaigns()
-        setActiveTab('history')
-      } else {
-        toast.error(res.error || 'Failed to queue campaign')
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Error creating campaign')
-    } finally {
-      setIsSending(false)
-    }
+    createMutation.mutate({
+      name: formData.name,
+      audience_type: formData.audience,
+      channel: formData.channel,
+      message: formData.message
+    })
   }
 
   const handleDelete = async () => {
     if (!deleteCandidate) return
-    setIsDeleting(true)
-    try {
-      const res = await deleteCrmBroadcastCampaign(deleteCandidate.id)
-      if (res.success) {
-        toast.success(`Campaign "${deleteCandidate.name}" deleted.`)
-        setCampaigns(prev => prev.filter(c => c.id !== deleteCandidate.id))
-        setDeleteCandidate(null)
-      } else {
-        toast.error(res.error || 'Failed to delete campaign')
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'Error deleting campaign')
-    } finally {
-      setIsDeleting(false)
-    }
+    deleteMutation.mutate(deleteCandidate.id)
   }
 
   const selectedAudience = AUDIENCE_OPTIONS.find(a => a.value === formData.audience)
   const selectedChannel = CHANNEL_OPTIONS.find(c => c.value === formData.channel)
   const ChannelIcon = selectedChannel?.icon || MessageSquare
+  const AudienceIcon = selectedAudience?.icon || Target
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
@@ -176,7 +175,7 @@ export function CrmBroadcastPage() {
             variant={activeTab === 'history' ? 'default' : 'ghost'}
             onClick={() => {
               setActiveTab('history')
-              fetchCampaigns()
+              refetchCampaigns()
             }}
             className="gap-2 text-xs"
           >
@@ -249,25 +248,30 @@ export function CrmBroadcastPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {AUDIENCE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, audience: opt.value })}
-                        className={cn(
-                          'flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all',
-                          formData.audience === opt.value
-                            ? 'border-primary bg-primary/5 shadow-sm'
-                            : 'border-border/50 hover:border-border hover:bg-muted/30'
-                        )}
-                      >
-                        <span className="text-xl mt-0.5">{opt.icon}</span>
-                        <div>
-                          <span className="block font-semibold text-sm">{opt.label}</span>
-                          <span className="block text-xs text-muted-foreground mt-0.5">{opt.desc}</span>
-                        </div>
-                      </button>
-                    ))}
+                    {AUDIENCE_OPTIONS.map((opt) => {
+                      const IconComp = opt.icon
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, audience: opt.value })}
+                          className={cn(
+                            'flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all',
+                            formData.audience === opt.value
+                              ? 'border-primary bg-primary/5 shadow-sm'
+                              : 'border-border/50 hover:border-border hover:bg-muted/30'
+                          )}
+                        >
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                            <IconComp className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <span className="block font-semibold text-sm">{opt.label}</span>
+                            <span className="block text-xs text-muted-foreground mt-0.5">{opt.desc}</span>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -311,7 +315,7 @@ export function CrmBroadcastPage() {
                       required
                     />
                     <div className="flex justify-between items-center text-xs text-muted-foreground">
-                      <span>Supports emoji 🎉 and multiline text.</span>
+                      <span>Supports multiline text and custom formatting.</span>
                       <span>{formData.message.length} characters</span>
                     </div>
                   </div>
@@ -367,8 +371,8 @@ export function CrmBroadcastPage() {
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Audience</span>
-                    <span className="font-semibold flex items-center gap-1">
-                      {selectedAudience?.icon} {selectedAudience?.label}
+                    <span className="font-semibold flex items-center gap-1.5">
+                      <AudienceIcon className="h-4 w-4 text-primary" /> {selectedAudience?.label}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -418,7 +422,7 @@ export function CrmBroadcastPage() {
                   All broadcast campaigns stored in the database with recipient snapshots.
                 </CardDescription>
               </div>
-              <Button size="sm" variant="outline" onClick={fetchCampaigns} disabled={isLoadingCampaigns} className="gap-2 text-xs">
+              <Button size="sm" variant="outline" onClick={() => refetchCampaigns()} disabled={isLoadingCampaigns} className="gap-2 text-xs">
                 {isLoadingCampaigns ? 'Refreshing...' : 'Refresh'}
               </Button>
             </div>

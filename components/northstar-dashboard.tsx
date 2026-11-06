@@ -840,7 +840,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               </button> */}
               <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg p-2 text-left text-red-500 hover:bg-red-500/10">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full"><LogOut className="size-4" /></div>
-                {!effectiveCollapsed && <span className="text-sm font-medium">Log out</span>}
+                {!effectiveCollapsed && <span className="text-sm font-medium">{t('Log out')}</span>}
               </button>
             </div>
           </div>

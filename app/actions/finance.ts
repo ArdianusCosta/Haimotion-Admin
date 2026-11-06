@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
+import type { FinanceReportKind } from '@/types/finance'
 
 /**
  * Modul Finance.
@@ -144,15 +145,16 @@ export async function getFinanceSummary() {
     paidInvoicesCount,
     payments,
     recentTransactions,
-    totalTransactionsCount
+    totalTransactionsCount,
+    yearExpenses
   ] = await Promise.all([
     prisma.financeInvoice.findMany({
       where: { type: 'SALES' },
-      select: { amount: true, status: true, due_date: true, payments: { select: { amount: true } } }
+      select: { amount: true, status: true, date: true, due_date: true, payments: { select: { amount: true } } }
     }),
     prisma.financeInvoice.findMany({
       where: { type: 'PURCHASE' },
-      select: { amount: true, status: true, payments: { select: { amount: true } } }
+      select: { amount: true, status: true, date: true, due_date: true, payments: { select: { amount: true } } }
     }),
     prisma.financeExpense.aggregate({ _sum: { amount: true }, where: { status: 'Paid' } }),
     prisma.financeAccount.aggregate({ _sum: { balance: true } }),
@@ -168,10 +170,14 @@ export async function getFinanceSummary() {
     }),
     prisma.financeTransaction.findMany({
       orderBy: { date: 'desc' },
-      take: 6,
+      take: 15,
       include: { account: { select: { name: true } } }
     }),
-    prisma.financeTransaction.count()
+    prisma.financeTransaction.count(),
+    prisma.financeExpense.findMany({
+      where: { status: 'Paid', date: { gte: yearStart, lte: yearEnd } },
+      select: { amount: true, date: true }
+    })
   ])
 
   const paidOf = (invoice: { payments: Array<{ amount: number }> }) =>
@@ -193,17 +199,33 @@ export async function getFinanceSummary() {
   const operatingExpenses = round2(paidExpenses._sum.amount || 0)
   const totalExpenses = round2(purchaseCost + operatingExpenses)
 
+  // Piutang Usaha (Outstanding Receivables / Faktur Penjualan belum lunas)
   const outstandingInvoices = round2(
     unpaidInvoices.reduce((sum, i) => sum + Math.max(0, i.amount - paidOf(i)), 0)
   )
   const overdueInvoicesCount = unpaidInvoices.filter(i => deriveStatus(i) === 'Overdue').length
 
+  // Utang Usaha (Outstanding Payables / Faktur Pembelian belum lunas)
+  const unpaidPurchases = purchaseInvoices.filter(i => !['Paid', 'Cancelled'].includes(i.status))
+  const outstandingPayables = round2(
+    unpaidPurchases.reduce((sum, i) => sum + Math.max(0, i.amount - paidOf(i)), 0)
+  )
+  const outstandingPayablesCount = unpaidPurchases.length
+
   const monthlyData = Array.from({ length: 12 }, (_, i) => {
-    const month = new Date(year, i).toLocaleString('en-US', { month: 'short' })
-    return { name: month, income: 0, expenses: 0 }
+    const month = new Date(year, i).toLocaleString('id-ID', { month: 'short' })
+    return {
+      name: month,
+      income: 0,
+      expenses: 0,
+      profit: 0,
+      cashFlow: 0,
+      receivables: 0,
+      payables: 0
+    }
   })
 
-  // Arus kas per bulan diambil dari transaksi kas/bank yang benar-benar tercatat
+  // Arus kas per bulan diambil dari transaksi pembayaran kas/bank
   payments.forEach(payment => {
     const monthIndex = new Date(payment.payment_date).getMonth()
     if (monthIndex < 0 || monthIndex > 11) return
@@ -214,6 +236,43 @@ export async function getFinanceSummary() {
     }
   })
 
+  // Tambahkan beban operasional yang lunas ke pengeluaran bulanan
+  yearExpenses.forEach(exp => {
+    const monthIndex = new Date(exp.date).getMonth()
+    if (monthIndex >= 0 && monthIndex < 12) {
+      monthlyData[monthIndex].expenses += exp.amount
+    }
+  })
+
+  // Akumulasi tren tagihan piutang dan utang per bulan
+  salesInvoices.forEach(inv => {
+    if (inv.date) {
+      const monthIndex = new Date(inv.date).getMonth()
+      if (monthIndex >= 0 && monthIndex < 12) {
+        monthlyData[monthIndex].receivables += inv.amount
+      }
+    }
+  })
+
+  purchaseInvoices.forEach(inv => {
+    if (inv.date) {
+      const monthIndex = new Date(inv.date).getMonth()
+      if (monthIndex >= 0 && monthIndex < 12) {
+        monthlyData[monthIndex].payables += inv.amount
+      }
+    }
+  })
+
+  // Finalisasi nilai per bulan
+  monthlyData.forEach(m => {
+    m.income = round2(m.income)
+    m.expenses = round2(m.expenses)
+    m.profit = round2(m.income - m.expenses)
+    m.cashFlow = round2(m.income - m.expenses)
+    m.receivables = round2(m.receivables)
+    m.payables = round2(m.payables)
+  })
+
   return {
     totalRevenue,
     totalExpenses,
@@ -222,20 +281,37 @@ export async function getFinanceSummary() {
     netProfit: round2(totalRevenue - totalExpenses),
     outstandingInvoices,
     outstandingInvoicesCount: unpaidInvoices.length,
+    outstandingPayables,
+    outstandingPayablesCount,
     overdueInvoicesCount,
     paidInvoicesCount,
     totalTransactionsCount,
     cashAndBank: round2(accounts._sum.balance || 0),
     monthlyData,
-    recentTransactions: recentTransactions.map(tx => ({
-      id: tx.id,
-      date: tx.date,
-      description: tx.description,
-      type: tx.type,
-      amount: tx.amount,
-      reference: tx.reference,
-      account: tx.account?.name || '-'
-    })),
+    recentTransactions: recentTransactions.map(tx => {
+      const isSales = tx.reference?.startsWith('INV')
+      const isPurchase = tx.reference?.startsWith('PIB')
+      const isExpense = tx.reference?.startsWith('EXP')
+      let category = 'Umum'
+      if (isSales) category = 'Penjualan'
+      else if (isPurchase) category = 'Pembelian'
+      else if (isExpense) category = 'Beban Operasional'
+      else if (tx.type === 'Income') category = 'Pemasukan'
+      else if (tx.type === 'Expense') category = 'Pengeluaran'
+      else if (tx.type === 'Transfer') category = 'Transfer Kas'
+
+      return {
+        id: tx.id,
+        date: tx.date,
+        description: tx.description,
+        type: tx.type,
+        amount: tx.amount,
+        reference: tx.reference,
+        account: tx.account?.name || 'Kas/Bank',
+        category,
+        status: 'Completed'
+      }
+    }),
     today
   }
 }

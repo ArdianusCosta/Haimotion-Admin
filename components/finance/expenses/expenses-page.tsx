@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Plus, Search, Download, MoreHorizontal, CreditCard, Eye, FileText, CheckCircle2, Clock } from 'lucide-react'
+import { Plus, Search, Download, MoreHorizontal, CreditCard, Eye, FileText, CheckCircle2, Clock, Users } from 'lucide-react'
 import { FinancePageHeader, FinanceStatusBadge } from '../components'
 import { ExpenseModal, ConfirmDeleteModal, PayExpenseModal, ReceiptPreviewModal } from '../components/modals'
 import { useExpenses, useCreateExpense, useUpdateExpense, useDeleteExpense, usePayExpense, useExportExpenses, useImportExpenses, useBankAccounts } from '../queries'
@@ -175,14 +175,16 @@ export function ExpensesPage() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span>{exp.description}</span>
                         {exp.payroll_id && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
-                            👥 Payroll HR
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20">
+                            <Users className="size-3 text-primary shrink-0" />
+                            Payroll HR
                           </span>
                         )}
                       </div>
                       {exp.notes && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5 max-w-[280px] truncate" title={exp.notes}>
-                          📝 {exp.notes}
+                        <p className="text-[11px] text-muted-foreground mt-0.5 max-w-[280px] truncate flex items-center gap-1" title={exp.notes}>
+                          <FileText className="size-3 text-muted-foreground shrink-0" />
+                          <span>{exp.notes}</span>
                         </p>
                       )}
                     </td>

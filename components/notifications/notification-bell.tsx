@@ -1,23 +1,35 @@
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
-import { Bell, X, CheckCheck, ExternalLink, Loader2 } from 'lucide-react'
+import { Bell, X, CheckCheck, ExternalLink, Loader2, ClipboardList, Pencil, MessageSquare, Tag, Calendar, Clock, Video, DollarSign, Lock, Smartphone } from 'lucide-react'
 import { useNotifications } from './notification-provider'
 import { formatDistanceToNow } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 
-const TYPE_ICONS: Record<string, string> = {
-  task_assigned: '📋',
-  task_updated: '✏️',
-  task_comment: '💬',
-  task_mention: '🔔',
-  chat_message: '💬',
-  chat_mention: '🏷️',
-  calendar_event: '📅',
-  calendar_reminder: '⏰',
-  meeting_invite: '🎥',
-  finance_approval: '💰',
-  general: '🔔',
+function NotificationTypeIcon({ type }: { type: string }) {
+  const iconProps = { className: "size-4 text-foreground/80" }
+  switch (type) {
+    case 'task_assigned':
+      return <ClipboardList {...iconProps} className="size-4 text-blue-500" />
+    case 'task_updated':
+      return <Pencil {...iconProps} className="size-4 text-amber-500" />
+    case 'task_comment':
+    case 'chat_message':
+      return <MessageSquare {...iconProps} className="size-4 text-sky-500" />
+    case 'task_mention':
+    case 'chat_mention':
+      return <Tag {...iconProps} className="size-4 text-purple-500" />
+    case 'calendar_event':
+      return <Calendar {...iconProps} className="size-4 text-emerald-500" />
+    case 'calendar_reminder':
+      return <Clock {...iconProps} className="size-4 text-amber-500" />
+    case 'meeting_invite':
+      return <Video {...iconProps} className="size-4 text-rose-500" />
+    case 'finance_approval':
+      return <DollarSign {...iconProps} className="size-4 text-emerald-600" />
+    default:
+      return <Bell {...iconProps} className="size-4 text-muted-foreground" />
+  }
 }
 
 export function NotificationBell() {
@@ -139,16 +151,24 @@ export function NotificationBell() {
                     ? 'bg-destructive'
                     : 'bg-amber-500'
                 }`} />
-                <span className="font-medium text-[11px] truncate">
-                  {!isSecureContext
-                    ? 'Web Push: Butuh HTTPS 🔒'
-                    : isPushSubscribed
-                    ? 'Notifikasi HP: Terhubung 📱🔔'
-                    : pushPermission === 'granted'
-                    ? 'Izin Aktif - Belum Terhubung'
-                    : pushPermission === 'denied'
-                    ? 'Notifikasi HP Diblokir'
-                    : 'Notifikasi HP Belum Aktif'}
+                <span className="font-medium text-[11px] truncate flex items-center gap-1">
+                  {!isSecureContext ? (
+                    <>
+                      <span>Web Push: Butuh HTTPS</span>
+                      <Lock className="size-3 text-muted-foreground" />
+                    </>
+                  ) : isPushSubscribed ? (
+                    <>
+                      <span>Notifikasi HP: Terhubung</span>
+                      <Smartphone className="size-3 text-emerald-500" />
+                    </>
+                  ) : pushPermission === 'granted' ? (
+                    'Izin Aktif - Belum Terhubung'
+                  ) : pushPermission === 'denied' ? (
+                    'Notifikasi HP Diblokir'
+                  ) : (
+                    'Notifikasi HP Belum Aktif'
+                  )}
                 </span>
               </div>
               {pushPermission !== 'denied' && (
@@ -209,8 +229,8 @@ export function NotificationBell() {
                     )}
 
                     {/* Icon */}
-                    <div className="size-8 rounded-xl bg-muted/80 flex items-center justify-center shrink-0 text-base shadow-2xs group-hover:scale-105 transition-transform">
-                      {TYPE_ICONS[notif.type] || '🔔'}
+                    <div className="size-8 rounded-xl bg-muted/80 border border-border/40 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                      <NotificationTypeIcon type={notif.type} />
                     </div>
 
                     {/* Content */}

@@ -4,6 +4,7 @@ import React from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
+import { useLanguage } from '@/components/language-provider'
 
 export interface ConfirmDeleteDialogProps {
   open: boolean
@@ -20,12 +21,19 @@ export function ConfirmDeleteDialog({
   open, 
   onOpenChange, 
   onConfirm, 
-  title = "Apakah Anda yakin?", 
-  description = "Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.",
-  confirmText = "Hapus",
-  cancelText = "Batal",
+  title, 
+  description,
+  confirmText,
+  cancelText,
   isLoading = false
 }: ConfirmDeleteDialogProps) {
+  const { t } = useLanguage()
+
+  const finalTitle = title ? t(title) : t('Apakah Anda yakin?')
+  const finalDescription = description ? t(description) : t('Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.')
+  const finalConfirmText = confirmText ? t(confirmText) : t('Hapus')
+  const finalCancelText = cancelText ? t(cancelText) : t('Batal')
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!w-[92vw] !max-w-[440px] p-6 rounded-2xl border border-border bg-card shadow-2xl">
@@ -34,9 +42,9 @@ export function ConfirmDeleteDialog({
             <AlertTriangle className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <DialogTitle className="text-lg font-bold text-foreground">{title}</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{finalTitle}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-              {description}
+              {finalDescription}
             </DialogDescription>
           </div>
         </div>
@@ -48,7 +56,7 @@ export function ConfirmDeleteDialog({
             onClick={() => onOpenChange(false)}
             className="h-10 px-4 cursor-pointer"
           >
-            {cancelText}
+            {finalCancelText}
           </Button>
           <Button 
             type="button" 
@@ -60,7 +68,7 @@ export function ConfirmDeleteDialog({
             }}
             className="h-10 px-5 font-semibold bg-destructive hover:bg-destructive/90 text-white cursor-pointer"
           >
-            {isLoading ? 'Menghapus...' : confirmText}
+            {isLoading ? t('Menghapus...') : finalConfirmText}
           </Button>
         </div>
       </DialogContent>

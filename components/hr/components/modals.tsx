@@ -452,7 +452,7 @@ export function UpdatePayrollModal({
                       onClick={() => setPaymentProof(null)}
                       className="text-xs text-rose-500 hover:text-rose-600 hover:underline flex items-center font-medium"
                     >
-                      <Trash2 className="size-3.5 mr-1" /> Hapus Bukti
+                      <Trash2 className="size-3.5 mr-1" /> {t('Hapus Bukti')}
                     </button>
                   )}
                 </div>
@@ -614,14 +614,14 @@ export function ProofPreviewModal({
             <div className="flex flex-col items-center justify-center text-center p-8 space-y-3">
               <AlertCircle className="size-12 text-rose-500/80" />
               <div>
-                <p className="text-sm font-semibold text-foreground">Gagal memuat pratinjau gambar</p>
+                <p className="text-sm font-semibold text-foreground">{t('Gagal memuat pratinjau gambar')}</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                  Format gambar atau tautan mungkin tidak dapat dibuka langsung di dalam browser.
+                  {t('Format gambar atau tautan mungkin tidak dapat dibuka langsung di dalam browser.')}
                 </p>
               </div>
               <Button variant="outline" size="sm" asChild>
                 <a href={proofUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="size-3.5 mr-1.5" /> Buka Tautan di Tab Baru
+                  <ExternalLink className="size-3.5 mr-1.5" /> {t('Buka Tautan di Tab Baru')}
                 </a>
               </Button>
             </div>
@@ -639,17 +639,17 @@ export function ProofPreviewModal({
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button variant="outline" asChild size="sm" className="h-9">
               <a href={proofUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="mr-2 size-3.5" /> Buka Tab Baru
+                <ExternalLink className="mr-2 size-3.5" /> {t('Buka Tab Baru')}
               </a>
             </Button>
             <Button variant="outline" asChild size="sm" className="h-9">
               <a href={proofUrl} download target="_blank" rel="noopener noreferrer">
-                <Download className="mr-2 size-3.5" /> Unduh
+                <Download className="mr-2 size-3.5" /> {t('Unduh')}
               </a>
             </Button>
           </div>
           <Button variant="secondary" onClick={onClose} size="sm" className="h-9 px-5 w-full sm:w-auto font-medium">
-            Tutup
+            {t('Tutup')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -721,7 +721,7 @@ export function AttendanceModal({
     if (!file) return;
 
     if (file.size > 8 * 1024 * 1024) {
-      toast.error('Ukuran berkas maksimal 8MB');
+      toast.error(t('Ukuran berkas maksimal 8MB'));
       return;
     }
 
@@ -738,10 +738,10 @@ export function AttendanceModal({
         setAttachment(data.url);
         toast.success('Bukti surat / dokumen berhasil diunggah!');
       } else {
-        toast.error('Gagal mengunggah berkas.');
+        toast.error(t('Gagal mengunggah berkas.'));
       }
     } catch (err) {
-      toast.error('Terjadi kesalahan saat upload berkas.');
+      toast.error(t('Terjadi kesalahan saat upload berkas.'));
     } finally {
       setIsUploading(false);
     }
@@ -750,7 +750,7 @@ export function AttendanceModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!employeeId) {
-      toast.error('Pilih karyawan terlebih dahulu');
+      toast.error(t('Pilih karyawan terlebih dahulu'));
       return;
     }
 
@@ -788,14 +788,14 @@ export function AttendanceModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Karyawan */}
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-semibold text-foreground">Karyawan <span className="text-destructive">*</span></label>
+              <label className="text-sm font-semibold text-foreground">{t('Karyawan')} <span className="text-destructive">*</span></label>
               <select
                 required
                 value={employeeId}
                 onChange={e => setEmployeeId(e.target.value)}
                 className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-foreground"
               >
-                <option value="">Pilih Karyawan</option>
+                <option value="">{t('Pilih Karyawan')}</option>
                 {employees.map(emp => (
                   <option key={emp.id} value={emp.id}>
                     {emp.name} {emp.position ? `(${emp.position})` : ''}
@@ -824,11 +824,11 @@ export function AttendanceModal({
                 onChange={e => handleStatusChange(e.target.value)}
                 className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-foreground"
               >
-                <option value="Present">🟢 Hadir (Present)</option>
-                <option value="Late">🟠 Terlambat (Late)</option>
-                <option value="Sick">🟣 Sakit (Sick)</option>
-                <option value="Permit">🔵 Izin (Permit)</option>
-                <option value="Absent">🔴 Alpha (Tidak Hadir)</option>
+                <option value="Present">{t('Hadir')}</option>
+                <option value="Late">{t('Terlambat')}</option>
+                <option value="Sick">{t('Sakit')}</option>
+                <option value="Permit">{t('Izin')}</option>
+                <option value="Absent">{t('Alpha (Tidak Hadir)')}</option>
               </select>
             </div>
 
@@ -858,7 +858,7 @@ export function AttendanceModal({
 
             {/* Status Approval Persetujuan HRD */}
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-semibold text-foreground">Status Persetujuan HRD</label>
+              <label className="text-sm font-semibold text-foreground">{t('Status Persetujuan HRD')}</label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
@@ -924,7 +924,7 @@ export function AttendanceModal({
                   </div>
                   <Button variant="ghost" size="sm" asChild className="h-8 text-xs text-primary">
                     <a href={attachment} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="size-3.5 mr-1" /> Lihat
+                      <ExternalLink className="size-3.5 mr-1" /> {t('Lihat')}
                     </a>
                   </Button>
                 </div>
@@ -940,7 +940,7 @@ export function AttendanceModal({
                   {isUploading ? (
                     <div className="flex items-center gap-2">
                       <Loader2 className="size-5 animate-spin text-primary" />
-                      <span className="text-xs text-muted-foreground">Mengunggah berkas...</span>
+                      <span className="text-xs text-muted-foreground">{t('Mengunggah berkas...')}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-muted-foreground">
@@ -967,7 +967,7 @@ export function AttendanceModal({
 
           <DialogFooter className="border-t pt-4 mt-6 gap-2 sm:gap-0">
             <Button variant="outline" type="button" onClick={onClose} className="h-10 px-5">
-              Batal
+              {t('Batal')}
             </Button>
             <Button type="submit" className="h-10 px-6 font-semibold shadow-sm">
               {attendance ? 'Simpan Perubahan' : 'Catat Kehadiran'}
@@ -995,6 +995,7 @@ export function AttendanceSummaryModal({
   summary?: any | null;
   employees: any[];
 }) {
+  const { t } = useLanguage();
   const [employeeId, setEmployeeId] = useState('');
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [department, setDepartment] = useState('');
@@ -1079,10 +1080,10 @@ export function AttendanceSummaryModal({
           </div>
           <div>
             <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
-              {summary ? 'Edit Rekap Kehadiran' : 'Input Rekap Kehadiran Bulanan'}
+              {summary ? t('Edit Rekap Kehadiran') : t('Input Rekap Kehadiran Bulanan')}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-              Catatan statistik kehadiran bulanan, keterlambatan, dan persentase kehadiran.
+              {t('Catatan statistik kehadiran bulanan, keterlambatan, dan persentase kehadiran.')}
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -1091,14 +1092,14 @@ export function AttendanceSummaryModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Karyawan */}
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-semibold text-foreground">Karyawan <span className="text-destructive">*</span></label>
+              <label className="text-sm font-semibold text-foreground">{t('Karyawan')} <span className="text-destructive">*</span></label>
               <select
                 required
                 value={employeeId}
                 onChange={e => setEmployeeId(e.target.value)}
                 className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-foreground"
               >
-                <option value="">Pilih Karyawan</option>
+                <option value="">{t('Pilih Karyawan')}</option>
                 {employees.map(emp => (
                   <option key={emp.id} value={emp.id}>
                     {emp.name} {emp.position ? `(${emp.position})` : ''}
@@ -1214,10 +1215,10 @@ export function AttendanceSummaryModal({
 
           <DialogFooter className="border-t pt-4 mt-6 gap-2 sm:gap-0">
             <Button variant="outline" type="button" onClick={onClose} className="h-10 px-5">
-              Batal
+              {t('Batal')}
             </Button>
             <Button type="submit" className="h-10 px-6 font-semibold shadow-sm">
-              {summary ? 'Simpan Perubahan' : 'Simpan Rekap'}
+              {summary ? t('Simpan Perubahan') : t('Simpan Rekap Kehadiran')}
             </Button>
           </DialogFooter>
         </form>
@@ -1242,6 +1243,7 @@ export function LeaveRequestModal({
   leave?: any | null;
   employees: any[];
 }) {
+  const { t } = useLanguage();
   const [employeeId, setEmployeeId] = useState('');
   const [type, setType] = useState('Sakit');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
@@ -1291,7 +1293,7 @@ export function LeaveRequestModal({
       const data = await res.json();
       if (data.url) {
         setAttachment(data.url);
-        toast.success('Surat / dokumen bukti berhasil diunggah!');
+        toast.success(t('Surat / dokumen bukti berhasil diunggah!'));
       } else {
         toast.error('Gagal mengunggah berkas.');
       }
@@ -1330,10 +1332,10 @@ export function LeaveRequestModal({
           </div>
           <div>
             <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
-              {leave ? 'Edit Pengajuan Izin / Sakit' : 'Ajukan Permohonan Izin / Sakit / Cuti'}
+              {leave ? t('Edit Pengajuan Izin / Sakit') : t('Ajukan Permohonan Izin / Sakit / Cuti')}
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-              Permohonan akan masuk ke antrean persetujuan HRD.
+              {t('Permohonan akan masuk ke antrean persetujuan HRD.')}
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -1360,22 +1362,22 @@ export function LeaveRequestModal({
 
             {/* Jenis Pengajuan */}
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-semibold text-foreground">Jenis Pengajuan <span className="text-destructive">*</span></label>
+              <label className="text-sm font-semibold text-foreground">{t('Jenis Pengajuan')} <span className="text-destructive">*</span></label>
               <select
                 value={type}
                 onChange={e => setType(e.target.value)}
                 className="flex h-10 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-foreground font-medium"
               >
-                <option value="Sakit">Sakit (Dengan Surat Dokter)</option>
-                <option value="Izin">Izin Keperluan Mendesak / Keluarga</option>
-                <option value="Cuti Tahunan">Cuti Tahunan (Annual Leave)</option>
-                <option value="Cuti Khusus">Cuti Khusus (Menikah, Melahirkan, Duka)</option>
+                <option value="Sakit">{t('Sakit (Dengan Surat Dokter)')}</option>
+                <option value="Izin">{t('Izin Keperluan Mendesak / Keluarga')}</option>
+                <option value="Cuti Tahunan">{t('Cuti Tahunan (Annual Leave)')}</option>
+                <option value="Cuti Khusus">{t('Cuti Khusus (Menikah, Melahirkan, Duka)')}</option>
               </select>
             </div>
 
             {/* Tanggal Mulai & Tanggal Selesai */}
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground">Tanggal Mulai <span className="text-destructive">*</span></label>
+              <label className="text-sm font-semibold text-foreground">{t('Tanggal Mulai')} <span className="text-destructive">*</span></label>
               <Input
                 type="date"
                 required
@@ -1385,7 +1387,7 @@ export function LeaveRequestModal({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-foreground">Tanggal Selesai <span className="text-destructive">*</span></label>
+              <label className="text-sm font-semibold text-foreground">{t('Tanggal Selesai')} <span className="text-destructive">*</span></label>
               <Input
                 type="date"
                 required
@@ -1408,7 +1410,7 @@ export function LeaveRequestModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  <Clock className="size-3.5" /> Pending
+                  <Clock className="size-3.5" /> {t('Pending')}
                 </button>
                 <button
                   type="button"
@@ -1419,7 +1421,7 @@ export function LeaveRequestModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  <CheckCircle2 className="size-3.5" /> Disetujui
+                  <CheckCircle2 className="size-3.5" /> {t('Disetujui')}
                 </button>
                 <button
                   type="button"
@@ -1430,18 +1432,18 @@ export function LeaveRequestModal({
                       : 'border-border text-muted-foreground hover:bg-muted/50'
                   }`}
                 >
-                  <XCircle className="size-3.5" /> Ditolak
+                  <XCircle className="size-3.5" /> {t('Ditolak')}
                 </button>
               </div>
             </div>
 
             {/* Alasan / Keperluan */}
             <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-semibold text-foreground">Alasan / Keterangan <span className="text-destructive">*</span></label>
+              <label className="text-sm font-semibold text-foreground">{t('Alasan / Keterangan')} <span className="text-destructive">*</span></label>
               <textarea
                 required
                 rows={3}
-                placeholder="Jelaskan alasan izin / sakit secara rinci..."
+                placeholder={t('Jelaskan alasan izin / sakit secara rinci...')}
                 value={reason}
                 onChange={e => setReason(e.target.value)}
                 className="w-full rounded-lg border border-border bg-background p-3 text-sm focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-foreground outline-none resize-none"
@@ -1452,7 +1454,7 @@ export function LeaveRequestModal({
             <div className="space-y-1.5 md:col-span-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold text-foreground">
-                  Surat Dokter / Dokumen Pendukung (Opsional)
+                  {t('Surat Dokter / Dokumen Pendukung (Opsional)')}
                 </label>
                 {attachment && (
                   <button
@@ -1469,7 +1471,7 @@ export function LeaveRequestModal({
                 <div className="border border-border rounded-xl p-3 bg-muted/20 flex items-center justify-between">
                   <div className="flex items-center gap-2.5 overflow-hidden">
                     <FileText className="size-5 text-primary shrink-0" />
-                    <span className="text-xs font-medium text-foreground truncate">Dokumen Surat Terlampir</span>
+                    <span className="text-xs font-medium text-foreground truncate">{t('Dokumen Surat Terlampir')}</span>
                   </div>
                   <Button variant="ghost" size="sm" asChild className="h-8 text-xs text-primary">
                     <a href={attachment} target="_blank" rel="noopener noreferrer">
@@ -1494,7 +1496,7 @@ export function LeaveRequestModal({
                   ) : (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Upload className="size-4 text-primary" />
-                      <span className="text-xs font-medium text-foreground">Klik untuk upload surat dokter / dokumen bukti (Maks. 8MB)</span>
+                      <span className="text-xs font-medium text-foreground">{t('Klik untuk upload surat dokter / dokumen bukti (Maks. 8MB)')}</span>
                     </div>
                   )}
                 </div>
@@ -1504,10 +1506,10 @@ export function LeaveRequestModal({
 
           <DialogFooter className="border-t pt-4 mt-6 gap-2 sm:gap-0">
             <Button variant="outline" type="button" onClick={onClose} className="h-10 px-5">
-              Batal
+              {t('Batal')}
             </Button>
             <Button type="submit" className="h-10 px-6 font-semibold shadow-sm">
-              {leave ? 'Simpan Perubahan' : 'Kirim Permohonan'}
+              {leave ? t('Simpan Perubahan') : t('Kirim Permohonan')}
             </Button>
           </DialogFooter>
         </form>
@@ -1523,8 +1525,8 @@ export function ConfirmDeleteDialog({
   isOpen,
   onClose,
   onConfirm,
-  title = "Hapus Data?",
-  description = "Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.",
+  title,
+  description,
   isPending = false
 }: {
   isOpen: boolean;
@@ -1534,6 +1536,10 @@ export function ConfirmDeleteDialog({
   description?: string;
   isPending?: boolean;
 }) {
+  const { t } = useLanguage();
+  const finalTitle = title ? t(title) : t('Hapus Data?');
+  const finalDescription = description ? t(description) : t('Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.');
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md p-6">
@@ -1542,18 +1548,18 @@ export function ConfirmDeleteDialog({
             <Trash2 className="size-5" />
           </div>
           <div>
-            <DialogTitle className="text-lg font-bold text-foreground">{title}</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">{finalTitle}</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-              {description}
+              {finalDescription}
             </DialogDescription>
           </div>
         </DialogHeader>
         <DialogFooter className="mt-4 gap-2 sm:gap-0">
           <Button variant="outline" onClick={onClose} disabled={isPending}>
-            Batal
+            {t('Batal')}
           </Button>
           <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
-            {isPending ? 'Menghapus...' : 'Ya, Hapus'}
+            {isPending ? t('Menghapus...') : t('Ya, Hapus')}
           </Button>
         </DialogFooter>
       </DialogContent>

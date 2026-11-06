@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Calendar, Briefcase, SlidersHorizontal, RotateCcw } from 'lucide-react'
+import { Calendar, Briefcase, SlidersHorizontal, RotateCcw, Sparkles } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useDashboard } from '@/hooks/use-dashboard'
 import { useLanguage } from '@/components/language-provider'
@@ -125,10 +125,10 @@ export function MainDashboard({ user }: { user: any }) {
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-foreground truncate">
-              {greeting},{' '}
-              <span className="text-primary">{userName}</span>{' '}
-              👋
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-foreground truncate flex items-center">
+              <span>{greeting},{' '}</span>
+              <span className="text-primary ml-1.5">{userName}</span>
+              <Sparkles className="size-5 sm:size-6 text-amber-500 shrink-0 ml-2" />
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2 max-w-2xl leading-relaxed">
               {userBio}
