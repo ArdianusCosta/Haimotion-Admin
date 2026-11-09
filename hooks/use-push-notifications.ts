@@ -1,150 +1,187 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  savePushSubscription,
+  removePushSubscription,
+  getPushSubscriptionStatus,
+  sendTestNotification,
+} from '@/app/actions/notifications'
 import { requestNotificationPermission, onForegroundMessage } from '@/lib/firebase/firebase-client'
+import { toast } from 'sonner'
 
-interface PushNotificationState {
-  isSupported: boolean
-  isSecureContext: boolean
-  permission: NotificationPermission | 'default'
-  token: string | null
-  isLoading: boolean
+// Helper to detect device & browser strings
+function getDeviceInfo() {
+  let device = 'Desktop'
+  let browser = 'Browser'
+
+  if (typeof window !== 'undefined') {
+    const ua = navigator.userAgent
+    if (/Android/i.test(ua)) device = 'Android Phone'
+    else if (/iPhone|iPad|iPod/.test(ua)) device = 'Apple iOS'
+    else if (/Macintosh/.test(ua)) device = 'macOS Desktop'
+    else if (/Windows/.test(ua)) device = 'Windows PC'
+
+    if (/Chrome/.test(ua) && !/Edg/.test(ua)) browser = 'Chrome'
+    else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari'
+    else if (/Edg/.test(ua)) browser = 'Edge'
+    else if (/Firefox/.test(ua)) browser = 'Firefox'
+  }
+
+  return { device, browser }
 }
 
-export function usePushNotifications(userId?: number | string | null) {
-  const [state, setState] = useState<PushNotificationState>({
-    isSupported: false,
-    isSecureContext: true,
-    permission: 'default',
-    token: null,
-    isLoading: true,
+// ============================================================================
+// TANSTACK QUERY HOOKS (Primary Modern Interface)
+// ============================================================================
+
+export function usePushNotificationStatus() {
+  return useQuery({
+    queryKey: ['push-notification', 'status'],
+    queryFn: async () => {
+      return await getPushSubscriptionStatus()
+    },
+    staleTime: 60000,
   })
-  const subscribed = useRef(false)
+}
 
-  // Check browser support
+export function useSubscribePush() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      // 1. Request browser permission and obtain FCM token
+      const token = await requestNotificationPermission()
+
+      // 2. Identify device and browser info
+      const { device, browser } = getDeviceInfo()
+
+      // 3. Persist subscription token to database
+      await savePushSubscription(token, device, browser)
+
+      // Store locally for quick token unsubscription
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('fcm_push_token', token)
+      }
+
+      return token
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['push-notification', 'status'] })
+      toast.success('Notifikasi perangkat berhasil diaktifkan!', {
+        description: 'Anda akan menerima dering panggilan dan pesan saat web ditutup.',
+      })
+    },
+    onError: (err: any) => {
+      console.error('Subscribe push error:', err)
+      toast.error('Gagal mengaktifkan notifikasi', {
+        description: err?.message || 'Pastikan Anda memberikan izin notifikasi di browser.',
+      })
+    },
+  })
+}
+
+export function useUnsubscribePush() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('fcm_push_token') : null
+      if (token) {
+        await removePushSubscription(token)
+        localStorage.removeItem('fcm_push_token')
+      }
+      return true
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['push-notification', 'status'] })
+      toast.info('Notifikasi push pada perangkat ini telah dinonaktifkan.')
+    },
+    onError: (err: any) => {
+      toast.error('Gagal menonaktifkan notifikasi', {
+        description: err?.message,
+      })
+    },
+  })
+}
+
+export function useSendTestPush() {
+  return useMutation({
+    mutationFn: async () => {
+      return await sendTestNotification()
+    },
+    onSuccess: () => {
+      toast.success('Notifikasi uji coba terkirim!', {
+        description: 'Periksa status bar HP atau desktop laptop Anda sekarang.',
+      })
+    },
+    onError: (err: any) => {
+      toast.error('Gagal mengirim notifikasi uji coba', {
+        description: err?.message,
+      })
+    },
+  })
+}
+
+// ============================================================================
+// PROVIDER COMPATIBILITY HOOKS (For NotificationProvider)
+// ============================================================================
+
+export function usePushNotifications(userId?: string | number | null) {
+  const [isSupported, setIsSupported] = useState(false)
+  const [isSecureContext, setIsSecureContext] = useState(true)
+  const [permission, setPermission] = useState<NotificationPermission | 'default'>('default')
+  const [token, setToken] = useState<string | null>(null)
+
   useEffect(() => {
-    const isSecure = typeof window !== 'undefined' ? window.isSecureContext : false
-    const hasAPIs =
-      typeof window !== 'undefined' &&
-      'Notification' in window &&
-      'serviceWorker' in navigator &&
-      'PushManager' in window
+    if (typeof window !== 'undefined') {
+      const supported = 'Notification' in window && 'serviceWorker' in navigator
+      setIsSupported(supported)
+      setIsSecureContext(window.isSecureContext)
 
-    setState((prev) => ({
-      ...prev,
-      isSecureContext: isSecure,
-      isSupported: hasAPIs,
-      permission: typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default',
-      isLoading: false,
-    }))
+      if ('Notification' in window) {
+        setPermission(Notification.permission)
+      }
+
+      const savedToken = localStorage.getItem('fcm_push_token')
+      if (savedToken) {
+        setToken(savedToken)
+      }
+    }
   }, [])
 
-  // Subscribe to push notifications
-  const subscribe = useCallback(
-    async (force = false): Promise<string> => {
-      if (typeof window !== 'undefined' && !window.isSecureContext) {
-        throw new Error('Akses dari HP wajib via HTTPS. Browser HP memblokir notifikasi di koneksi HTTP biasa.')
-      }
+  const subscribe = useCallback(async (showToast = true) => {
+    const fcmToken = await requestNotificationPermission()
+    const { device, browser } = getDeviceInfo()
+    await savePushSubscription(fcmToken, device, browser)
 
-      if (!state.isSupported) {
-        throw new Error('Browser di perangkat ini tidak mendukung Web Push Notification.')
-      }
-
-      if (subscribed.current && state.token && !force) {
-        return state.token
-      }
-
-      setState((prev) => ({ ...prev, isLoading: true }))
-
-      try {
-        const token = await requestNotificationPermission()
-
-        // Save token to server
-        const response = await fetch('/api/notifications/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            token,
-            device: getDeviceInfo(),
-            browser: getBrowserInfo(),
-            userId,
-          }),
-        })
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}))
-          throw new Error(errData.error || `Server status ${response.status}: Gagal menyimpan langganan`)
-        }
-
-        subscribed.current = true
-        setState((prev) => ({
-          ...prev,
-          permission: 'granted',
-          token,
-          isLoading: false,
-        }))
-
-        return token
-      } catch (error: any) {
-        console.error('Push subscription error:', error)
-        setState((prev) => ({ ...prev, isLoading: false }))
-        throw error
-      }
-    },
-    [state.isSupported, state.token, userId]
-  )
-
-  // Unsubscribe from push notifications
-  const unsubscribe = useCallback(async () => {
-    if (!state.token) return
-
-    try {
-      await fetch('/api/notifications/subscribe', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: state.token }),
-      })
-
-      subscribed.current = false
-      setState((prev) => ({ ...prev, token: null }))
-    } catch (error) {
-      console.error('Push unsubscribe error:', error)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fcm_push_token', fcmToken)
+      setToken(fcmToken)
+      setPermission('granted')
     }
-  }, [state.token])
+
+    if (showToast) {
+      toast.success('Notifikasi perangkat aktif!', {
+        description: 'Panggilan dan pesan akan masuk ke perangkat ini.',
+      })
+    }
+
+    return fcmToken
+  }, [])
 
   return {
-    ...state,
+    isSupported,
+    isSecureContext,
+    permission,
+    token,
     subscribe,
-    unsubscribe,
   }
 }
 
-// Helper: detect device type
-function getDeviceInfo(): string {
-  if (typeof navigator === 'undefined') return 'unknown'
-  const ua = navigator.userAgent
-  if (/Android/i.test(ua)) return 'Android'
-  if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS'
-  if (/Windows/i.test(ua)) return 'Windows'
-  if (/Mac/i.test(ua)) return 'macOS'
-  if (/Linux/i.test(ua)) return 'Linux'
-  return 'unknown'
-}
-
-// Helper: detect browser
-function getBrowserInfo(): string {
-  if (typeof navigator === 'undefined') return 'unknown'
-  const ua = navigator.userAgent
-  if (/Chrome/i.test(ua) && !/Edge/i.test(ua)) return 'Chrome'
-  if (/Firefox/i.test(ua)) return 'Firefox'
-  if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return 'Safari'
-  if (/Edge/i.test(ua)) return 'Edge'
-  return 'unknown'
-}
-
-// Hook to listen for foreground messages
-export function useForegroundMessages(onMessage: (payload: any) => void) {
+export function useForegroundMessages(callback: (payload: any) => void) {
   useEffect(() => {
-    onForegroundMessage(onMessage)
-  }, [onMessage])
+    onForegroundMessage(callback)
+  }, [callback])
 }

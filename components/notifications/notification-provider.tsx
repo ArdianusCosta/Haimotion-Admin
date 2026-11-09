@@ -78,7 +78,7 @@ export function NotificationProvider({
   // Auto-subscribe to push when user is logged in and permission is already granted
   useEffect(() => {
     if (userId && isSupported && isSecureContext && permission === 'granted') {
-      subscribe(false).catch((err) => {
+      subscribe(false).catch((err: any) => {
         console.warn('Auto push subscription skipped/failed:', err?.message)
       })
     }

@@ -86,11 +86,15 @@ export async function sendPushNotification({
       ...(icon && { imageUrl: icon }),
     },
     webpush: {
+      headers: {
+        Urgency: 'high',
+      },
       notification: {
         title,
         body,
         icon: icon || '/icon-dark-32x32.png',
         badge: '/icon-dark-32x32.png',
+        requireInteraction: true,
         ...(link && { click_action: link }),
       },
       fcmOptions: {

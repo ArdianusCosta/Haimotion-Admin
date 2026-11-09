@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { pusherServer } from '@/lib/pusher'
 import { sendPushNotification } from '@/lib/firebase/firebase-admin'
+import { requireAuth } from '@/lib/auth/authorization'
 
 // ============ NOTIFICATION TYPES ============
 export type NotificationType =
@@ -16,6 +17,7 @@ export type NotificationType =
   | 'calendar_reminder'
   | 'meeting_invite'
   | 'finance_approval'
+  | 'call_incoming'
   | 'general'
 
 // ============ CORE: Send Notification to Users ============
@@ -296,3 +298,130 @@ export async function markAllAsRead(userId: number) {
     data: { is_read: true, read_at: new Date() },
   })
 }
+
+// ============ PUSH SUBSCRIPTION MANAGEMENT ============
+
+/**
+ * Save or update a Web Push / FCM device token for the current user.
+ */
+export async function savePushSubscription(token: string, device?: string, browser?: string) {
+  const user = await requireAuth()
+  const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+
+  if (!token) throw new Error('Token push notification wajib diisi')
+
+  const existing = await prisma.pushSubscription.findFirst({
+    where: { user_id: userId, token }
+  })
+
+  if (existing) {
+    await prisma.pushSubscription.update({
+      where: { id: existing.id },
+      data: {
+        device: device || existing.device,
+        browser: browser || existing.browser,
+        updated_at: new Date()
+      }
+    })
+  } else {
+    await prisma.pushSubscription.create({
+      data: {
+        user_id: userId,
+        token,
+        device: device || null,
+        browser: browser || null
+      }
+    })
+  }
+
+  return { success: true }
+}
+
+/**
+ * Remove a device push subscription token.
+ */
+export async function removePushSubscription(token: string) {
+  const user = await requireAuth()
+  const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+
+  if (!token) return { success: true }
+
+  await prisma.pushSubscription.deleteMany({
+    where: { user_id: userId, token }
+  })
+
+  return { success: true }
+}
+
+/**
+ * Check if the current user has registered push notification devices.
+ */
+export async function getPushSubscriptionStatus() {
+  const user = await requireAuth()
+  const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+
+  const count = await prisma.pushSubscription.count({
+    where: { user_id: userId }
+  })
+
+  return { hasActiveSubscription: count > 0, deviceCount: count }
+}
+
+/**
+ * Trigger an incoming call push notification (Voice / Video Call).
+ */
+export async function notifyIncomingCall({
+  recipientUserIds,
+  callerName,
+  callType,
+  roomName,
+  isGroup = false,
+}: {
+  recipientUserIds: number[]
+  callerName: string
+  callType: 'voice' | 'video'
+  roomName: string
+  isGroup?: boolean
+}) {
+  if (recipientUserIds.length === 0) return
+
+  const typeLabel = callType === 'video' ? 'Video Call' : 'Panggilan Suara'
+  const title = `Panggilan Masuk: ${callerName}`
+  const body = `${callerName} memanggil Anda via ${typeLabel} ${isGroup ? '(Grup)' : ''}. Klik untuk menjawab.`
+  const link = `/messenger?call=${roomName}&type=${callType}`
+
+  await sendNotification({
+    userIds: recipientUserIds,
+    title,
+    body,
+    link,
+    type: 'call_incoming',
+    data: {
+      room_name: roomName,
+      call_type: callType,
+      callerName,
+      isGroup: String(isGroup),
+      is_call: 'true',
+    },
+  })
+}
+
+/**
+ * Send a test push notification to the logged-in user.
+ */
+export async function sendTestNotification() {
+  const user = await requireAuth()
+  const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+
+  await sendNotification({
+    userIds: [userId],
+    title: 'Uji Coba Notifikasi HaiMotion',
+    body: 'Notifikasi berhasil terhubung! HP dan laptop Anda kini siap menerima notifikasi panggilan dan pesan secara langsung.',
+    link: '/messenger',
+    type: 'general',
+    data: { test: 'true' }
+  })
+
+  return { success: true }
+}
+

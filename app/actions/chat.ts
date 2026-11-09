@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma'
 import { pusherServer } from '@/lib/pusher'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { cleanUserName, parseUserInfo } from '@/lib/utils'
-import { notifyChatMessage } from '@/app/actions/notifications'
+import { notifyChatMessage, notifyIncomingCall } from '@/app/actions/notifications'
 
 export async function getUnreadChatCount() {
   try {
@@ -335,12 +335,22 @@ export async function createCallSession(threadId: number, callerId: number, type
     const thread = await prisma.chatThread.findUnique({ where: { id: threadId } })
     if (thread) {
       const otherUserId = thread.user1_id === callerId ? thread.user2_id : thread.user1_id
-      // Notify the other user globally
+      const callerName = `${user.firstname} ${user.lastname || ''}`.trim()
+      // 1. Notify the other user globally via Pusher WebSocket (if browser tab is active)
       await pusherServer.trigger(`private-user-${otherUserId}`, 'call:incoming', {
         ...call,
         caller_id: callerId,
-        callerName: `${user.firstname} ${user.lastname}`
+        callerName
       })
+
+      // 2. Trigger Web Push Notification via FCM / Service Worker (even if browser tab is closed/mobile locked)
+      notifyIncomingCall({
+        recipientUserIds: [otherUserId],
+        callerName,
+        callType: type,
+        roomName,
+        isGroup: false
+      }).catch((err: any) => console.error('Push call notification error:', err))
     }
 
     return JSON.parse(JSON.stringify(call))
@@ -939,6 +949,17 @@ export async function createGroupCallSession(groupId: number, callerId: number, 
       })
     )
   );
+
+  // Trigger Web Push Notification to all group members
+  if (receiverIds.length > 0) {
+    notifyIncomingCall({
+      recipientUserIds: receiverIds,
+      callerName,
+      callType: type,
+      roomName,
+      isGroup: true
+    }).catch((err: any) => console.error('Group push call notification error:', err));
+  }
 
   return { room_name: roomName, type };
 }

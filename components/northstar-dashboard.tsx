@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChatPage } from '@/components/chat-page'
+import { PushNotificationBanner } from '@/components/notifications/push-notification-banner'
 
 import { GlobalSearch } from '@/components/global-search'
 import { KanbanPage } from '@/components/kanban-page'
@@ -294,6 +295,20 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
       }
     }
   }
+
+  // Auto-connect call from Push Notification click / URL params
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user?.id) return
+    const params = new URLSearchParams(window.location.search)
+    const callRoom = params.get('call')
+    const callType = (params.get('type') as 'voice' | 'video') || 'voice'
+    if (callRoom) {
+      setActiveCall({ roomName: callRoom, type: callType, startedAt: Date.now() })
+      // Clean query params from URL without reload
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [user?.id])
 
   const toggleFinanceGroup = (group: string) => {
     setOpenFinanceGroups(prev => ({ ...prev, [group]: !prev[group] }))
@@ -922,6 +937,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
           </div>
         </header>
         <div className={`p-4 md:p-8 ${contentWidth === 'centered' ? 'w-full' : 'w-full max-w-full min-w-0'}`}>
+          <PushNotificationBanner />
           {isFiles ? <FileManager user={user} /> : (() => {
             switch (section) {
               case 'Dashboard': return <MainDashboard user={user} />

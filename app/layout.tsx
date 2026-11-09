@@ -16,6 +16,12 @@ export const metadata: Metadata = {
   title: 'HaiMotion — Dashboard',
   description: 'A focused command center for modern teams.',
   generator: 'HaiMotion',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'HaiMotion',
+  },
   icons: {
     icon: [
       {
