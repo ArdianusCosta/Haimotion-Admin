@@ -1,7 +1,16 @@
 // Firebase Messaging Service Worker
-// This file MUST be in /public/ directory
-// Note: Service workers cannot access process.env, so Firebase config is hardcoded here.
+// Location: /public/firebase-messaging-sw.js
 
+// Ensure instant activation of updated service worker
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+// Import Firebase scripts for compat mode
 importScripts('https://www.gstatic.com/firebasejs/11.7.1/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/11.7.1/firebase-messaging-compat.js')
 
@@ -16,35 +25,32 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging()
 
-// Handle background messages (when browser tab is not active / device locked)
-messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] Background message received:', payload)
+// Helper to show notification with proper vibration and action buttons
+function displayNotification(title, body, data, notification) {
+  const isCall = data?.type === 'call_incoming' || data?.type === 'call' || data?.is_call === 'true'
+  const notifTitle = title || data?.title || (isCall ? 'Panggilan Masuk' : 'HaiMotion')
+  const notifBody = body || data?.body || (isCall ? 'Panggilan masuk di HaiMotion Messenger' : '')
 
-  const isCall = payload.data?.type === 'call_incoming' || payload.data?.type === 'call' || payload.data?.is_call === 'true'
-  const notificationTitle = payload.notification?.title || payload.data?.title || (isCall ? 'Panggilan Masuk' : 'HaiMotion')
-  const notificationBody = payload.notification?.body || payload.data?.body || (isCall ? 'Panggilan masuk di HaiMotion Messenger' : '')
-  
-  // Custom vibration for calls (ringing rhythm) vs regular alerts
-  const vibratePattern = isCall 
+  const vibratePattern = isCall
     ? [500, 200, 500, 200, 700, 300, 700]
     : [200, 100, 200]
 
-  const link = payload.data?.link || payload.fcmOptions?.link || (isCall ? `/messenger?call=${payload.data?.room_name || ''}&type=${payload.data?.call_type || 'voice'}` : '/')
+  const link = data?.link || (isCall ? `/messenger?call=${data?.room_name || ''}&type=${data?.call_type || 'voice'}` : '/')
 
-  const notificationOptions = {
-    body: notificationBody,
-    icon: payload.notification?.icon || payload.data?.icon || '/icon-dark-32x32.png',
+  const options = {
+    body: notifBody,
+    icon: notification?.icon || data?.icon || '/icon-dark-32x32.png',
     badge: '/icon-dark-32x32.png',
-    tag: isCall ? `call-${payload.data?.room_name || 'incoming'}` : (payload.data?.type || 'general'),
+    tag: isCall ? `call-${data?.room_name || 'incoming'}` : (data?.type || 'general'),
     renotify: true,
     requireInteraction: isCall ? true : false,
     vibrate: vibratePattern,
     data: {
       link,
       isCall,
-      roomName: payload.data?.room_name,
-      callType: payload.data?.call_type,
-      ...payload.data,
+      roomName: data?.room_name,
+      callType: data?.call_type,
+      ...data,
     },
     actions: isCall ? [
       { action: 'answer', title: 'Jawab Panggilan' },
@@ -55,10 +61,43 @@ messaging.onBackgroundMessage((payload) => {
     ],
   }
 
-  self.registration.showNotification(notificationTitle, notificationOptions)
+  return self.registration.showNotification(notifTitle, options)
+}
+
+// 1. Native Push Event Listener (CRITICAL FOR BACKGROUND WAKEUP ON ANDROID & PWA)
+// Without event.waitUntil(showNotification), Android kills the background worker and delays the alert until app opens!
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push event received in background:', event)
+  let payload = {}
+
+  if (event.data) {
+    try {
+      payload = event.data.json()
+    } catch (e) {
+      payload = { notification: { title: 'HaiMotion', body: event.data.text() } }
+    }
+  }
+
+  const notification = payload.notification || {}
+  const data = payload.data || {}
+  const title = notification.title || data.title
+  const body = notification.body || data.body
+
+  event.waitUntil(displayNotification(title, body, data, notification))
 })
 
-// Handle notification click
+// 2. Firebase onBackgroundMessage fallback
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] Firebase onBackgroundMessage received:', payload)
+  const notification = payload.notification || {}
+  const data = payload.data || {}
+  const title = notification.title || data.title
+  const body = notification.body || data.body
+
+  return displayNotification(title, body, data, notification)
+})
+
+// 3. Handle notification click (open/focus app directly to call or chat)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
@@ -68,7 +107,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open at the origin, focus and navigate
+      // Focus existing window if open
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
           client.focus()
@@ -78,7 +117,7 @@ self.addEventListener('notificationclick', (event) => {
           return
         }
       }
-      // Otherwise, open a new window
+      // Open new window if app was closed
       if (clients.openWindow) {
         return clients.openWindow(link)
       }

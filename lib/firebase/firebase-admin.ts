@@ -101,6 +101,9 @@ export async function sendPushNotification({
         link: link || '/',
       },
     },
+    android: {
+      priority: 'high' as const,
+    },
     data: {
       ...data,
       ...(link && { link }),
