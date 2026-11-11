@@ -10,13 +10,32 @@ export const getUserSession = cache(async () => {
       headers: hdrs,
     });
     
-    if (!session || !session.user) {
-      console.log("getUserSession: No session or session.user", session);
+    let userId: number | null = session?.user?.id ? parseInt(session.user.id) : null;
+
+    // Fallback: Check Authorization header for Bearer token if session not found
+    if (!userId) {
+      const authHeader = hdrs.get("authorization") || hdrs.get("Authorization");
+      if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+        const token = authHeader.slice(7).trim();
+        const rawToken = token.split(".")[0];
+        if (rawToken) {
+          const dbSession = await prisma.session.findUnique({
+            where: { token: rawToken },
+            select: { userId: true, expiresAt: true }
+          });
+          if (dbSession && new Date(dbSession.expiresAt) > new Date()) {
+            userId = dbSession.userId;
+          }
+        }
+      }
+    }
+
+    if (!userId) {
       return null;
     }
     
     const dbUser = await prisma.user.findUnique({
-      where: { id: parseInt(session.user.id) },
+      where: { id: userId },
       include: {
         role: {
           include: {

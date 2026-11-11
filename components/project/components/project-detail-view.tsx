@@ -2,18 +2,12 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { 
-  ChevronRight, Star, Share2, MoreHorizontal, Users, 
+  ChevronRight, Star, Share2, Users, 
   Clock, CalendarDays, ClipboardList, Trash2, Edit, 
-  ChevronLeft, Lock, X 
+  ChevronLeft, Lock, X, Copy, Archive, Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 
 function getAvatarUrl(avatar: string | null | undefined) {
   if (!avatar) return ''
@@ -37,15 +31,13 @@ import {
 } from "@/components/ui/dialog"
 
 import { TaskStatusCard } from './task-status-card'
-import { TaskTypeCard } from './task-type-card'
 import { ProjectTeamKpi } from './project-team-kpi'
 import { deeplyDecodeHTML } from '../utils/html-helpers'
 import { STATUS_LABELS } from './project-list-view'
 import { ProjectFormDialog } from '@/components/project-form-dialog'
 import { ProjectContributorsDialog } from '@/components/project-contributors-dialog'
 import { ProjectDomainChecker } from './project-domain-checker'
-import { ProjectMilestones } from './project-milestones'
-import { ProjectBudgetCard } from './project-budget-card'
+import { ProjectTaskTable } from './project-task-table'
 
 export function ProjectDetailView({
   selectedProject, setSelectedProjectId,
@@ -61,7 +53,7 @@ export function ProjectDetailView({
   const router = useRouter()
 
   return (
-    <div className="flex h-[calc(100vh-140px)] min-h-[600px] flex-col gap-6 overflow-hidden lg:flex-row">
+    <div className="flex h-[calc(100vh-140px)] min-h-[600px] flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 pb-24">
         
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -76,14 +68,45 @@ export function ProjectDetailView({
             <span className="font-medium text-foreground">{selectedProject.name}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => toggleFavorite.mutate(selectedProject.id)} className={`flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground ${selectedProject.is_favorite ? 'text-amber-500' : 'text-muted-foreground'}`}>
+            <button 
+              onClick={() => toggleFavorite.mutate(selectedProject.id)} 
+              className={`flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground ${selectedProject.is_favorite ? 'text-amber-500' : 'text-muted-foreground'}`}
+              title={selectedProject.is_favorite ? 'Favorited' : 'Favorite'}
+            >
               <Star className="size-4" />
             </button>
-            <button onClick={() => {
-              navigator.clipboard.writeText(window.location.origin + '/projects/' + selectedProject.id)
-              toast.success('Project link copied.')
-            }} className="flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground text-foreground">
-              <Share2 className="size-4" /> <span className="hidden sm:inline">Share</span>
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.origin + '/projects/' + selectedProject.id)
+                toast.success('Project link copied.')
+              }} 
+              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="Share Project"
+            >
+              <Share2 className="size-4" />
+            </button>
+            <button 
+              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
+              onClick={() => duplicateMutation.mutate(selectedProject.id)}
+              disabled={duplicateMutation?.isPending}
+              title="Duplicate Project"
+            >
+              <Copy className="size-4" />
+            </button>
+            <button 
+              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-amber-500/10 hover:text-amber-500 text-muted-foreground"
+              onClick={() => setIsArchiveDialogOpen(true)}
+              title="Archive Project"
+            >
+              <Archive className="size-4" />
+            </button>
+            <button 
+              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
+              onClick={() => exportMutation.mutate(selectedProject.id)}
+              disabled={exportMutation?.isPending}
+              title="Export Project Data"
+            >
+              <Download className="size-4" />
             </button>
             <button 
               className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -95,19 +118,10 @@ export function ProjectDetailView({
             <button 
               className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-destructive hover:text-destructive text-muted-foreground"
               onClick={() => setIsDeleteDialogOpen(true)}
+              title="Delete Project"
             >
               <Trash2 className="size-4" />
             </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground">
-                <MoreHorizontal className="size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => duplicateMutation.mutate(selectedProject.id)}>Duplicate project</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsArchiveDialogOpen(true)}>Archive project</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportMutation.mutate(selectedProject.id)}>Export project data</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
@@ -198,6 +212,83 @@ export function ProjectDetailView({
               <span className="font-semibold text-foreground">{selectedProject.stats?.totalTasks || 0}</span>{' '}tasks completed
             </p>
           </div>
+
+          {/* ═══════════════════ CONTRIBUTORS SECTION ═══════════════════ */}
+          <div className="mt-6 border-t border-border pt-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Users className="size-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-foreground">Contributors</h3>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                  {(selectedProject.members?.length || 0) + (selectedProject.manager ? 1 : 0)}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsContributorsOpen(true)}
+                className="h-8 gap-1.5 text-xs font-medium"
+              >
+                <Users className="size-3.5" />
+                Manage Contributors
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {selectedProject.manager && (
+                <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <Avatar className="size-9 ring-1 ring-primary/30 shrink-0">
+                    <AvatarImage
+                      src={getAvatarUrl(selectedProject.manager.avatar)}
+                      alt={selectedProject.manager.firstname || 'Manager'}
+                      className="object-cover size-full"
+                    />
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                      {getInitials(selectedProject.manager.firstname, selectedProject.manager.lastname)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold truncate text-foreground">
+                      {selectedProject.manager.firstname} {selectedProject.manager.lastname}
+                    </p>
+                    <span className="inline-block text-[10px] font-semibold text-primary">
+                      Project Manager
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {selectedProject.members?.map((member: any) => (
+                <div key={member.id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <Avatar className="size-9 ring-1 ring-border shrink-0">
+                    <AvatarImage
+                      src={getAvatarUrl(member.avatar)}
+                      alt={member.firstname || 'Member'}
+                      className="object-cover size-full"
+                    />
+                    <AvatarFallback className="bg-muted text-foreground text-xs font-bold">
+                      {getInitials(member.firstname, member.lastname)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate text-foreground">
+                      {member.firstname} {member.lastname}
+                    </p>
+                    <span className="inline-block text-[10px] text-muted-foreground">
+                      Member
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {(!selectedProject.manager && (!selectedProject.members || selectedProject.members.length === 0)) && (
+                <div className="col-span-full py-4 text-center text-xs text-muted-foreground">
+                  Belum ada contributor yang ditambahkan.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ═══════════════════ PROJECT STATISTICS ═══════════════════ */}
@@ -206,8 +297,6 @@ export function ProjectDetailView({
           <div className="flex flex-col gap-4">
 
             <TaskStatusCard stats={selectedProject.stats || { pendingTasks: 0, inProgressTasks: 0, completedTasks: 0, totalTasks: 0 }} />
-
-            <TaskTypeCard detailTasks={detailTasks} isLoading={isDetailLoading} />
 
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow">
               <div className="mb-6 flex items-center justify-between">
@@ -250,104 +339,20 @@ export function ProjectDetailView({
           </div>
         </div>
 
-        {/* ═══════════════════ MILESTONES ═══════════════════ */}
-        <div className="mb-5">
-          <ProjectMilestones projectId={selectedProject.id} />
-        </div>
-
-        {/* ═══════════════════ BUDGET ═══════════════════ */}
-        <div className="mb-5">
-          <ProjectBudgetCard projectId={selectedProject.id} />
-        </div>
+        {/* ═══════════════════ PROJECT TASKS TABLE ═══════════════════ */}
+        <ProjectTaskTable 
+          projectId={selectedProject.id}
+          projectName={selectedProject.name}
+          tasks={detailTasks}
+          users={users}
+          isLoading={isDetailLoading}
+        />
 
         {/* ═══════════════════ DOMAIN CHECKER ═══════════════════ */}
         <div className="mb-5">
           <ProjectDomainChecker defaultDomain={/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(selectedProject.name || '') ? selectedProject.name : ''} />
         </div>
       </div>
-
-      {/* Right Sidebar */}
-      <aside className="hidden w-[340px] shrink-0 flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-sm xl:flex">
-        <section className="border-b border-border p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 font-semibold"><ClipboardList className="size-4" /> Summary</h2>
-          </div>
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center gap-3 text-sm">
-              <span className="text-muted-foreground">⠿</span>
-              <span className="min-w-0 flex-1 truncate">Total Tasks: {selectedProject.stats?.totalTasks || 0}</span>
-            </div>
-             <div className="flex items-center gap-3 text-sm">
-              <span className="text-muted-foreground">⠿</span>
-              <span className="min-w-0 flex-1 truncate">Completed: {selectedProject.stats?.completedTasks || 0}</span>
-            </div>
-             <div className="flex items-center gap-3 text-sm">
-              <span className="text-muted-foreground">⠿</span>
-              <span className="min-w-0 flex-1 truncate">In Progress: {selectedProject.stats?.inProgressTasks || 0}</span>
-            </div>
-          </div>
-          <button onClick={() => router.push('/tasks?projectId=' + selectedProject.id)} className="mt-4 flex h-8 w-full items-center justify-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
-            View tasks for this project <ChevronRight className="size-3.5" />
-          </button>
-        </section>
-
-        <section className="border-b border-border p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 font-semibold"><Users className="size-4" /> Contributors</h2>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{selectedProject.members?.length || 0}</span>
-          </div>
-          <div className="mt-4 space-y-4 max-h-[300px] overflow-y-auto pr-2">
-            {selectedProject.manager && (
-              <div className="flex items-center gap-3">
-                <Avatar className="size-9 ring-1 ring-border shrink-0 overflow-hidden">
-                  <AvatarImage
-                    src={getAvatarUrl(selectedProject.manager.avatar)}
-                    alt={selectedProject.manager.firstname || 'Manager'}
-                    className="object-cover size-full"
-                  />
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                    {getInitials(selectedProject.manager.firstname, selectedProject.manager.lastname)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1 truncate">
-                  <p className="text-sm font-medium truncate">{selectedProject.manager.firstname} {selectedProject.manager.lastname}</p>
-                  <p className="text-xs text-primary font-medium">Project Manager</p>
-                </div>
-              </div>
-            )}
-            
-            {selectedProject.members?.map((member: any) => (
-              <div key={member.id} className="flex items-center gap-3">
-                <Avatar className="size-9 ring-1 ring-border shrink-0 overflow-hidden">
-                  <AvatarImage
-                    src={getAvatarUrl(member.avatar)}
-                    alt={member.firstname || 'Member'}
-                    className="object-cover size-full"
-                  />
-                  <AvatarFallback className="bg-muted text-foreground text-xs font-bold">
-                    {getInitials(member.firstname, member.lastname)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1 truncate">
-                  <p className="text-sm font-medium truncate">{member.firstname} {member.lastname}</p>
-                  <p className="text-xs text-muted-foreground">Member</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button onClick={() => setIsContributorsOpen(true)} className="mt-4 flex h-8 w-full items-center justify-center gap-1 rounded-md border border-border bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
-            Manage contributors <ChevronRight className="size-3.5" />
-          </button>
-        </section>
-
-        <section className="border-b border-border p-5">
-          <h2 className="flex items-center gap-2 font-semibold"><Clock className="size-4" /> Time</h2>
-          <div className="mt-4 space-y-3 text-sm">
-            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Start date</span><span>{selectedProject.start_date ? new Date(selectedProject.start_date).toLocaleDateString() : '-'}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Target date</span><span>{selectedProject.end_date ? new Date(selectedProject.end_date).toLocaleDateString() : '-'}</span></div>
-          </div>
-        </section>
-      </aside>
 
       <ProjectContributorsDialog 
         open={isContributorsOpen} 

@@ -24,14 +24,50 @@ import {
 
 export function cleanHtmlText(text?: string | null): string {
   if (!text) return ''
-  const decoded = text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-  return decoded.replace(/<[^>]*>?/gm, '').trim()
+  let result = text
+  for (let i = 0; i < 4; i++) {
+    const prev = result
+    result = result
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&#x2019;|&#8217;|&rsquo;|&#2019;/gi, "'")
+      .replace(/&#x2018;|&#8216;|&lsquo;|&#2018;/gi, "'")
+      .replace(/&#x201C;|&#8220;|&ldquo;|&#201C;/gi, '"')
+      .replace(/&#x201D;|&#8221;|&rdquo;|&#201D;/gi, '"')
+      .replace(/&mdash;|&#8212;|&#x2014;|&#2014;/gi, ' — ')
+      .replace(/&ndash;|&#8211;|&#x2013;|&#2013;/gi, ' – ')
+      .replace(/&hellip;|&#8230;|&#x2026;|&#2026;/gi, '...')
+      .replace(/&nbsp;|&#160;|&#xa0;/gi, ' ')
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+        try {
+          return String.fromCharCode(parseInt(hex, 16))
+        } catch {
+          return ''
+        }
+      })
+      .replace(/&#(\d+);/g, (_, dec) => {
+        try {
+          const code = parseInt(dec, 10)
+          if (code === 2019 || code === 8217) return "'"
+          if (code === 2018 || code === 8216) return "'"
+          if (code === 2014 || code === 8212) return ' — '
+          if (code === 2013 || code === 8211) return ' – '
+          return String.fromCharCode(code)
+        } catch {
+          return ''
+        }
+      })
+    if (result === prev) break
+  }
+  return result
+    .replace(/<[^>]*>?/gm, ' ')
+    .replace(/&[a-zA-Z0-9#x]+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 type EventDetailDialogProps = {

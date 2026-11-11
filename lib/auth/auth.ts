@@ -4,6 +4,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { passkey } from "@better-auth/passkey";
+import { bearer } from "better-auth/plugins/bearer";
 
 const prismaWithHooks = prisma.$extends({
   query: {
@@ -235,7 +236,12 @@ const getTrustedOrigins = () => {
   const origins = [
     "http://192.168.0.29:3000",
     "http://192.168.7.21:3000",
+    "http://192.168.0.20:3000",
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8081",
+    "http://127.0.0.1:8081",
+    "http://192.168.0.20:8081",
     "https://dashboardv2.haimotion.com",
     "http://dashboardv2.haimotion.com",
   ];
@@ -377,6 +383,7 @@ export const auth = betterAuth({
       })(),
       rpName: "HaiMotion",
       origin: getBaseURL(),
-    })
+    }),
+    bearer()
   ]
 });

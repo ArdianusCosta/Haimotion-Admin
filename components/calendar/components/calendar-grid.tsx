@@ -11,6 +11,7 @@ import {
   DialogFooter
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { cleanHtmlText } from '../dialogs/event-detail-dialog'
 
 type CalendarGridProps = {
   view: 'Month' | 'Week' | 'Day'
@@ -247,7 +248,7 @@ export function CalendarGrid({
 
                       {event.description && (
                         <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                          {event.description}
+                          {cleanHtmlText(event.description)}
                         </p>
                       )}
                     </div>
