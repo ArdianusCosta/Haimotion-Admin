@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { 
   Plus, Search, CheckCircle2, Circle, Calendar, 
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createTask, updateTask, deleteTask } from '@/app/actions/tasks'
+import { getProjectById } from '@/app/actions/projects'
 import { cleanHtmlText } from '@/components/calendar/dialogs/event-detail-dialog'
 
 function getAvatarUrl(avatar: string | null | undefined) {
@@ -41,8 +42,8 @@ function getInitials(firstname?: string | null, lastname?: string | null) {
 }
 
 export const TASK_STATUS_CONFIG: Record<number, { label: string; color: string; dot: string }> = {
-  0: { label: 'PENDING', color: 'bg-zinc-700/80 text-zinc-100 border-zinc-600', dot: 'bg-zinc-400' },
-  1: { label: 'TO DO', color: 'bg-slate-700/80 text-slate-200 border-slate-600', dot: 'bg-slate-300' },
+  0: { label: 'PENDING', color: 'bg-zinc-700 text-zinc-100 border-zinc-600', dot: 'bg-zinc-400' },
+  1: { label: 'TO DO', color: 'bg-slate-700 text-slate-200 border-slate-600', dot: 'bg-slate-300' },
   6: { label: 'STARTED', color: 'bg-sky-600 text-white border-sky-500', dot: 'bg-white' },
   2: { label: 'ON-PROGRESS', color: 'bg-blue-600 text-white border-blue-500 font-bold', dot: 'bg-white' },
   3: { label: 'IN REVIEW', color: 'bg-purple-600 text-white border-purple-500', dot: 'bg-white' },
@@ -55,8 +56,8 @@ export const TASK_STATUS_CONFIG: Record<number, { label: string; color: string; 
 interface ProjectTaskTableProps {
   projectId: number
   projectName: string
-  tasks: any[]
-  users: any[]
+  tasks?: any[]
+  users?: any[]
   isLoading?: boolean
 }
 
@@ -71,12 +72,34 @@ export function ProjectTaskTable({
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
+  // Direct query fallback for tasks to guarantee they always load
+  const { data: directProjectData, isLoading: isDirectLoading } = useQuery({
+    queryKey: ['project-task-list', projectId],
+    queryFn: async () => {
+      const res = await getProjectById(projectId)
+      return res?.data?.tasks || []
+    },
+    enabled: !!projectId,
+    staleTime: 10_000,
+  })
+
+  // Prioritize loaded tasks
+  const allTasks: any[] = useMemo(() => {
+    if (Array.isArray(directProjectData) && directProjectData.length > 0) {
+      return directProjectData
+    }
+    if (Array.isArray(tasks) && tasks.length > 0) {
+      return tasks
+    }
+    return []
+  }, [tasks, directProjectData])
+
   // Task Form State
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<any | null>(null)
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDescription, setTaskDescription] = useState('')
-  const [taskStatus, setTaskStatus] = useState<number>(1)
+  const [taskStatus, setTaskStatus] = useState<number>(0) // default Pending as in PHP
   const [taskDueDate, setTaskDueDate] = useState('')
   const [taskAssignees, setTaskAssignees] = useState<number[]>([])
 
@@ -86,13 +109,17 @@ export function ProjectTaskTable({
   // Map users for fast lookup
   const userMap = useMemo(() => {
     const map = new Map<number, any>()
-    users.forEach(u => map.set(u.id, u))
+    if (Array.isArray(users)) {
+      users.forEach(u => {
+        if (u && u.id) map.set(u.id, u)
+      })
+    }
     return map
   }, [users])
 
   // Filter tasks for this project
   const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
+    return allTasks.filter(task => {
       const matchSearch = 
         (task.task || '').toLowerCase().includes(search.toLowerCase()) ||
         (task.description || '').toLowerCase().includes(search.toLowerCase())
@@ -101,7 +128,7 @@ export function ProjectTaskTable({
 
       return matchSearch && matchStatus
     })
-  }, [tasks, search, statusFilter])
+  }, [allTasks, search, statusFilter])
 
   // Mutations
   const createMutation = useMutation({
@@ -111,6 +138,7 @@ export function ProjectTaskTable({
       if (res.success) {
         toast.success('Task berhasil ditambahkan')
         setIsDialogOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['project-task-list', projectId] })
         queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] })
         queryClient.invalidateQueries({ queryKey: ['projects'] })
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
@@ -127,6 +155,7 @@ export function ProjectTaskTable({
       if (res.success) {
         toast.success('Task berhasil diperbarui')
         setIsDialogOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['project-task-list', projectId] })
         queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] })
         queryClient.invalidateQueries({ queryKey: ['projects'] })
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
@@ -142,6 +171,7 @@ export function ProjectTaskTable({
       if (res.success) {
         toast.success('Task berhasil dihapus')
         setDeletingTaskId(null)
+        queryClient.invalidateQueries({ queryKey: ['project-task-list', projectId] })
         queryClient.invalidateQueries({ queryKey: ['project-detail', projectId] })
         queryClient.invalidateQueries({ queryKey: ['projects'] })
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
@@ -151,9 +181,9 @@ export function ProjectTaskTable({
     }
   })
 
-  // Quick toggle status between Done (5) and To Do (1)
+  // Quick toggle status between Done (5) and On-Progress (2)
   const handleToggleComplete = (task: any) => {
-    const newStatus = task.status === 5 ? 1 : 5
+    const newStatus = task.status === 5 ? 2 : 5
     const assigneeIds = (task.assignees || []).map((a: any) => a.user_id)
     updateMutation.mutate({
       id: task.id,
@@ -188,7 +218,7 @@ export function ProjectTaskTable({
     setEditingTask(null)
     setTaskTitle('')
     setTaskDescription('')
-    setTaskStatus(1) // To Do
+    setTaskStatus(0) // Default Pending
     setTaskDueDate('')
     setTaskAssignees([])
     setIsDialogOpen(true)
@@ -198,7 +228,7 @@ export function ProjectTaskTable({
     setEditingTask(task)
     setTaskTitle(task.task || '')
     setTaskDescription(task.description || '')
-    setTaskStatus(task.status ?? 1)
+    setTaskStatus(task.status ?? 0)
     setTaskDueDate(task.end_date ? new Date(task.end_date).toISOString().split('T')[0] : '')
     setTaskAssignees((task.assignees || []).map((a: any) => a.user_id))
     setIsDialogOpen(true)
@@ -234,24 +264,27 @@ export function ProjectTaskTable({
   }
 
   const isSaving = createMutation.isPending || updateMutation.isPending
+  const isTableLoading = isLoading || isDirectLoading
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden mb-6">
-      {/* Table Header Controls */}
+      {/* ═══════════════════ HEADER: TASK LIST & + ADD TASK BUTTON ═══════════════════ */}
       <div className="p-5 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h3 className="font-extrabold text-base text-foreground tracking-wider uppercase">TASK LIST</h3>
+            <h3 className="font-extrabold text-base sm:text-lg text-foreground tracking-wider uppercase">
+              TASK LIST
+            </h3>
             <span className="rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 px-2.5 py-0.5 text-xs font-bold">
-              {tasks.length}
+              {allTasks.length}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Daftar tugas khusus untuk project <span className="font-medium text-foreground">{projectName}</span>
+            Daftar tugas khusus untuk project <span className="font-semibold text-foreground">{projectName}</span>
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Search Input */}
           <div className="relative w-full sm:w-48">
             <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
@@ -276,11 +309,11 @@ export function ProjectTaskTable({
             ))}
           </select>
 
-          {/* Add Task Button (Orange as in reference screenshot) */}
+          {/* + ADD TASK BUTTON (ORANGE STYLE AS IN REFERENCE IMAGE) */}
           <Button 
             onClick={openCreateDialog}
             size="sm"
-            className="h-9 gap-1.5 font-bold tracking-wide uppercase bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white rounded-lg shadow-sm px-4"
+            className="h-9 gap-1.5 font-bold tracking-wide uppercase bg-orange-600 hover:bg-orange-500 text-white rounded-lg shadow-sm px-4 text-xs transition-colors"
           >
             <Plus className="size-4 stroke-[3]" />
             <span>+ ADD TASK</span>
@@ -288,7 +321,7 @@ export function ProjectTaskTable({
         </div>
       </div>
 
-      {/* Task List / Table */}
+      {/* ═══════════════════ TABLE SECTION ═══════════════════ */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
@@ -297,24 +330,23 @@ export function ProjectTaskTable({
               <th className="py-3 px-4 min-w-[200px]">Judul Task</th>
               <th className="py-3 px-4 min-w-[240px]">Deskripsi</th>
               <th className="py-3 px-4 w-36 text-center">Status</th>
-              <th className="py-3 px-4 min-w-[140px]">Assignee</th>
-              <th className="py-3 px-4 w-32">Tenggat Waktu</th>
-              <th className="py-3 px-4 w-20 text-right">Aksi</th>
+              <th className="py-3 px-4 min-w-[140px] text-right">Assignee</th>
+              <th className="py-3 px-4 w-28 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {isLoading ? (
+            {isTableLoading ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                <td colSpan={6} className="py-12 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
-                    <Loader2 className="size-5 animate-spin text-primary" />
+                    <Loader2 className="size-5 animate-spin text-orange-500" />
                     <span>Memuat daftar task project...</span>
                   </div>
                 </td>
               </tr>
             ) : filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center">
+                <td colSpan={6} className="py-12 text-center">
                   <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                     <div className="size-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                       <Clock className="size-5" />
@@ -325,17 +357,19 @@ export function ProjectTaskTable({
                         ? 'Tidak ada task yang sesuai dengan filter pencarian.' 
                         : 'Belum ada task untuk project ini. Tambahkan task pertama sekarang.'}
                     </p>
-                    {(!search && statusFilter === 'all') && (
-                      <Button onClick={openCreateDialog} size="sm" variant="outline" className="mt-2 gap-1.5">
-                        <Plus className="size-3.5" /> Tambah Task
-                      </Button>
-                    )}
+                    <Button 
+                      onClick={openCreateDialog} 
+                      size="sm" 
+                      className="mt-2 gap-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold"
+                    >
+                      <Plus className="size-3.5" /> + ADD TASK
+                    </Button>
                   </div>
                 </td>
               </tr>
             ) : (
               filteredTasks.map((task, idx) => {
-                const statusCfg = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG[1]
+                const statusCfg = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG[0]
                 const isDone = task.status === 5
                 const isOverdue = task.end_date && new Date(task.end_date).getTime() < Date.now() && !isDone
                 const taskAssigneeList = (task.assignees || [])
@@ -347,7 +381,7 @@ export function ProjectTaskTable({
                     key={task.id}
                     className={`hover:bg-muted/30 transition-colors group ${isDone ? 'bg-muted/10 opacity-75' : ''}`}
                   >
-                    {/* Number & Complete Checkbox */}
+                    {/* Column 1: Number & Complete Checkbox */}
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <span className="font-bold text-muted-foreground text-xs w-5">
@@ -356,53 +390,53 @@ export function ProjectTaskTable({
                         <button
                           onClick={() => handleToggleComplete(task)}
                           title={isDone ? 'Tandai belum selesai' : 'Tandai selesai'}
-                          className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
+                          className="text-muted-foreground hover:text-emerald-500 transition-colors focus:outline-none"
                         >
                           {isDone ? (
-                            <CheckCircle2 className="size-3.5 text-emerald-500" />
+                            <CheckCircle2 className="size-4 text-emerald-500" />
                           ) : (
-                            <Circle className="size-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
+                            <Circle className="size-4 text-muted-foreground/50 group-hover:text-muted-foreground" />
                           )}
                         </button>
                       </div>
                     </td>
 
-                    {/* Judul Task */}
-                    <td className="py-3.5 px-4 min-w-[180px]">
+                    {/* Column 2: Judul Task */}
+                    <td className="py-3.5 px-4 min-w-[200px]">
                       <span 
                         onClick={() => openEditDialog(task)}
-                        className={`font-semibold text-foreground hover:text-primary cursor-pointer transition-colors line-clamp-1 ${isDone ? 'line-through text-muted-foreground' : ''}`}
+                        className={`font-semibold text-foreground hover:text-orange-500 cursor-pointer transition-colors line-clamp-1 text-xs ${isDone ? 'line-through text-muted-foreground' : ''}`}
                       >
                         {task.task}
                       </span>
                     </td>
 
-                    {/* Deskripsi (Italic style as in reference image) */}
-                    <td className="py-3.5 px-4 min-w-[220px]">
+                    {/* Column 3: Deskripsi (Italic style as in reference image) */}
+                    <td className="py-3.5 px-4 min-w-[240px]">
                       <span className="text-xs italic text-muted-foreground line-clamp-1">
                         {task.description ? cleanHtmlText(task.description) : '-'}
                       </span>
                     </td>
 
-                    {/* Status Pill */}
+                    {/* Column 4: Status Pill */}
                     <td className="py-3.5 px-4 text-center">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border transition-all hover:opacity-90 shadow-2xs ${statusCfg.color}`}>
+                          <button className={`inline-flex items-center justify-center px-3.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border transition-all hover:opacity-90 shadow-2xs ${statusCfg.color}`}>
                             {statusCfg.label}
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-36 text-xs">
+                        <DropdownMenuContent align="center" className="w-40 text-xs">
                           {Object.entries(TASK_STATUS_CONFIG).map(([codeStr, cfg]) => {
                             const code = Number(codeStr)
                             return (
                               <DropdownMenuItem
                                 key={code}
                                 onClick={() => handleQuickStatusChange(task, code)}
-                                className="flex items-center gap-2 cursor-pointer"
+                                className="flex items-center gap-2 cursor-pointer font-medium"
                               >
                                 <span className={`size-2 rounded-full ${cfg.dot}`} />
-                                <span className={task.status === code ? 'font-bold' : ''}>{cfg.label}</span>
+                                <span className={task.status === code ? 'font-bold text-foreground' : ''}>{cfg.label}</span>
                               </DropdownMenuItem>
                             )
                           })}
@@ -410,16 +444,16 @@ export function ProjectTaskTable({
                       </DropdownMenu>
                     </td>
 
-                    {/* Assignees */}
-                    <td className="py-3.5 px-4">
+                    {/* Column 5: Assignees (Overlapping avatars as in reference) */}
+                    <td className="py-3.5 px-4 text-right">
                       {taskAssigneeList.length === 0 ? (
                         <span className="text-[11px] text-muted-foreground italic">Unassigned</span>
                       ) : (
-                        <div className="flex items-center -space-x-1.5 overflow-hidden">
-                          {taskAssigneeList.slice(0, 3).map((assignee: any) => (
+                        <div className="flex items-center justify-end -space-x-2 overflow-hidden">
+                          {taskAssigneeList.slice(0, 4).map((assignee: any) => (
                             <Avatar 
                               key={assignee.id} 
-                              className="size-6 ring-2 ring-card shrink-0"
+                              className="size-7 ring-2 ring-card shrink-0 shadow-xs"
                               title={`${assignee.firstname} ${assignee.lastname || ''}`}
                             >
                               <AvatarImage 
@@ -432,37 +466,18 @@ export function ProjectTaskTable({
                               </AvatarFallback>
                             </Avatar>
                           ))}
-                          {taskAssigneeList.length > 3 && (
-                            <span className="flex size-6 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground ring-2 ring-card">
-                              +{taskAssigneeList.length - 3}
+                          {taskAssigneeList.length > 4 && (
+                            <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground ring-2 ring-card shadow-xs">
+                              +{taskAssigneeList.length - 4}
                             </span>
                           )}
                         </div>
                       )}
                     </td>
 
-                    {/* Due Date */}
-                    <td className="py-3.5 px-4">
-                      {task.end_date ? (
-                        <div className={`flex items-center gap-1.5 text-[11px] font-medium ${isOverdue ? 'text-rose-500 font-semibold' : 'text-muted-foreground'}`}>
-                          <Calendar className="size-3.5 shrink-0" />
-                          <span>
-                            {new Date(task.end_date).toLocaleDateString('id-ID', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </span>
-                          {isOverdue && <span className="text-[10px] uppercase font-bold text-rose-500">Overdue</span>}
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground/60">—</span>
-                      )}
-                    </td>
-
-                    {/* Actions */}
+                    {/* Column 6: Actions */}
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => openEditDialog(task)}
                           className="flex size-7 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
@@ -487,6 +502,15 @@ export function ProjectTaskTable({
         </table>
       </div>
 
+      {/* ═══════════════════ FLOATING ACTION BUTTON (+ ADD TASK) ═══════════════════ */}
+      <button
+        onClick={openCreateDialog}
+        className="fixed bottom-8 right-8 z-50 size-13 rounded-full bg-orange-600 hover:bg-orange-500 text-white shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 group focus:outline-none"
+        title="Add Task"
+      >
+        <Plus className="size-6 stroke-[3] group-hover:rotate-90 transition-transform duration-200" />
+      </button>
+
       {/* ═══════════════════ CREATE / EDIT TASK DIALOG ═══════════════════ */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px] p-6">
@@ -507,7 +531,7 @@ export function ProjectTaskTable({
               </label>
               <Input
                 type="text"
-                placeholder="Contoh: Desain landing page hero section"
+                placeholder="Contoh: Input Konten Client Ke Google Drive"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
                 className="text-xs"
@@ -559,7 +583,7 @@ export function ProjectTaskTable({
                 <span>Pilih Assignee ({taskAssignees.length} dipilih)</span>
               </label>
               <div className="max-h-36 overflow-y-auto rounded-md border border-border p-2 space-y-1 bg-muted/20">
-                {users.length === 0 ? (
+                {(!Array.isArray(users) || users.length === 0) ? (
                   <p className="text-xs text-muted-foreground text-center py-2">Tidak ada user tersedia</p>
                 ) : (
                   users.map((u) => {
@@ -601,7 +625,7 @@ export function ProjectTaskTable({
                 type="submit"
                 size="sm"
                 disabled={isSaving}
-                className="gap-1.5"
+                className="gap-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold"
               >
                 {isSaving && <Loader2 className="size-3.5 animate-spin" />}
                 {editingTask ? 'Simpan Perubahan' : 'Buat Task'}
@@ -645,4 +669,3 @@ export function ProjectTaskTable({
     </div>
   )
 }
-

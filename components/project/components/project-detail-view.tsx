@@ -291,15 +291,6 @@ export function ProjectDetailView({
           </div>
         </div>
 
-        {/* ═══════════════════ PROJECT TASKS TABLE ═══════════════════ */}
-        <ProjectTaskTable 
-          projectId={selectedProject.id}
-          projectName={selectedProject.name}
-          tasks={(projectDetailRes?.data?.tasks as any[]) || detailTasks || []}
-          users={users}
-          isLoading={isDetailLoading}
-        />
-
         {/* ═══════════════════ PROJECT STATISTICS ═══════════════════ */}
         <div className="mb-5">
           <h3 className="mb-3 font-semibold">Project Statistics</h3>
@@ -347,6 +338,15 @@ export function ProjectDetailView({
             </div>
           </div>
         </div>
+
+        {/* ═══════════════════ PROJECT TASKS TABLE ═══════════════════ */}
+        <ProjectTaskTable 
+          projectId={selectedProject.id}
+          projectName={selectedProject.name}
+          tasks={(projectDetailRes?.data?.tasks as any[]) || detailTasks || []}
+          users={users}
+          isLoading={isDetailLoading}
+        />
 
         {/* ═══════════════════ DOMAIN CHECKER ═══════════════════ */}
         <div className="mb-5">
