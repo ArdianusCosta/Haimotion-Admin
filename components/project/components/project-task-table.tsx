@@ -41,15 +41,15 @@ function getInitials(firstname?: string | null, lastname?: string | null) {
 }
 
 export const TASK_STATUS_CONFIG: Record<number, { label: string; color: string; dot: string }> = {
-  0: { label: 'Pending', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20', dot: 'bg-amber-500' },
-  1: { label: 'To Do', color: 'bg-slate-500/10 text-slate-400 border-slate-500/20', dot: 'bg-slate-400' },
-  6: { label: 'Started', color: 'bg-sky-500/10 text-sky-500 border-sky-500/20', dot: 'bg-sky-500' },
-  2: { label: 'In Progress', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20', dot: 'bg-blue-500' },
-  3: { label: 'In Review', color: 'bg-purple-500/10 text-purple-500 border-purple-500/20', dot: 'bg-purple-500' },
-  4: { label: 'Revisions', color: 'bg-orange-500/10 text-orange-500 border-orange-500/20', dot: 'bg-orange-500' },
-  7: { label: 'Hold', color: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20', dot: 'bg-yellow-600' },
-  8: { label: 'Overdue', color: 'bg-rose-500/10 text-rose-500 border-rose-500/20', dot: 'bg-rose-500' },
-  5: { label: 'Done', color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20', dot: 'bg-emerald-500' },
+  0: { label: 'PENDING', color: 'bg-zinc-700/80 text-zinc-100 border-zinc-600', dot: 'bg-zinc-400' },
+  1: { label: 'TO DO', color: 'bg-slate-700/80 text-slate-200 border-slate-600', dot: 'bg-slate-300' },
+  6: { label: 'STARTED', color: 'bg-sky-600 text-white border-sky-500', dot: 'bg-white' },
+  2: { label: 'ON-PROGRESS', color: 'bg-blue-600 text-white border-blue-500 font-bold', dot: 'bg-white' },
+  3: { label: 'IN REVIEW', color: 'bg-purple-600 text-white border-purple-500', dot: 'bg-white' },
+  4: { label: 'REVISIONS', color: 'bg-amber-600 text-white border-amber-500', dot: 'bg-white' },
+  7: { label: 'HOLD', color: 'bg-yellow-600 text-white border-yellow-500', dot: 'bg-white' },
+  8: { label: 'OVERDUE', color: 'bg-rose-600 text-white border-rose-500', dot: 'bg-white' },
+  5: { label: 'DONE', color: 'bg-emerald-600 text-white border-emerald-500 font-bold', dot: 'bg-white' },
 }
 
 interface ProjectTaskTableProps {
@@ -240,9 +240,9 @@ export function ProjectTaskTable({
       {/* Table Header Controls */}
       <div className="p-5 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-base text-foreground tracking-tight">Project Tasks</h3>
-            <span className="rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
+          <div className="flex items-center gap-2.5">
+            <h3 className="font-extrabold text-base text-foreground tracking-wider uppercase">TASK LIST</h3>
+            <span className="rounded-full bg-orange-500/10 text-orange-500 border border-orange-500/20 px-2.5 py-0.5 text-xs font-bold">
               {tasks.length}
             </span>
           </div>
@@ -276,14 +276,14 @@ export function ProjectTaskTable({
             ))}
           </select>
 
-          {/* Add Task Button */}
+          {/* Add Task Button (Orange as in reference screenshot) */}
           <Button 
             onClick={openCreateDialog}
             size="sm"
-            className="h-9 gap-1.5 font-medium shadow-xs"
+            className="h-9 gap-1.5 font-bold tracking-wide uppercase bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white rounded-lg shadow-sm px-4"
           >
-            <Plus className="size-4" />
-            <span>Tambah Task</span>
+            <Plus className="size-4 stroke-[3]" />
+            <span>+ ADD TASK</span>
           </Button>
         </div>
       </div>
@@ -293,18 +293,19 @@ export function ProjectTaskTable({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-border bg-muted/40 text-muted-foreground font-semibold">
-              <th className="py-3 px-4 w-12 text-center">#</th>
-              <th className="py-3 px-4 min-w-[240px]">Judul Task</th>
-              <th className="py-3 px-4 w-36">Status</th>
+              <th className="py-3 px-4 w-14 text-center">#</th>
+              <th className="py-3 px-4 min-w-[200px]">Judul Task</th>
+              <th className="py-3 px-4 min-w-[240px]">Deskripsi</th>
+              <th className="py-3 px-4 w-36 text-center">Status</th>
               <th className="py-3 px-4 min-w-[140px]">Assignee</th>
-              <th className="py-3 px-4 w-36">Tenggat Waktu</th>
-              <th className="py-3 px-4 w-24 text-right">Aksi</th>
+              <th className="py-3 px-4 w-32">Tenggat Waktu</th>
+              <th className="py-3 px-4 w-20 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                <td colSpan={7} className="py-12 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Loader2 className="size-5 animate-spin text-primary" />
                     <span>Memuat daftar task project...</span>
@@ -313,7 +314,7 @@ export function ProjectTaskTable({
               </tr>
             ) : filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center">
+                <td colSpan={7} className="py-12 text-center">
                   <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                     <div className="size-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                       <Clock className="size-5" />
@@ -346,44 +347,48 @@ export function ProjectTaskTable({
                     key={task.id}
                     className={`hover:bg-muted/30 transition-colors group ${isDone ? 'bg-muted/10 opacity-75' : ''}`}
                   >
-                    {/* Checkbox Complete */}
+                    {/* Number & Complete Checkbox */}
                     <td className="py-3.5 px-4 text-center">
-                      <button
-                        onClick={() => handleToggleComplete(task)}
-                        title={isDone ? 'Tandai belum selesai' : 'Tandai selesai'}
-                        className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
-                      >
-                        {isDone ? (
-                          <CheckCircle2 className="size-4 text-emerald-500" />
-                        ) : (
-                          <Circle className="size-4 text-muted-foreground/60 group-hover:text-muted-foreground" />
-                        )}
-                      </button>
-                    </td>
-
-                    {/* Task Title & Description */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex flex-col gap-0.5">
-                        <span 
-                          onClick={() => openEditDialog(task)}
-                          className={`font-semibold text-foreground hover:text-primary cursor-pointer transition-colors line-clamp-1 ${isDone ? 'line-through text-muted-foreground' : ''}`}
-                        >
-                          {task.task}
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className="font-bold text-muted-foreground text-xs w-5">
+                          {idx + 1}
                         </span>
-                        {task.description && (
-                          <span className="text-[11px] text-muted-foreground line-clamp-1">
-                            {cleanHtmlText(task.description)}
-                          </span>
-                        )}
+                        <button
+                          onClick={() => handleToggleComplete(task)}
+                          title={isDone ? 'Tandai belum selesai' : 'Tandai selesai'}
+                          className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
+                        >
+                          {isDone ? (
+                            <CheckCircle2 className="size-3.5 text-emerald-500" />
+                          ) : (
+                            <Circle className="size-3.5 text-muted-foreground/50 group-hover:text-muted-foreground" />
+                          )}
+                        </button>
                       </div>
                     </td>
 
-                    {/* Status Dropdown */}
-                    <td className="py-3.5 px-4">
+                    {/* Judul Task */}
+                    <td className="py-3.5 px-4 min-w-[180px]">
+                      <span 
+                        onClick={() => openEditDialog(task)}
+                        className={`font-semibold text-foreground hover:text-primary cursor-pointer transition-colors line-clamp-1 ${isDone ? 'line-through text-muted-foreground' : ''}`}
+                      >
+                        {task.task}
+                      </span>
+                    </td>
+
+                    {/* Deskripsi (Italic style as in reference image) */}
+                    <td className="py-3.5 px-4 min-w-[220px]">
+                      <span className="text-xs italic text-muted-foreground line-clamp-1">
+                        {task.description ? cleanHtmlText(task.description) : '-'}
+                      </span>
+                    </td>
+
+                    {/* Status Pill */}
+                    <td className="py-3.5 px-4 text-center">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all hover:opacity-85 ${statusCfg.color}`}>
-                            <span className={`size-1.5 rounded-full ${statusCfg.dot}`} />
+                          <button className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border transition-all hover:opacity-90 shadow-2xs ${statusCfg.color}`}>
                             {statusCfg.label}
                           </button>
                         </DropdownMenuTrigger>
