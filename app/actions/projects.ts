@@ -152,7 +152,8 @@ export async function getProjectById(id: number) {
       return {
         userId: m.id,
         name: `${m.firstname} ${m.lastname || ''}`.trim(),
-        avatar: (m.firstname ?? '?').charAt(0),
+        avatar: (m.firstname ?? '?').charAt(0).toUpperCase(),
+        avatarUrl: m.avatar,
         assigned: assignedTasks.length,
         done: doneTasks.length,
       }
@@ -380,14 +381,15 @@ export async function toggleFavoriteProject(id: number) {
 export async function archiveProject(id: number) {
   try {
     const user = await requireAuth();
-    const hasAccess = await canAccessProject(user, id, 'manager');
-    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+    const hasAccess = await canAccessProject(user, id, 'editor');
+    if (!hasAccess) return { success: false, error: 'Unauthorized: Anda tidak memiliki akses untuk mengarsipkan project ini.' };
     await prisma.project_list.update({
       where: { id },
       data: { is_archived: true }
     })
     return { success: true }
   } catch (error) {
+    console.error('archiveProject error:', error);
     return { success: false, error: 'Failed to archive project' }
   }
 }
@@ -395,14 +397,15 @@ export async function archiveProject(id: number) {
 export async function unarchiveProject(id: number) {
   try {
     const user = await requireAuth();
-    const hasAccess = await canAccessProject(user, id, 'manager');
-    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+    const hasAccess = await canAccessProject(user, id, 'editor');
+    if (!hasAccess) return { success: false, error: 'Unauthorized: Anda tidak memiliki akses untuk memulihkan project ini.' };
     await prisma.project_list.update({
       where: { id },
       data: { is_archived: false }
     })
     return { success: true }
   } catch (error) {
+    console.error('unarchiveProject error:', error);
     return { success: false, error: 'Failed to unarchive project' }
   }
 }

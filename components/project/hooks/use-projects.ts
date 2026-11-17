@@ -33,22 +33,34 @@ export function useProjects() {
   
   const archiveMutation = useMutation({
     mutationFn: archiveProject,
-    onSuccess: () => {
-      toast.success('Project archived successfully')
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      setSelectedProjectId(null)
+    onSuccess: (res: any) => {
+      if (res?.success) {
+        toast.success('Project archived successfully')
+        queryClient.invalidateQueries({ queryKey: ['projects'] })
+        setShowArchived(true)
+        setSelectedProjectId(null)
+      } else {
+        toast.error(res?.error || 'Failed to archive project')
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to archive project')
     }
   })
 
   const unarchiveMutation = useMutation({
     mutationFn: unarchiveProject,
-    onSuccess: (res) => {
-      if (res.success) {
+    onSuccess: (res: any) => {
+      if (res?.success) {
         toast.success('Project restored from archive')
         queryClient.invalidateQueries({ queryKey: ['projects'] })
+        setShowArchived(false)
       } else {
-        toast.error(res.error || 'Failed to restore project')
+        toast.error(res?.error || 'Failed to restore project')
       }
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to restore project')
     }
   })
   
@@ -102,16 +114,19 @@ export function useProjects() {
   const projects = projectsRes?.data || []
   const users = projectsRes?.users || []
 
-  const activeProjectsCount = projects.filter((p: any) => !p.is_archived).length
-  const archivedProjectsCount = projects.filter((p: any) => p.is_archived).length
+  const isProjectArchived = (p: any) => p.is_archived === true || p.is_archived === 1 || p.is_archived === 'true'
+
+  const activeProjectsCount = projects.filter((p: any) => !isProjectArchived(p)).length
+  const archivedProjectsCount = projects.filter((p: any) => isProjectArchived(p)).length
 
   const filteredProjects = projects.filter((p: any) => {
+    const isArchived = isProjectArchived(p)
     const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase())
     if (showArchived) {
-      return Boolean(p.is_archived) && matchesSearch
+      return isArchived && matchesSearch
     }
     const matchesStatus = statusFilter === null || p.status === statusFilter
-    return !p.is_archived && matchesSearch && matchesStatus
+    return !isArchived && matchesSearch && matchesStatus
   })
   
   const selectedProject = selectedProjectId ? projects.find((p: any) => p.id === selectedProjectId) : null

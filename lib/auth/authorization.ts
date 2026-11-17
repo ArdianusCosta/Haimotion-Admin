@@ -98,9 +98,10 @@ export async function canAccessProject(user: any, projectId: number, accessLevel
   // Manager has full access
   if (project.manager_id === user.id) return true;
 
-  // Global Admin fallback (if they have the global permission, they can access it)
-  // We check if the user has a global 'projects.manage_all' or similar, but for now let's rely on explicit membership
-  if (hasPermission(user, 'projects.update') && accessLevel === 'editor') return true;
+  // Global Admin fallback or users with project permissions
+  if (user.role_id === 1 || user.role?.name?.toLowerCase()?.includes('admin') || user.type === 1) return true;
+  if (hasPermission(user, 'projects.delete')) return true;
+  if (hasPermission(user, 'projects.update') && (accessLevel === 'editor' || accessLevel === 'manager')) return true;
   if (hasPermission(user, 'projects.view') && accessLevel === 'viewer') return true;
 
   // Member checking

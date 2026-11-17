@@ -340,9 +340,9 @@ export function ProjectDetailView({
                   <div className="flex flex-col gap-4">
                     {[...Array(3)].map((_, i) => (
                       <div key={i} className="flex items-center gap-4 animate-pulse">
-                        <div className="flex w-32 items-center gap-3 shrink-0">
-                          <div className="size-8 rounded-full bg-muted" />
-                          <div className="h-3 w-16 rounded bg-muted" />
+                        <div className="flex w-44 sm:w-52 items-center gap-3 shrink-0 min-w-0">
+                          <div className="size-8 shrink-0 min-w-8 min-h-8 aspect-square rounded-full bg-muted" />
+                          <div className="h-3 w-20 rounded bg-muted" />
                         </div>
                         <div className="flex-1 border-l border-border/50 pl-4 flex flex-col gap-2">
                           <div className="h-2 w-full rounded-full bg-muted" />
