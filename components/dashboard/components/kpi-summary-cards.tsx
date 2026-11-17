@@ -30,14 +30,14 @@ export function KpiSummaryCards({ data }: KpiSummaryCardsProps) {
         className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 sm:p-6 shadow-xs hover:shadow-md hover:border-amber-500/40 transition-all duration-200 cursor-pointer flex items-center justify-between min-w-0 gap-3"
       >
         <div className="min-w-0 flex-1">
-          {/* active / total */}
+          {/* active / inactive */}
           <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight truncate">
             <span className="text-emerald-500 group-hover:brightness-110 transition-all">
               {activeUsers.toLocaleString()}
             </span>
             <span className="text-muted-foreground/60 mx-0.5">/</span>
             <span className="text-red-500 group-hover:brightness-110 transition-all">
-              {totalUsers.toLocaleString()}
+              {inactiveUsers.toLocaleString()}
             </span>
           </p>
           {/* status label */}

@@ -2,10 +2,17 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { 
-  ChevronRight, Star, Share2, Users, 
+  ChevronRight, Users, 
   Clock, CalendarDays, ClipboardList, Trash2, Edit, 
-  ChevronLeft, Lock, X, Copy, Archive, Download
+  ChevronLeft, Lock, X, Copy, Archive, Download, MoreVertical
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
@@ -67,62 +74,55 @@ export function ProjectDetailView({
             <ChevronRight className="size-3.5" />
             <span className="font-medium text-foreground">{selectedProject.name}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => toggleFavorite.mutate(selectedProject.id)} 
-              className={`flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground ${selectedProject.is_favorite ? 'text-amber-500' : 'text-muted-foreground'}`}
-              title={selectedProject.is_favorite ? 'Favorited' : 'Favorite'}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer outline-none"
+              title="More options"
             >
-              <Star className="size-4" />
-            </button>
-            <button 
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.origin + '/projects/' + selectedProject.id)
-                toast.success('Project link copied.')
-              }} 
-              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Share Project"
-            >
-              <Share2 className="size-4" />
-            </button>
-            <button 
-              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
-              onClick={() => duplicateMutation.mutate(selectedProject.id)}
-              disabled={duplicateMutation?.isPending}
-              title="Duplicate Project"
-            >
-              <Copy className="size-4" />
-            </button>
-            <button 
-              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-amber-500/10 hover:text-amber-500 text-muted-foreground"
-              onClick={() => setIsArchiveDialogOpen(true)}
-              title="Archive Project"
-            >
-              <Archive className="size-4" />
-            </button>
-            <button 
-              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
-              onClick={() => exportMutation.mutate(selectedProject.id)}
-              disabled={exportMutation?.isPending}
-              title="Export Project Data"
-            >
-              <Download className="size-4" />
-            </button>
-            <button 
-              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
-              onClick={() => onEditProject ? onEditProject() : setIsFormOpen(true)}
-              title="Edit Project"
-            >
-              <Edit className="size-4" />
-            </button>
-            <button 
-              className="flex size-9 items-center justify-center rounded-md border border-border bg-card shadow-sm transition-colors hover:bg-destructive hover:text-destructive text-muted-foreground"
-              onClick={() => setIsDeleteDialogOpen(true)}
-              title="Delete Project"
-            >
-              <Trash2 className="size-4" />
-            </button>
-          </div>
+              <MoreVertical className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem 
+                onClick={() => onEditProject ? onEditProject() : setIsFormOpen(true)}
+                className="cursor-pointer"
+              >
+                <Edit className="mr-2 size-4" />
+                <span>Edit Project</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => duplicateMutation.mutate(selectedProject.id)}
+                disabled={duplicateMutation?.isPending}
+                className="cursor-pointer"
+              >
+                <Copy className="mr-2 size-4" />
+                <span>Duplicate Project</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => exportMutation.mutate(selectedProject.id)}
+                disabled={exportMutation?.isPending}
+                className="cursor-pointer"
+              >
+                <Download className="mr-2 size-4" />
+                <span>Export Project Data</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setIsArchiveDialogOpen(true)}
+                className="cursor-pointer"
+              >
+                <Archive className="mr-2 size-4" />
+                <span>Archive Project</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                variant="destructive"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="cursor-pointer text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 size-4" />
+                <span>Delete Project</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* ═══════════════════ PROJECT DETAILS CARD ═══════════════════ */}
