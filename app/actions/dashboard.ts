@@ -89,7 +89,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     const [
       totalUsersCount,
       activeUsersCount,
-      inactiveUsersCount,
+      resignUsersCount,
       totalProjectsCount,
       totalTasksCount,
       allTasksInRange,
@@ -100,9 +100,33 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
       taskComments,
       productivity
     ] = await Promise.all([
-      prisma.user.count({ where: { status: { not: 'resign' } } }),
-      prisma.user.count({ where: { status: 'active' } }),
-      prisma.user.count({ where: { status: { notIn: ['active', 'resign'] } } }),
+      prisma.user.count({
+        where: {
+          NOT: [
+            { status: 'resign' },
+            { firstname: { contains: 'resign' } },
+            { lastname: { contains: 'resign' } }
+          ]
+        }
+      }),
+      prisma.user.count({
+        where: {
+          status: 'active',
+          NOT: [
+            { firstname: { contains: 'resign' } },
+            { lastname: { contains: 'resign' } }
+          ]
+        }
+      }),
+      prisma.user.count({
+        where: {
+          OR: [
+            { status: 'resign' },
+            { firstname: { contains: 'resign' } },
+            { lastname: { contains: 'resign' } }
+          ]
+        }
+      }),
       prisma.project_list.count({ where: { is_archived: false } }),
       prisma.task_list.count({ where: taskWhere }),
       prisma.task_list.findMany({
@@ -757,7 +781,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
     });
 
     const kpis = {
-      totalUsers: { value: totalUsersCount, activeCount: activeUsersCount, inactiveCount: inactiveUsersCount, prev: null },
+      totalUsers: { value: totalUsersCount, activeCount: activeUsersCount, inactiveCount: resignUsersCount, resignCount: resignUsersCount, prev: null },
       totalProjects: { value: totalProjectsCount, prev: prevProjects },
       totalTasks: { value: totalTasksCount, prev: null },
       tasksCompleted: { value: tasksCompleted, prev: prevTasksCompleted },
@@ -821,7 +845,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
 
     return {
       kpis: {
-        totalUsers: { value: 54, activeCount: 48, inactiveCount: 6, prev: null },
+        totalUsers: { value: 54, activeCount: 48, inactiveCount: 6, resignCount: 6, prev: null },
         totalProjects: { value: 28, prev: 24 },
         totalTasks: { value: 1315, prev: 1200 },
         tasksCompleted: { value: 1256, prev: 1100 },

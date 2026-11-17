@@ -1,5 +1,5 @@
 import React from 'react'
-import { Plus, Search, Filter, ClipboardList, CalendarDays } from 'lucide-react'
+import { Plus, Search, Filter, ClipboardList, CalendarDays, Archive } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { ProjectFormDialog } from '@/components/project-form-dialog'
 import { stripHtmlTags } from '../utils/html-helpers'
@@ -23,46 +24,83 @@ export const STATUS_LABELS: Record<number, { label: string; color: string }> = {
 export function ProjectListView({
   statusFilter, setStatusFilter,
   searchQuery, setSearchQuery,
+  showArchived, setShowArchived,
+  activeProjectsCount, archivedProjectsCount,
   setIsFormOpen, isFormOpen,
   isLoading, filteredProjects,
   setSelectedProjectId, users,
   onNewProject
 }: any) {
   return (
-    <div className="flex h-[calc(100vh-140px)] min-h-[600px] flex-col gap-6 overflow-hidden">
+    <div className="flex h-[calc(100vh-140px)] min-h-[600px] flex-col gap-5 overflow-hidden">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Projects</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage all your active projects and deliverables.</p>
         </div>
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', size: 'sm', className: 'h-9 gap-2' })}>
-              <Filter className="size-4" /> 
-              {statusFilter === null ? 'Filter' : statusFilter === 2 ? 'Active' : statusFilter === 5 ? 'Done' : statusFilter === 0 ? 'On Hold' : 'Pending'}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuCheckboxItem checked={statusFilter === null} onCheckedChange={() => setStatusFilter(null)}>All Status</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem checked={statusFilter === 2} onCheckedChange={() => setStatusFilter(2)}>Active</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem checked={statusFilter === 1} onCheckedChange={() => setStatusFilter(1)}>Pending</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem checked={statusFilter === 0} onCheckedChange={() => setStatusFilter(0)}>On Hold</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem checked={statusFilter === 5} onCheckedChange={() => setStatusFilter(5)}>Completed</DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {!showArchived && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={buttonVariants({ variant: 'outline', size: 'sm', className: 'h-9 gap-2' })}>
+                <Filter className="size-4" /> 
+                {statusFilter === null ? 'Filter' : statusFilter === 2 ? 'Active' : statusFilter === 5 ? 'Done' : statusFilter === 0 ? 'On Hold' : 'Pending'}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuCheckboxItem checked={statusFilter === null} onCheckedChange={() => setStatusFilter(null)}>All Status</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={statusFilter === 2} onCheckedChange={() => setStatusFilter(2)}>Active</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={statusFilter === 1} onCheckedChange={() => setStatusFilter(1)}>Pending</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={statusFilter === 0} onCheckedChange={() => setStatusFilter(0)}>On Hold</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem checked={statusFilter === 5} onCheckedChange={() => setStatusFilter(5)}>Completed</DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button size="sm" className="h-9 gap-2 shadow-xs font-medium" onClick={onNewProject || (() => setIsFormOpen(true))}>
             <Plus className="size-4" /> New Project
           </Button>
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input 
-          placeholder="Search projects..." 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full max-w-sm pl-9" 
-        />
+      {/* Tabs: Active Projects vs Archived */}
+      <div className="flex items-center justify-between gap-4 border-b border-border pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowArchived(false)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              !showArchived
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            <span>Active Projects</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${!showArchived ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+              {activeProjectsCount || 0}
+            </span>
+          </button>
+          <button
+            onClick={() => setShowArchived(true)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              showArchived
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            <Archive className="size-3.5" />
+            <span>Archived</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${showArchived ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground'}`}>
+              {archivedProjectsCount || 0}
+            </span>
+          </button>
+        </div>
+
+        <div className="relative w-full max-w-xs">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input 
+            placeholder={showArchived ? "Search archived projects..." : "Search projects..."}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 h-8 text-xs" 
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pb-8 pr-2">
@@ -97,14 +135,24 @@ export function ProjectListView({
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="flex h-52 flex-col items-center justify-center rounded-xl border border-dashed border-border text-center p-6">
-            <ClipboardList className="mb-2 size-9 text-muted-foreground/40" />
-            <p className="text-sm font-medium text-foreground">No projects found</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-              {searchQuery ? 'No projects match your current filter or search criteria.' : 'Get started by creating your first project.'}
+            {showArchived ? (
+              <Archive className="mb-2 size-9 text-muted-foreground/40" />
+            ) : (
+              <ClipboardList className="mb-2 size-9 text-muted-foreground/40" />
+            )}
+            <p className="text-sm font-medium text-foreground">
+              {showArchived ? 'Belum ada project yang diarsipkan' : 'No projects found'}
             </p>
-            <Button size="sm" className="mt-4 gap-1.5" onClick={onNewProject || (() => setIsFormOpen(true))}>
-              <Plus className="size-3.5" /> Create Project
-            </Button>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+              {showArchived
+                ? 'Project yang diarsipkan akan muncul di sini dan dapat dipulihkan kapan saja.'
+                : (searchQuery ? 'No projects match your current filter or search criteria.' : 'Get started by creating your first project.')}
+            </p>
+            {!showArchived && (
+              <Button size="sm" className="mt-4 gap-1.5" onClick={onNewProject || (() => setIsFormOpen(true))}>
+                <Plus className="size-3.5" /> Create Project
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -121,7 +169,12 @@ export function ProjectListView({
                       {stripHtmlTags(project.description)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {project.is_archived && (
+                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                        <Archive className="size-3" /> Archived
+                      </span>
+                    )}
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_LABELS[project.status]?.color ?? 'bg-muted text-muted-foreground'}`}>
                       {STATUS_LABELS[project.status]?.label ?? `Status ${project.status}`}
                     </span>

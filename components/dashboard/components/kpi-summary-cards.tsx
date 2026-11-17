@@ -17,7 +17,7 @@ export function KpiSummaryCards({ data }: KpiSummaryCardsProps) {
 
   const totalUsers = kpis?.totalUsers?.value ?? 0
   const activeUsers = kpis?.totalUsers?.activeCount ?? 0
-  const inactiveUsers = kpis?.totalUsers?.inactiveCount ?? 0
+  const resignUsers = kpis?.totalUsers?.resignCount ?? kpis?.totalUsers?.inactiveCount ?? 0
   const totalProjects = kpis?.totalProjects?.value ?? 0
   const totalTasks = kpis?.totalTasks?.value ?? 0
 
@@ -30,22 +30,22 @@ export function KpiSummaryCards({ data }: KpiSummaryCardsProps) {
         className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 sm:p-6 shadow-xs hover:shadow-md hover:border-amber-500/40 transition-all duration-200 cursor-pointer flex items-center justify-between min-w-0 gap-3"
       >
         <div className="min-w-0 flex-1">
-          {/* active / inactive */}
+          {/* active / resign */}
           <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight truncate">
             <span className="text-emerald-500 group-hover:brightness-110 transition-all">
               {activeUsers.toLocaleString()}
             </span>
             <span className="text-muted-foreground/60 mx-0.5">/</span>
             <span className="text-red-500 group-hover:brightness-110 transition-all">
-              {inactiveUsers.toLocaleString()}
+              {resignUsers.toLocaleString()}
             </span>
           </p>
           {/* status label */}
           <p className="text-xs font-medium text-muted-foreground mt-1.5 leading-relaxed truncate">
             <span className="text-emerald-500 font-semibold">{activeUsers}</span>
             {' '}{isId ? 'Aktif' : 'Active'} ·{' '}
-            <span className="text-red-500 font-semibold">{inactiveUsers}</span>
-            {' '}{isId ? 'Tidak Aktif' : 'Inactive'}
+            <span className="text-red-500 font-semibold">{resignUsers}</span>
+            {' '}Resign
           </p>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5 font-medium uppercase tracking-wide truncate">
             {isId ? 'Total Pengguna' : 'Total Users'}

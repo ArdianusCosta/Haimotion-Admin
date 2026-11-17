@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { 
   getProjects, getProjectById, deleteProject, toggleFavoriteProject, 
-  archiveProject, duplicateProject, exportProjectData 
+  archiveProject, unarchiveProject, duplicateProject, exportProjectData 
 } from '@/app/actions/projects'
 
 export function useProjects() {
@@ -11,6 +11,7 @@ export function useProjects() {
   const [activeTab, setActiveTab] = useState('Dependencies')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<number | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
   
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -36,6 +37,18 @@ export function useProjects() {
       toast.success('Project archived successfully')
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setSelectedProjectId(null)
+    }
+  })
+
+  const unarchiveMutation = useMutation({
+    mutationFn: unarchiveProject,
+    onSuccess: (res) => {
+      if (res.success) {
+        toast.success('Project restored from archive')
+        queryClient.invalidateQueries({ queryKey: ['projects'] })
+      } else {
+        toast.error(res.error || 'Failed to restore project')
+      }
     }
   })
   
@@ -88,7 +101,18 @@ export function useProjects() {
 
   const projects = projectsRes?.data || []
   const users = projectsRes?.users || []
-  const filteredProjects = projects.filter((p: any) => p.name?.toLowerCase().includes(searchQuery.toLowerCase()) && (statusFilter === null || p.status === statusFilter))
+
+  const activeProjectsCount = projects.filter((p: any) => !p.is_archived).length
+  const archivedProjectsCount = projects.filter((p: any) => p.is_archived).length
+
+  const filteredProjects = projects.filter((p: any) => {
+    const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    if (showArchived) {
+      return Boolean(p.is_archived) && matchesSearch
+    }
+    const matchesStatus = statusFilter === null || p.status === statusFilter
+    return !p.is_archived && matchesSearch && matchesStatus
+  })
   
   const selectedProject = selectedProjectId ? projects.find((p: any) => p.id === selectedProjectId) : null
   const detailTasks = (projectDetailRes?.data?.tasks as any[]) ?? []
@@ -98,6 +122,8 @@ export function useProjects() {
     activeTab, setActiveTab,
     searchQuery, setSearchQuery,
     statusFilter, setStatusFilter,
+    showArchived, setShowArchived,
+    activeProjectsCount, archivedProjectsCount,
     isFormOpen, setIsFormOpen,
     isDeleteDialogOpen, setIsDeleteDialogOpen,
     isArchiveDialogOpen, setIsArchiveDialogOpen,
@@ -106,6 +132,6 @@ export function useProjects() {
     isLoading, projectsError, projects, users,
     filteredProjects, selectedProject,
     projectDetailRes, isDetailLoading, detailTasks,
-    toggleFavorite, archiveMutation, duplicateMutation, exportMutation, deleteMutation
+    toggleFavorite, archiveMutation, unarchiveMutation, duplicateMutation, exportMutation, deleteMutation
   }
 }

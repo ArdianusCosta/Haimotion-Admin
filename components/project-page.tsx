@@ -18,6 +18,8 @@ export function ProjectPage({ slug }: { slug?: string[] }) {
     selectedProjectId, setSelectedProjectId,
     searchQuery, setSearchQuery,
     statusFilter, setStatusFilter,
+    showArchived, setShowArchived,
+    activeProjectsCount, archivedProjectsCount,
     isFormOpen, setIsFormOpen,
     isDeleteDialogOpen, setIsDeleteDialogOpen,
     isArchiveDialogOpen, setIsArchiveDialogOpen,
@@ -26,7 +28,7 @@ export function ProjectPage({ slug }: { slug?: string[] }) {
     isLoading, projectsError, projects, users,
     filteredProjects, selectedProject,
     projectDetailRes, isDetailLoading, detailTasks,
-    toggleFavorite, archiveMutation, duplicateMutation, exportMutation, deleteMutation
+    toggleFavorite, archiveMutation, unarchiveMutation, duplicateMutation, exportMutation, deleteMutation
   } = useProjects()
 
   // Sync route slug to selectedProjectId if navigating directly (e.g. /project/123)
@@ -120,6 +122,10 @@ export function ProjectPage({ slug }: { slug?: string[] }) {
         setStatusFilter={setStatusFilter}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        showArchived={showArchived}
+        setShowArchived={setShowArchived}
+        activeProjectsCount={activeProjectsCount}
+        archivedProjectsCount={archivedProjectsCount}
         setIsFormOpen={setIsFormOpen}
         isFormOpen={isFormOpen}
         isLoading={isLoading}
@@ -156,6 +162,7 @@ export function ProjectPage({ slug }: { slug?: string[] }) {
       deleteMutation={deleteMutation}
       isArchiveDialogOpen={isArchiveDialogOpen}
       archiveMutation={archiveMutation}
+      unarchiveMutation={unarchiveMutation}
       users={users}
       onEditProject={() => handleEditProject(selectedProject.id)}
     />

@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { 
   ChevronRight, Users, 
   Clock, CalendarDays, ClipboardList, Trash2, Edit, 
-  ChevronLeft, Lock, X, Copy, Archive, Download, MoreVertical
+  ChevronLeft, Lock, X, Copy, Archive, MoreVertical, RotateCcw
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -54,7 +54,7 @@ export function ProjectDetailView({
   isKpiDialogOpen, setIsKpiDialogOpen,
   isContributorsOpen, setIsContributorsOpen,
   isFormOpen, isDeleteDialogOpen, deleteMutation,
-  isArchiveDialogOpen, archiveMutation, users,
+  isArchiveDialogOpen, archiveMutation, unarchiveMutation, users,
   onEditProject
 }: any) {
   const router = useRouter()
@@ -81,7 +81,7 @@ export function ProjectDetailView({
             >
               <MoreVertical className="size-4" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem 
                 onClick={() => onEditProject ? onEditProject() : setIsFormOpen(true)}
                 className="cursor-pointer"
@@ -97,21 +97,24 @@ export function ProjectDetailView({
                 <Copy className="mr-2 size-4" />
                 <span>Duplicate Project</span>
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => exportMutation.mutate(selectedProject.id)}
-                disabled={exportMutation?.isPending}
-                className="cursor-pointer"
-              >
-                <Download className="mr-2 size-4" />
-                <span>Export Project Data</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setIsArchiveDialogOpen(true)}
-                className="cursor-pointer"
-              >
-                <Archive className="mr-2 size-4" />
-                <span>Archive Project</span>
-              </DropdownMenuItem>
+              {selectedProject.is_archived ? (
+                <DropdownMenuItem 
+                  onClick={() => unarchiveMutation?.mutate(selectedProject.id)}
+                  disabled={unarchiveMutation?.isPending}
+                  className="cursor-pointer text-amber-600 focus:text-amber-600"
+                >
+                  <RotateCcw className="mr-2 size-4" />
+                  <span>Pulihkan dari Arsip</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem 
+                  onClick={() => setIsArchiveDialogOpen(true)}
+                  className="cursor-pointer"
+                >
+                  <Archive className="mr-2 size-4" />
+                  <span>Archive Project</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 variant="destructive"
@@ -124,6 +127,29 @@ export function ProjectDetailView({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* ═══════════════════ ARCHIVED BANNER ═══════════════════ */}
+        {selectedProject.is_archived && (
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-amber-600 dark:text-amber-400">
+            <div className="flex items-center gap-2.5 text-sm font-medium">
+              <Archive className="size-5 shrink-0" />
+              <div>
+                <p className="font-semibold">Project ini sedang diarsipkan</p>
+                <p className="text-xs text-muted-foreground">Project tidak tampil di daftar utama dan bisa dipulihkan kapan saja.</p>
+              </div>
+            </div>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-8 gap-1.5 text-xs border-amber-500/40 hover:bg-amber-500/20 text-foreground cursor-pointer"
+              onClick={() => unarchiveMutation?.mutate(selectedProject.id)}
+              disabled={unarchiveMutation?.isPending}
+            >
+              <RotateCcw className="size-3.5" />
+              {unarchiveMutation?.isPending ? 'Memulihkan...' : 'Pulihkan Project'}
+            </Button>
+          </div>
+        )}
 
         {/* ═══════════════════ PROJECT DETAILS CARD ═══════════════════ */}
         <div className="mb-5 rounded-xl border border-border bg-card p-5 shadow-sm">

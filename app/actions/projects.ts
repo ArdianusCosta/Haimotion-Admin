@@ -9,7 +9,6 @@ export async function getProjects() {
     const user = await requireAuth();
     requirePermission(user, "projects.view");
     const projects = await prisma.project_list.findMany({
-      where: { is_archived: false },
       orderBy: { date_created: 'desc' },
       include: {
         members: {
@@ -390,6 +389,21 @@ export async function archiveProject(id: number) {
     return { success: true }
   } catch (error) {
     return { success: false, error: 'Failed to archive project' }
+  }
+}
+
+export async function unarchiveProject(id: number) {
+  try {
+    const user = await requireAuth();
+    const hasAccess = await canAccessProject(user, id, 'manager');
+    if (!hasAccess) return { success: false, error: 'Unauthorized' };
+    await prisma.project_list.update({
+      where: { id },
+      data: { is_archived: false }
+    })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: 'Failed to unarchive project' }
   }
 }
 
