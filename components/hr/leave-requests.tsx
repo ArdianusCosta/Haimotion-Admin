@@ -28,8 +28,7 @@ import {
   RotateCcw,
   SlidersHorizontal,
   X,
-  Filter,
-  Lock
+  Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -215,7 +214,7 @@ export function LeaveRequests() {
     );
   };
 
-  // Status Badge with clean Lucide icons & Lock Indicator for Processed Requests
+  // Status Badge with clean Lucide icons
   const getStatusBadge = (status: string) => {
     const sLower = (status || 'Pending').toLowerCase();
     if (sLower === 'approved') {
@@ -223,7 +222,6 @@ export function LeaveRequests() {
         <Badge variant="outline" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
           <CheckCircle2 className="size-3.5 shrink-0" />
           <span>{t('Disetujui')}</span>
-          <Lock className="size-3 ml-0.5 opacity-60" />
         </Badge>
       );
     }
@@ -232,7 +230,6 @@ export function LeaveRequests() {
         <Badge variant="outline" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30">
           <XCircle className="size-3.5 shrink-0" />
           <span>{t('Ditolak')}</span>
-          <Lock className="size-3 ml-0.5 opacity-60" />
         </Badge>
       );
     }
@@ -319,7 +316,7 @@ export function LeaveRequests() {
                 {stats.approved}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {t('Telah disetujui & status terkunci')}
+                {t('Permohonan telah disetujui')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
@@ -594,7 +591,7 @@ export function LeaveRequests() {
                             setIsModalOpen(true);
                           }}
                           className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-                          title={isPending ? t('Edit Permohonan') : t('Lihat Detail (Status Terkunci)')}
+                          title={isPending ? t('Edit Permohonan') : t('Lihat Detail')}
                         >
                           <Pencil className="size-3.5" />
                         </Button>

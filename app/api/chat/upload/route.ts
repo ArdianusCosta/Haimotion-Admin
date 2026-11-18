@@ -17,8 +17,12 @@ export async function POST(req: Request) {
       } catch (_) {}
     }
 
-    if (!file || !userId) {
-      return NextResponse.json({ error: 'File and userId are required' }, { status: 400 })
+    if (!file) {
+      return NextResponse.json({ error: 'File is required' }, { status: 400 })
+    }
+
+    if (!userId) {
+      userId = 'shared'
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())

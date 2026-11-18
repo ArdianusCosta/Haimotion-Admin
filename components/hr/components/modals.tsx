@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/components/language-provider';
-import { Upload, FileText, CheckCircle, ExternalLink, Eye, Loader2, X, Trash2, CreditCard, Wallet, Calendar, ArrowUpRight, CheckCircle2, AlertCircle, RefreshCw, Download, Clock, XCircle, Lock } from 'lucide-react';
+import { Upload, FileText, CheckCircle, ExternalLink, Eye, Loader2, X, Trash2, CreditCard, Wallet, Calendar, ArrowUpRight, CheckCircle2, AlertCircle, RefreshCw, Download, Clock, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 
@@ -1402,14 +1402,8 @@ export function LeaveRequestModal({
             {/* Status Approval Persetujuan HRD */}
             {isStatusLocked ? (
               <div className="space-y-1.5 md:col-span-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold text-foreground">{t('Status Persetujuan HRD')}</label>
-                  <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                    <Lock className="size-3" />
-                    {t('Status Terkunci')}
-                  </span>
-                </div>
-                <div className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg border text-xs font-semibold ${
+                <label className="text-sm font-semibold text-foreground">{t('Status Persetujuan HRD')}</label>
+                <div className={`flex items-center px-3.5 py-2.5 rounded-lg border text-xs font-semibold ${
                   (status || '').toLowerCase() === 'approved'
                     ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                     : 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400'
@@ -1421,12 +1415,9 @@ export function LeaveRequestModal({
                       <XCircle className="size-4" />
                     )}
                     <span>
-                      {(status || '').toLowerCase() === 'approved' ? t('Disetujui (Approved)') : t('Ditolak (Rejected)')}
+                      {(status || '').toLowerCase() === 'approved' ? t('Disetujui') : t('Ditolak')}
                     </span>
                   </div>
-                  <span className="text-[11px] font-normal text-muted-foreground">
-                    {t('Permohonan telah selesai diproses dan tidak dapat diubah statusnya')}
-                  </span>
                 </div>
               </div>
             ) : !leave ? (
