@@ -430,7 +430,6 @@ model UserPreference {
   updated_at             DateTime @default(now()) @updatedAt @db.DateTime(0)
   content_width          String   @default("centered") @db.VarChar(50)
   header_style           String   @default("sticky") @db.VarChar(50)
-  layout_style           String   @default("sidebar") @db.VarChar(50)
   sidebar_style          String   @default("sidebar") @db.VarChar(50)
   theme_color            String   @default("Green") @db.VarChar(50)
   theme_mode             String   @default("system") @db.VarChar(50)

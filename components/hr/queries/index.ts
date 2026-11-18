@@ -107,7 +107,22 @@ export function useUpdateLeaveStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       updateLeaveStatus(id, status),
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['hr-leaves'] });
+      const previousLeaves = queryClient.getQueryData(['hr-leaves']);
+      queryClient.setQueryData(['hr-leaves'], (old: any[] = []) =>
+        old.map((leave) =>
+          leave.id === id ? { ...leave, status } : leave
+        )
+      );
+      return { previousLeaves };
+    },
+    onError: (_err, _variables, context: any) => {
+      if (context?.previousLeaves) {
+        queryClient.setQueryData(['hr-leaves'], context.previousLeaves);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['hr-leaves'] });
       queryClient.invalidateQueries({ queryKey: ['hr-overview'] });
     },

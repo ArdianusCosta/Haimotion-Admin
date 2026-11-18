@@ -399,6 +399,7 @@ export async function createLeaveRequest(data: {
   requirePermission(auth, 'hr.create')
   const uid = parseInt(auth.id, 10)
 
+  // Selalu set status pengajuan baru ke 'Pending' untuk masuk antrean approval
   const leave = await prisma.hrLeaveRequest.create({
     data: {
       employee_id: Number(data.employeeId),
@@ -407,7 +408,7 @@ export async function createLeaveRequest(data: {
       end_date: new Date(data.endDate),
       reason: data.reason,
       attachment: data.attachment || null,
-      status: data.status || 'Pending'
+      status: 'Pending'
     },
     include: { employee: true }
   })
@@ -434,6 +435,13 @@ export async function updateLeaveRequest(id: number, data: {
   requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
 
+  const existing = await prisma.hrLeaveRequest.findUnique({
+    where: { id }
+  })
+  if (!existing) {
+    throw new Error('Permohonan tidak ditemukan')
+  }
+
   const updateData: any = {}
   if (data.employeeId !== undefined) updateData.employee_id = Number(data.employeeId)
   if (data.type !== undefined) updateData.type = data.type
@@ -441,7 +449,12 @@ export async function updateLeaveRequest(id: number, data: {
   if (data.endDate !== undefined) updateData.end_date = new Date(data.endDate)
   if (data.reason !== undefined) updateData.reason = data.reason
   if (data.attachment !== undefined) updateData.attachment = data.attachment
-  if (data.status !== undefined) updateData.status = data.status
+  
+  // Status hanya boleh diubah jika status sebelumnya masih 'Pending'
+  const isExistingPending = (existing.status || 'Pending').toLowerCase() === 'pending'
+  if (data.status !== undefined && isExistingPending) {
+    updateData.status = data.status
+  }
 
   const leave = await prisma.hrLeaveRequest.update({
     where: { id },
@@ -462,6 +475,19 @@ export async function updateLeaveStatus(id: number, status: string) {
   const auth = await requireAuth()
   requirePermission(auth, 'hr.update')
   const uid = parseInt(auth.id, 10)
+
+  const existing = await prisma.hrLeaveRequest.findUnique({
+    where: { id }
+  })
+  if (!existing) {
+    throw new Error('Permohonan tidak ditemukan')
+  }
+
+  // Jika sudah disetujui atau ditolak, status tidak dapat diubah kembali
+  const isExistingPending = (existing.status || 'Pending').toLowerCase() === 'pending'
+  if (!isExistingPending) {
+    throw new Error(`Permohonan telah berstatus "${existing.status}" dan statusnya sudah terkunci tidak dapat diubah lagi.`)
+  }
 
   const leave = await prisma.hrLeaveRequest.update({
     where: { id },

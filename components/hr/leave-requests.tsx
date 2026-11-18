@@ -27,7 +27,9 @@ import {
   UserCheck,
   RotateCcw,
   SlidersHorizontal,
-  X
+  X,
+  Filter,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +51,8 @@ export function LeaveRequests() {
   const deleteMutation = useDeleteLeaveRequest();
 
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'cuti' | 'izin' | 'sakit' | 'approved' | 'rejected'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'cuti' | 'izin' | 'sakit' | 'khusus'>('all');
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,7 +60,7 @@ export function LeaveRequests() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string; type: string } | null>(null);
 
-  // Statistics calculation for KPI cards
+  // Statistics calculation for KPI cards and tab badges
   const stats = useMemo(() => {
     const total = leaves.length;
     const pending = leaves.filter((l: any) => (l.status || 'Pending').toLowerCase() === 'pending').length;
@@ -79,50 +82,48 @@ export function LeaveRequests() {
     return { total, pending, approved, rejected, cuti, sakit, izin };
   }, [leaves]);
 
-  // Tab items configuration
+  // Tab items configuration (Filament-style status tabs)
   const tabItems = [
-    { key: 'all', label: t('Semua Permohonan'), count: stats.total, icon: FileText },
-    { key: 'pending', label: t('Perlu Persetujuan'), count: stats.pending, icon: Clock, badgeVariant: 'warning' },
-    { key: 'cuti', label: t('Cuti Tahunan'), count: stats.cuti, icon: CalendarDays },
-    { key: 'izin', label: t('Izin Kerja'), count: stats.izin, icon: Briefcase },
-    { key: 'sakit', label: t('Sakit'), count: stats.sakit, icon: HeartPulse },
-    { key: 'approved', label: t('Disetujui'), count: stats.approved, icon: CheckCircle2 },
-    { key: 'rejected', label: t('Ditolak'), count: stats.rejected, icon: XCircle },
-  ] as const;
+    { key: 'all' as const, label: t('Semua'), count: stats.total, icon: FileText },
+    { key: 'pending' as const, label: t('Perlu Persetujuan'), count: stats.pending, icon: Clock, badgeVariant: 'warning' as const },
+    { key: 'approved' as const, label: t('Disetujui'), count: stats.approved, icon: CheckCircle2, badgeVariant: 'success' as const },
+    { key: 'rejected' as const, label: t('Ditolak'), count: stats.rejected, icon: XCircle, badgeVariant: 'danger' as const },
+  ];
 
-  // Filtered leaves according to tab and search
+  // Filtered leaves according to status tab, type filter, and search
   const filteredLeaves = useMemo(() => {
     return leaves.filter((l: any) => {
-      const matchesSearch = 
-        (l.employee?.name && l.employee.name.toLowerCase().includes(search.toLowerCase())) || 
-        (l.type && l.type.toLowerCase().includes(search.toLowerCase())) ||
-        (l.employee?.department && l.employee.department.toLowerCase().includes(search.toLowerCase())) ||
-        (l.reason && l.reason.toLowerCase().includes(search.toLowerCase()));
-
-      if (!matchesSearch) return false;
-
       const status = (l.status || 'Pending').toLowerCase();
       const type = (l.type || '').toLowerCase();
 
-      switch (activeTab) {
-        case 'pending':
-          return status === 'pending';
-        case 'approved':
-          return status === 'approved';
-        case 'rejected':
-          return status === 'rejected';
-        case 'cuti':
-          return type.includes('cuti') || type.includes('leave');
-        case 'izin':
-          return type.includes('izin') || type.includes('permit');
-        case 'sakit':
-          return type.includes('sakit') || type.includes('sick');
-        case 'all':
-        default:
-          return true;
+      // 1. Status Filter (Tab)
+      if (activeTab === 'pending' && status !== 'pending') return false;
+      if (activeTab === 'approved' && status !== 'approved') return false;
+      if (activeTab === 'rejected' && status !== 'rejected') return false;
+
+      // 2. Type Filter (Dropdown)
+      if (typeFilter !== 'all') {
+        if (typeFilter === 'cuti' && !(type.includes('cuti') || type.includes('leave'))) return false;
+        if (typeFilter === 'izin' && !(type.includes('izin') || type.includes('permit'))) return false;
+        if (typeFilter === 'sakit' && !(type.includes('sakit') || type.includes('sick'))) return false;
+        if (typeFilter === 'khusus' && !type.includes('khusus')) return false;
       }
+
+      // 3. Search query filter
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchesSearch = 
+          (l.employee?.name && l.employee.name.toLowerCase().includes(q)) || 
+          (l.type && l.type.toLowerCase().includes(q)) ||
+          (l.employee?.department && l.employee.department.toLowerCase().includes(q)) ||
+          (l.reason && l.reason.toLowerCase().includes(q));
+
+        if (!matchesSearch) return false;
+      }
+
+      return true;
     });
-  }, [leaves, search, activeTab]);
+  }, [leaves, search, activeTab, typeFilter]);
 
   const handleSaveLeave = async (formData: any) => {
     try {
@@ -214,27 +215,29 @@ export function LeaveRequests() {
     );
   };
 
-  // Status Badge with clean Lucide icons (No Emojis)
+  // Status Badge with clean Lucide icons & Lock Indicator for Processed Requests
   const getStatusBadge = (status: string) => {
     const sLower = (status || 'Pending').toLowerCase();
     if (sLower === 'approved') {
       return (
-        <Badge variant="outline" className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+        <Badge variant="outline" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
           <CheckCircle2 className="size-3.5 shrink-0" />
           <span>{t('Disetujui')}</span>
+          <Lock className="size-3 ml-0.5 opacity-60" />
         </Badge>
       );
     }
     if (sLower === 'rejected') {
       return (
-        <Badge variant="outline" className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30">
+        <Badge variant="outline" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30">
           <XCircle className="size-3.5 shrink-0" />
           <span>{t('Ditolak')}</span>
+          <Lock className="size-3 ml-0.5 opacity-60" />
         </Badge>
       );
     }
     return (
-      <Badge variant="outline" className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+      <Badge variant="outline" className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
         <Clock className="size-3.5 shrink-0 animate-pulse" />
         <span>{t('Menunggu Review')}</span>
       </Badge>
@@ -243,7 +246,7 @@ export function LeaveRequests() {
 
   return (
     <div className="space-y-6 w-full min-w-0 max-w-full">
-      {/* 1. TOP METRIC CARDS (Shadcn Card components) */}
+      {/* 1. TOP METRIC CARDS (Filament/Shadcn Metric Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Permohonan */}
         <Card 
@@ -261,16 +264,16 @@ export function LeaveRequests() {
                 {stats.total}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {t('Semua permohonan diajukan')}
+                {stats.cuti} {t('Cuti')} · {stats.izin} {t('Izin')} · {stats.sakit} {t('Sakit')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
-              <CalendarDays className="size-6" />
+              <FileText className="size-6" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Menunggu Review */}
+        {/* Perlu Persetujuan (Menunggu Review) */}
         <Card 
           onClick={() => setActiveTab('pending')}
           className={`cursor-pointer transition-all duration-200 border-border hover:border-amber-500/40 hover:shadow-md ${
@@ -281,7 +284,7 @@ export function LeaveRequests() {
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">
-                  {t('Perlu Review')}
+                  {t('Perlu Persetujuan')}
                 </p>
                 {stats.pending > 0 && (
                   <span className="size-2 rounded-full bg-amber-500 animate-ping inline-block" />
@@ -291,7 +294,7 @@ export function LeaveRequests() {
                 {stats.pending}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {t('Menunggu persetujuan HR')}
+                {t('Menunggu review & persetujuan HR')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
@@ -300,129 +303,152 @@ export function LeaveRequests() {
           </CardContent>
         </Card>
 
-        {/* Cuti Tahunan & Khusus */}
+        {/* Disetujui (Approved) */}
         <Card 
-          onClick={() => setActiveTab('cuti')}
+          onClick={() => setActiveTab('approved')}
           className={`cursor-pointer transition-all duration-200 border-border hover:border-emerald-500/40 hover:shadow-md ${
-            activeTab === 'cuti' ? 'ring-2 ring-emerald-500/30 bg-emerald-500/5' : ''
+            activeTab === 'approved' ? 'ring-2 ring-emerald-500/30 bg-emerald-500/5' : ''
           }`}
         >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {t('Cuti Tahunan')}
+                {t('Disetujui')}
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-                {stats.cuti}
+                {stats.approved}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {t('Cuti tahunan & khusus')}
+                {t('Telah disetujui & status terkunci')}
               </p>
             </div>
             <div className="size-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Calendar className="size-6" />
+              <CheckCircle2 className="size-6" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Izin & Sakit */}
+        {/* Ditolak (Rejected) */}
         <Card 
-          onClick={() => setActiveTab('sakit')}
-          className={`cursor-pointer transition-all duration-200 border-border hover:border-purple-500/40 hover:shadow-md ${
-            activeTab === 'sakit' ? 'ring-2 ring-purple-500/30 bg-purple-500/5' : ''
+          onClick={() => setActiveTab('rejected')}
+          className={`cursor-pointer transition-all duration-200 border-border hover:border-rose-500/40 hover:shadow-md ${
+            activeTab === 'rejected' ? 'ring-2 ring-rose-500/30 bg-rose-500/5' : ''
           }`}
         >
           <CardContent className="p-5 flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {t('Izin & Sakit')}
+                {t('Ditolak')}
               </p>
               <p className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-                {stats.sakit + stats.izin}
+                {stats.rejected}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {stats.sakit} {t('sakit')} · {stats.izin} {t('izin')}
+                {t('Permohonan ditolak oleh HR')}
               </p>
             </div>
-            <div className="size-12 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 flex items-center justify-center shrink-0">
-              <HeartPulse className="size-6" />
+            <div className="size-12 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0">
+              <XCircle className="size-6" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 2. TAB CONTROLS (Shadcn Segmented Tab Style - Clean & Responsive) */}
-      <div className="flex flex-wrap items-center gap-1.5 bg-muted/40 p-1.5 rounded-2xl border border-border/60 overflow-x-auto scrollbar-none">
-        {tabItems.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          const isWarning = (tab as any).badgeVariant === 'warning' && (tab.count || 0) > 0;
+      {/* 2. TAB CONTROLS (Filament-style Pill Segmented Controls) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
+        {/* Filament Tabs */}
+        <div className="inline-flex items-center gap-1 p-1 bg-muted/50 dark:bg-zinc-950/80 border border-border/80 dark:border-zinc-800 rounded-xl shadow-2xs overflow-x-auto max-w-full">
+          {tabItems.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            const isWarning = tab.badgeVariant === 'warning' && (tab.count || 0) > 0;
 
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key as any)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all select-none whitespace-nowrap ${
-                isActive
-                  ? 'bg-card text-foreground font-semibold shadow-xs border border-border'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-card/40'
-              }`}
-            >
-              <Icon className={`size-3.5 ${
-                isActive ? 'text-primary' : isWarning ? 'text-amber-500' : 'text-muted-foreground'
-              }`} />
-              <span>{tab.label}</span>
-              {tab.count !== undefined && (
-                <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                  isWarning
-                    ? 'bg-amber-500 text-white'
-                    : isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'bg-muted text-muted-foreground'
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all select-none whitespace-nowrap ${
+                  isActive
+                    ? 'bg-card dark:bg-zinc-800 text-foreground dark:text-white font-semibold shadow-xs border border-border/80 dark:border-zinc-700/60'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-card/40'
+                }`}
+              >
+                <Icon className={`size-3.5 shrink-0 ${
+                  isActive 
+                    ? (tab.key === 'pending' ? 'text-amber-500' : tab.key === 'approved' ? 'text-emerald-500' : tab.key === 'rejected' ? 'text-rose-500' : 'text-primary')
+                    : isWarning 
+                      ? 'text-amber-500' 
+                      : 'text-muted-foreground'
+                }`} />
+                <span>{tab.label}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  tab.key === 'pending'
+                    ? (tab.count > 0 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' : 'bg-muted text-muted-foreground')
+                    : tab.key === 'approved'
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
+                      : tab.key === 'rejected'
+                        ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25'
+                        : 'bg-muted dark:bg-zinc-800 text-muted-foreground'
                 }`}>
                   {tab.count}
                 </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 3. TOOLBAR: SEARCH & CREATE ACTION BUTTON */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-        {/* Search Bar */}
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input 
-            type="text" 
-            placeholder={t('Cari nama karyawan, jenis, atau alasan...')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-8 bg-card border-border h-10 rounded-xl text-xs"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Primary Action Button: Ajukan Permohonan */}
-        <Button 
-          onClick={() => {
-            setSelectedLeave(null);
-            setIsModalOpen(true);
-          }}
-          className="gap-2 h-10 px-5 rounded-xl font-semibold shadow-sm hover:shadow transition-all shrink-0"
-        >
-          <Plus className="size-4" />
-          <span>{t('Ajukan Izin / Cuti')}</span>
-        </Button>
+        {/* Search, Filter Jenis, & Create Button Toolbar */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input 
+              type="text" 
+              placeholder={t('Cari nama karyawan, jenis, alasan...')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 bg-card border-border h-9 rounded-xl text-xs"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Type Filter Select */}
+          <div className="relative">
+            <select
+              value={typeFilter}
+              onChange={(e: any) => setTypeFilter(e.target.value)}
+              className="h-9 pl-8 pr-7 rounded-xl border border-border bg-card text-xs font-medium text-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
+            >
+              <option value="all">{t('Semua Jenis')}</option>
+              <option value="cuti">{t('Cuti Tahunan')}</option>
+              <option value="izin">{t('Izin Kerja')}</option>
+              <option value="sakit">{t('Sakit (Surat Dokter)')}</option>
+              <option value="khusus">{t('Cuti Khusus')}</option>
+            </select>
+            <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+          </div>
+
+          {/* Primary Action Button: Ajukan Permohonan */}
+          <Button 
+            onClick={() => {
+              setSelectedLeave(null);
+              setIsModalOpen(true);
+            }}
+            className="gap-2 h-9 px-4 rounded-xl font-semibold shadow-sm hover:shadow transition-all shrink-0 text-xs"
+          >
+            <Plus className="size-4" />
+            <span>{t('Ajukan Izin / Cuti')}</span>
+          </Button>
+        </div>
       </div>
 
       {/* 4. DATA TABLE (Clean & Modern Shadcn-style Card) */}
@@ -568,7 +594,7 @@ export function LeaveRequests() {
                             setIsModalOpen(true);
                           }}
                           className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted"
-                          title={t('Edit Permohonan')}
+                          title={isPending ? t('Edit Permohonan') : t('Lihat Detail (Status Terkunci)')}
                         >
                           <Pencil className="size-3.5" />
                         </Button>
@@ -598,23 +624,33 @@ export function LeaveRequests() {
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <AlertCircle className="size-8 text-muted-foreground/40" />
                       <p className="text-sm font-medium text-foreground">
-                        {t('Tidak ada data permohonan pada kategori ini')}
+                        {activeTab === 'pending'
+                          ? t('Tidak ada permohonan yang perlu persetujuan')
+                          : activeTab === 'approved'
+                            ? t('Belum ada permohonan yang disetujui')
+                            : activeTab === 'rejected'
+                              ? t('Tidak ada permohonan yang ditolak')
+                              : t('Tidak ada data permohonan')}
                       </p>
                       <p className="text-xs text-muted-foreground max-w-sm">
-                        {t('Belum ada permohonan izin atau cuti yang diajukan. Klik tombol di bawah untuk membuat pengajuan baru.')}
+                        {activeTab === 'pending'
+                          ? t('Semua permohonan yang masuk telah selesai diproses oleh HR.')
+                          : t('Belum ada permohonan izin atau cuti yang sesuai dengan kriteria filter saat ini.')}
                       </p>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedLeave(null);
-                          setIsModalOpen(true);
-                        }}
-                        className="mt-2 text-xs gap-1.5"
-                      >
-                        <Plus className="size-3.5" />
-                        {t('Ajukan Permohonan Baru')}
-                      </Button>
+                      {activeTab !== 'pending' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedLeave(null);
+                            setIsModalOpen(true);
+                          }}
+                          className="mt-2 text-xs gap-1.5"
+                        >
+                          <Plus className="size-3.5" />
+                          {t('Ajukan Permohonan Baru')}
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

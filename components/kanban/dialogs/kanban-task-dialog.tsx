@@ -3,10 +3,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Loader2, Paperclip, Plus, Send, Clock, MessageSquare } from 'lucide-react'
+import { Loader2, Paperclip, Plus, Send, Clock, MessageSquare, Eye, ExternalLink } from 'lucide-react'
 import { useKanban } from '../kanban-provider'
 import { useQueryClient } from '@tanstack/react-query'
 import { pusherClient } from '@/lib/pusher-client'
+
+const isImageFile = (fileName: string, url?: string) => {
+  const name = (fileName || '').toLowerCase()
+  const u = (url || '').toLowerCase()
+  return (
+    name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') ||
+    name.endsWith('.webp') || name.endsWith('.gif') || name.endsWith('.svg') ||
+    u.startsWith('data:image/') || u.startsWith('blob:') ||
+    /\.(jpg|jpeg|png|webp|gif|svg)($|\?)/i.test(u)
+  )
+}
 
 export function KanbanTaskDialog() {
   const { 
@@ -23,6 +34,7 @@ export function KanbanTaskDialog() {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionPosition, setMentionPosition] = useState(0)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   // Auto-scroll comments to bottom when dialog opens or comments change
   useEffect(() => {
@@ -160,18 +172,36 @@ export function KanbanTaskDialog() {
     }, 10)
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !selectedTask) return
     
-    const fakeUrl = URL.createObjectURL(file)
-    uploadAttachmentMutation.mutate({ taskId: selectedTask.dbId, url: fakeUrl, name: file.name })
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: formData
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const fileUrl = data.url || URL.createObjectURL(file)
+        uploadAttachmentMutation.mutate({ taskId: selectedTask.dbId, url: fileUrl, name: file.name })
+      } else {
+        const fakeUrl = URL.createObjectURL(file)
+        uploadAttachmentMutation.mutate({ taskId: selectedTask.dbId, url: fakeUrl, name: file.name })
+      }
+    } catch {
+      const fakeUrl = URL.createObjectURL(file)
+      uploadAttachmentMutation.mutate({ taskId: selectedTask.dbId, url: fakeUrl, name: file.name })
+    }
   }
 
   const taskStatusColumn = columns.find((c: any) => parseInt(c.id) === selectedTask?.status)
 
   return (
-    <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+    <>
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
       <DialogContent className="max-w-4xl lg:max-w-5xl max-h-[90vh] h-[670px] flex flex-col p-6 overflow-hidden border-border/60 shadow-2xl">
         {selectedTask && (
           <>
@@ -210,15 +240,72 @@ export function KanbanTaskDialog() {
                       </label>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 p-2.5 max-h-[105px] overflow-y-auto">
+                  <div className="rounded-xl border border-border/50 bg-muted/20 p-2.5 max-h-[160px] overflow-y-auto">
                     {taskDetails.attachments.length > 0 ? (
-                      <div className="flex flex-col gap-1.5">
-                        {taskDetails.attachments.map((att: any) => (
-                          <a key={att.id} href={att.file_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border/40 bg-background/50 hover:bg-background text-xs transition-colors group">
-                            <Paperclip className="size-3.5 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
-                            <span className="truncate flex-1 font-medium">{att.file_name}</span>
-                          </a>
-                        ))}
+                      <div className="flex flex-col gap-2">
+                        {taskDetails.attachments.map((att: any) => {
+                          const isImg = isImageFile(att.file_name, att.file_url)
+                          return (
+                            <div 
+                              key={att.id} 
+                              className="group flex items-center gap-2.5 p-2 rounded-lg border border-border/40 bg-background/60 hover:bg-background text-xs transition-all shadow-2xs"
+                            >
+                              {isImg ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewImage(att.file_url)}
+                                  className="size-11 rounded-md overflow-hidden border border-border/60 bg-muted/40 shrink-0 cursor-pointer relative group/thumb hover:ring-2 hover:ring-primary/40 transition-all"
+                                  title="Klik untuk melihat preview"
+                                >
+                                  <img 
+                                    src={att.file_url} 
+                                    alt={att.file_name} 
+                                    className="size-full object-cover" 
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLElement).style.display = 'none';
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Eye className="size-3.5 text-white" />
+                                  </div>
+                                </button>
+                              ) : (
+                                <div className="size-11 rounded-md border border-border/50 bg-muted/40 flex items-center justify-center shrink-0 text-muted-foreground">
+                                  <Paperclip className="size-4" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <a 
+                                  href={att.file_url} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="font-medium hover:text-primary transition-colors truncate block"
+                                  title={att.file_name}
+                                >
+                                  {att.file_name}
+                                </a>
+                                {isImg && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewImage(att.file_url)}
+                                    className="text-[10px] text-primary hover:underline font-medium cursor-pointer inline-flex items-center gap-1 mt-0.5"
+                                  >
+                                    <Eye className="size-3" /> Preview Gambar
+                                  </button>
+                                )}
+                              </div>
+                              <a 
+                                href={att.file_url} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors shrink-0"
+                                title="Buka di tab baru"
+                              >
+                                <ExternalLink className="size-3.5" />
+                              </a>
+                            </div>
+                          )
+                        })}
                       </div>
                     ) : (
                       <p className="text-xs text-muted-foreground px-1 py-0.5">No attachments.</p>
@@ -275,10 +362,6 @@ export function KanbanTaskDialog() {
                       {detailsLoading ? <Loader2 className="size-3 animate-spin inline" /> : taskDetails.comments.length}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
-                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Real-time</span>
-                  </div>
                 </div>
 
                 {/* Comments Message Feed */}
@@ -322,7 +405,7 @@ export function KanbanTaskDialog() {
                             : 'bg-background/80 text-foreground border-border/70 rounded-tl-none'
                           } ${isPending ? 'opacity-85' : 'opacity-100'}`}>
                             {comment.comment.split(/(@\w+(?: \w+)?)/g).map((part: string, i: number) => 
-                              part.startsWith('@') ? <span key={i} className={isMe ? 'font-bold opacity-95 underline decoration-white/30' : 'text-primary font-bold'}>{part}</span> : part
+                              part.startsWith('@') ? <span key={i} className={isMe ? 'font-semibold opacity-95' : 'text-primary font-semibold'}>{part}</span> : part
                             )}
                           </div>
                         </div>
@@ -399,5 +482,34 @@ export function KanbanTaskDialog() {
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Lightbox Image Preview Modal */}
+    <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+      <DialogContent className="max-w-3xl p-3 bg-background/95 backdrop-blur-md border border-border shadow-2xl">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between px-2 pt-1">
+            <span className="text-xs font-semibold text-muted-foreground">Preview Lampiran</span>
+            {previewImage && (
+              <a
+                href={previewImage}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+              >
+                <ExternalLink className="size-3.5" /> Buka ukuran penuh
+              </a>
+            )}
+          </div>
+          <div className="relative flex items-center justify-center min-h-[250px] max-h-[75vh] overflow-hidden rounded-lg bg-black/20 p-2">
+            <img
+              src={previewImage || ''}
+              alt="Attachment Preview"
+              className="max-h-[70vh] w-auto max-w-full object-contain rounded-md shadow-md"
+            />
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

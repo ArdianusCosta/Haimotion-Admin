@@ -11,7 +11,6 @@ import { KanbanPage } from '@/components/kanban-page'
 import { CalendarPage } from '@/components/calendar-page'
 import { SettingsPage } from '@/components/settings-page'
 import { ProjectPage } from '@/components/project-page'
-import { LayoutsPage } from '@/components/layouts-page'
 import { AiPage } from '@/components/ai-page'
 import { TasksPage } from '@/components/tasks-page'
 
@@ -67,7 +66,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Command, Download,
   File, FileImage, FileSpreadsheet, Folder, FolderOpen, Grid2X2, LayoutDashboard,
   List, Menu, MessageCircle, MoreHorizontal, Package, PanelLeft,
-  Plus, Search, Settings, Sparkles, Sun, Users, X, Zap, ClipboardList, LayoutTemplate, Paintbrush, ListTodo, UserCheck, Blocks, Flag, GitPullRequest, ShieldAlert, ShieldCheck, LogOut, DollarSign, Receipt,
+  Plus, Search, Settings, Sparkles, Sun, Users, X, Zap, ClipboardList, Paintbrush, ListTodo, UserCheck, Blocks, Flag, GitPullRequest, ShieldAlert, ShieldCheck, LogOut, DollarSign, Receipt,
   PieChart, CreditCard, Wallet, Banknote, TrendingDown, TrendingUp, BookOpen, Target, BarChart3, Scale, Clock, FileText, Briefcase, Video
 } from 'lucide-react'
 
@@ -89,7 +88,6 @@ const workMenu: MenuItem[] = [
   { label: 'Calendar', icon: CalendarDays },
 ]
 const apps: MenuItem[] = [
-  { label: 'Layouts', icon: LayoutTemplate },
   { label: 'Meetings', icon: Video },
 ]
 
@@ -531,7 +529,6 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
     return () => document.removeEventListener('keydown', down)
   }, [])
   const [customizerOpen, setCustomizerOpen] = useState(false)
-  const [layoutStyle, setLayoutStyle] = useState<'sidebar' | 'topnav'>(() => typeof window !== 'undefined' ? (localStorage.getItem('pref_layout_style') as any) || 'sidebar' : 'sidebar')
   const [activeColor, setActiveColor] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_theme_color') || 'Green' : 'Green')
   const [activeRadius, setActiveRadius] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_theme_radius') || '0.5' : '0.5')
   const [activeFont, setActiveFont] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('pref_font_family') || 'Inter' : 'Inter')
@@ -558,7 +555,6 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
       const data = await res.json()
       const pref = data.preference
       if (pref) {
-        if (pref.layout_style) { setLayoutStyle(pref.layout_style as any); localStorage.setItem('pref_layout_style', pref.layout_style); }
         if (pref.theme_color) { setActiveColor(pref.theme_color); localStorage.setItem('pref_theme_color', pref.theme_color); }
         if (pref.theme_radius) { setActiveRadius(pref.theme_radius); localStorage.setItem('pref_theme_radius', pref.theme_radius); }
         if (pref.font_family) { setActiveFont(pref.font_family); localStorage.setItem('pref_font_family', pref.font_family); }
@@ -642,7 +638,6 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
 
   const isFiles = section === 'File Manager'
 
-  const isTopnav = layoutStyle === 'topnav'
   const isSidebarMini = sidebarStyle === 'icon' || collapsed
   const effectiveCollapsed = isSidebarMini && !mobileMenuOpen
 
@@ -706,7 +701,6 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
-      {!isTopnav && (
         <aside className={asideClasses}>
           <div className={`flex items-center justify-center border-b border-sidebar-border px-2 ${sidebarStyle === 'floating' ? 'h-14' : 'h-16'}`}>
             {effectiveCollapsed
@@ -860,24 +854,11 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
             </div>
           </div>
         </aside>
-      )}
       <main className="min-w-0 flex-1 h-screen overflow-y-auto overflow-x-hidden relative">
         <header className={headerClasses}>
           <div className="flex items-center gap-3">
-            {!isTopnav && <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-lg p-2 hover:bg-muted md:hidden" aria-label="Open menu"><Menu className="size-5" /></button>}
-            {!isTopnav && <button onClick={() => setCollapsed(!collapsed)} className="hidden rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:block" aria-label="Toggle sidebar"><PanelLeft className="size-4" /></button>}
-            {isTopnav && (
-              <div className="flex items-center gap-6">
-                <div className="flex items-center">
-                  <img src={workspaceLogo} alt="Workspace Logo" className="h-12 w-auto object-contain max-h-12" />
-                </div>
-                <div className="hidden md:flex items-center gap-1 overflow-x-auto">
-                  {[...nav, ...chatsMenu, ...aiMenu, ...workMenu, ...apps, ...financeMenu, ...hrMenu, ...crmMenu, ...administration].map(({ label, icon }) => (
-                    <button key={label} onClick={() => handleNavigate(label)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${section === label ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}><Icon icon={icon} className="size-4 shrink-0" />{t(label)}</button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-lg p-2 hover:bg-muted md:hidden" aria-label="Open menu"><Menu className="size-5" /></button>
+            <button onClick={() => setCollapsed(!collapsed)} className="hidden rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:block" aria-label="Toggle sidebar"><PanelLeft className="size-4" /></button>
             <div className="hidden h-5 w-px bg-border md:block" />
             <GlobalSearch />
           </div>
@@ -948,7 +929,6 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Project': return <ProjectPage slug={slug} />
               case 'Tasks': return <TasksPage />
               case 'AI Assistant': return <AiPage />
-              case 'Layouts': return <LayoutsPage layoutStyle={layoutStyle} setLayoutStyle={(val) => handlePrefChange('layout_style', val, setLayoutStyle)} />
               case 'Finance Dashboard': return <FinanceOverviewPage user={user} />
               case 'Finance Overview': return <FinanceOverviewPage user={user} />
               case 'Beranda': return <FinanceOverviewPage user={user} />
@@ -1089,16 +1069,14 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
                 ))}
               </div>
             </div>
-            {!isTopnav && (
-              <div>
-                <h3 className="text-sm font-medium mb-3">Sidebar</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {['sidebar', 'floating', 'icon', 'offcanvas'].map(s => (
-                    <button key={s} onClick={() => handlePrefChange('sidebar_style', s, setSidebarStyle)} className={`flex items-center justify-center rounded-md border py-2 text-xs font-medium capitalize transition-colors ${sidebarStyle === s ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted hover:border-primary/50'}`}>{s}</button>
-                  ))}
-                </div>
+            <div>
+              <h3 className="text-sm font-medium mb-3">Sidebar</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {['sidebar', 'floating', 'icon', 'offcanvas'].map(s => (
+                  <button key={s} onClick={() => handlePrefChange('sidebar_style', s, setSidebarStyle)} className={`flex items-center justify-center rounded-md border py-2 text-xs font-medium capitalize transition-colors ${sidebarStyle === s ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted hover:border-primary/50'}`}>{s}</button>
+                ))}
               </div>
-            )}
+            </div>
             <div>
               <h3 className="text-sm font-medium mb-3">Header</h3>
               <div className="grid grid-cols-3 gap-2">

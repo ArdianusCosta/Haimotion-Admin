@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/components/language-provider';
-import { Upload, FileText, CheckCircle, ExternalLink, Eye, Loader2, X, Trash2, CreditCard, Wallet, Calendar, ArrowUpRight, CheckCircle2, AlertCircle, RefreshCw, Download, Clock, XCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, ExternalLink, Eye, Loader2, X, Trash2, CreditCard, Wallet, Calendar, ArrowUpRight, CheckCircle2, AlertCircle, RefreshCw, Download, Clock, XCircle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 
@@ -1304,6 +1304,8 @@ export function LeaveRequestModal({
     }
   };
 
+  const isStatusLocked = Boolean(leave && leave.status && leave.status.toLowerCase() !== 'pending');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!employeeId) {
@@ -1319,7 +1321,7 @@ export function LeaveRequestModal({
       endDate,
       reason,
       attachment,
-      status,
+      status: isStatusLocked ? leave.status : status,
     });
   };
 
@@ -1398,44 +1400,83 @@ export function LeaveRequestModal({
             </div>
 
             {/* Status Approval Persetujuan HRD */}
-            <div className="space-y-1.5 md:col-span-2">
-              <label className="text-sm font-semibold text-foreground">Status Persetujuan HRD</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStatus('Pending')}
-                  className={`h-10 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
-                    status === 'Pending'
-                      ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400'
-                      : 'border-border text-muted-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  <Clock className="size-3.5" /> {t('Pending')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatus('Approved')}
-                  className={`h-10 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
-                    status === 'Approved'
-                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                      : 'border-border text-muted-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  <CheckCircle2 className="size-3.5" /> {t('Disetujui')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatus('Rejected')}
-                  className={`h-10 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
-                    status === 'Rejected'
-                      ? 'bg-rose-500/15 border-rose-500 text-rose-600 dark:text-rose-400'
-                      : 'border-border text-muted-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  <XCircle className="size-3.5" /> {t('Ditolak')}
-                </button>
+            {isStatusLocked ? (
+              <div className="space-y-1.5 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-foreground">{t('Status Persetujuan HRD')}</label>
+                  <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                    <Lock className="size-3" />
+                    {t('Status Terkunci')}
+                  </span>
+                </div>
+                <div className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg border text-xs font-semibold ${
+                  (status || '').toLowerCase() === 'approved'
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {(status || '').toLowerCase() === 'approved' ? (
+                      <CheckCircle2 className="size-4" />
+                    ) : (
+                      <XCircle className="size-4" />
+                    )}
+                    <span>
+                      {(status || '').toLowerCase() === 'approved' ? t('Disetujui (Approved)') : t('Ditolak (Rejected)')}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    {t('Permohonan telah selesai diproses dan tidak dapat diubah statusnya')}
+                  </span>
+                </div>
               </div>
-            </div>
+            ) : !leave ? (
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-semibold text-foreground">{t('Status Pengajuan Baru')}</label>
+                <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-medium">
+                  <Clock className="size-4 shrink-0 animate-pulse" />
+                  <span>{t('Menunggu Persetujuan (Pending) — Otomatis masuk antrean review')}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-sm font-semibold text-foreground">{t('Status Persetujuan HRD')}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStatus('Pending')}
+                    className={`h-10 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
+                      status === 'Pending'
+                        ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400'
+                        : 'border-border text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Clock className="size-3.5" /> {t('Pending')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatus('Approved')}
+                    className={`h-10 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
+                      status === 'Approved'
+                        ? 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                        : 'border-border text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <CheckCircle2 className="size-3.5" /> {t('Disetujui')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatus('Rejected')}
+                    className={`h-10 rounded-lg text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all ${
+                      status === 'Rejected'
+                        ? 'bg-rose-500/15 border-rose-500 text-rose-600 dark:text-rose-400'
+                        : 'border-border text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <XCircle className="size-3.5" /> {t('Ditolak')}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Alasan / Keperluan */}
             <div className="space-y-1.5 md:col-span-2">

@@ -377,7 +377,6 @@ CREATE TABLE `UserPreference` (
     `updated_at` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0),
     `content_width` VARCHAR(50) NOT NULL DEFAULT 'centered',
     `header_style` VARCHAR(50) NOT NULL DEFAULT 'sticky',
-    `layout_style` VARCHAR(50) NOT NULL DEFAULT 'sidebar',
     `sidebar_style` VARCHAR(50) NOT NULL DEFAULT 'sidebar',
     `theme_color` VARCHAR(50) NOT NULL DEFAULT 'Green',
     `theme_mode` VARCHAR(50) NOT NULL DEFAULT 'system',

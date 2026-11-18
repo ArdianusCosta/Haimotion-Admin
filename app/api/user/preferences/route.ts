@@ -34,7 +34,6 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const { 
       file_manager_view_mode,
-      layout_style,
       theme_color,
       theme_radius,
       theme_mode,
@@ -46,7 +45,6 @@ export async function PATCH(req: Request) {
 
     const updateData: any = {};
     if (file_manager_view_mode !== undefined) updateData.file_manager_view_mode = file_manager_view_mode;
-    if (layout_style !== undefined) updateData.layout_style = layout_style;
     if (theme_color !== undefined) updateData.theme_color = theme_color;
     if (theme_radius !== undefined) updateData.theme_radius = theme_radius;
     if (theme_mode !== undefined) updateData.theme_mode = theme_mode;
