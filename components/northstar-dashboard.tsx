@@ -38,15 +38,11 @@ import { HROverviewPage } from '@/components/hr/hr-overview-page'
 import { EmployeesPage } from '@/components/hr/employees-page'
 import { AttendancePage } from '@/components/hr/attendance-page'
 import { PayrollPage } from '@/components/hr/payroll-page'
-import { RecruitmentPage } from '@/components/hr/recruitment-page'
 
 import { CrmOverviewPage } from '@/components/crm/crm-overview-page'
 import { CrmLeadsPage } from '@/components/crm/crm-leads-page'
 import { CrmClientsPage } from '@/components/crm/crm-clients-page'
 import { CrmPipelinePage } from '@/components/crm/crm-pipeline-page'
-import { CrmFollowUpsPage } from '@/components/crm/crm-follow-ups-page'
-import { CrmActivitiesPage } from '@/components/crm/crm-activities-page'
-import { CrmBroadcastPage } from '@/components/crm/crm-broadcast-page'
 
 import FileManager from '@/components/file-manager/file-manager'
 import { useLanguage } from '@/components/language-provider'
@@ -116,7 +112,6 @@ const hrMenu = [
   { label: 'Employees', icon: Users },
   { label: 'Attendance & Leave', icon: CalendarDays },
   { label: 'Payroll', icon: Receipt },
-  { label: 'Recruitment', icon: Briefcase },
 ]
 
 const crmMenu = [
@@ -124,9 +119,6 @@ const crmMenu = [
   { label: 'Leads', icon: Target },
   { label: 'Clients', icon: Briefcase },
   { label: 'Pipeline', icon: GitPullRequest },
-  { label: 'Follow Ups', icon: Clock },
-  { label: 'Activities', icon: Activity },
-  { label: 'Broadcast', icon: MessageCircle },
 ]
 
 const administration = [
@@ -171,15 +163,11 @@ const sectionPermissionMap: Record<string, string> = {
   'Employees': 'hr.view',
   'Attendance & Leave': 'hr.view',
   'Payroll': 'hr.view',
-  'Recruitment': 'hr.view',
   // CRM
   'CRM Overview': 'crm.view',
   'Leads': 'crm.view',
   'Clients': 'crm.view',
   'Pipeline': 'crm.view',
-  'Follow Ups': 'crm.view',
-  'Activities': 'crm.view',
-  'Broadcast': 'crm.view',
   // Administration
   'Roles & Permissions': 'roles.view',
   'User Management': 'users.view',
@@ -428,8 +416,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
       'HR Overview': 'hr/overview',
       'Employees': 'hr/employees',
       'Attendance & Leave': 'hr/attendance',
-      'Payroll': 'hr/payroll',
-      'Recruitment': 'hr/recruitment'
+      'Payroll': 'hr/payroll'
     }
 
     // Custom routing for CRM module
@@ -438,9 +425,6 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
       'Leads': 'crm/leads',
       'Clients': 'crm/clients',
       'Pipeline': 'crm/pipeline',
-      'Follow Ups': 'crm/follow-ups',
-      'Activities': 'crm/activities',
-      'Broadcast': 'crm/broadcast'
     }
 
     if (financeRouteMap[newSection]) {
@@ -962,16 +946,12 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Employees': return clientCanAccess(user, 'HR Overview') ? <EmployeesPage /> : <AccessDenied section="Employees" />
               case 'Attendance & Leave': return clientCanAccess(user, 'HR Overview') ? <AttendancePage /> : <AccessDenied section="Attendance & Leave" />
               case 'Payroll': return clientCanAccess(user, 'HR Overview') ? <PayrollPage /> : <AccessDenied section="Payroll" />
-              case 'Recruitment': return clientCanAccess(user, 'HR Overview') ? <RecruitmentPage /> : <AccessDenied section="Recruitment" />
 
               // CRM Routes
               case 'CRM Overview': return clientCanAccess(user, 'CRM Overview') ? <CrmOverviewPage /> : <AccessDenied section="CRM Overview" />
               case 'Leads': return clientCanAccess(user, 'CRM Overview') ? <CrmLeadsPage /> : <AccessDenied section="Leads" />
               case 'Clients': return clientCanAccess(user, 'CRM Overview') ? <CrmClientsPage /> : <AccessDenied section="Clients" />
               case 'Pipeline': return clientCanAccess(user, 'CRM Overview') ? <CrmPipelinePage /> : <AccessDenied section="Pipeline" />
-              case 'Follow Ups': return clientCanAccess(user, 'CRM Overview') ? <CrmFollowUpsPage /> : <AccessDenied section="Follow Ups" />
-              case 'Activities': return clientCanAccess(user, 'CRM Overview') ? <CrmActivitiesPage /> : <AccessDenied section="Activities" />
-              case 'Broadcast': return clientCanAccess(user, 'CRM Overview') ? <CrmBroadcastPage /> : <AccessDenied section="Broadcast" />
 
               case 'Roles & Permissions': return clientCanAccess(user, 'Roles & Permissions') ? <RolesPermissionsPage /> : <AccessDenied section="Roles & Permissions" />
               case 'User Management': return clientCanAccess(user, 'User Management') ? <UsersPage /> : <AccessDenied section="User Management" />

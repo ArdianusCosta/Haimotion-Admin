@@ -83,10 +83,10 @@ export function LeaveRequests() {
 
   // Tab items configuration (Filament-style status tabs)
   const tabItems = [
-    { key: 'all' as const, label: t('Semua'), count: stats.total, icon: FileText },
-    { key: 'pending' as const, label: t('Perlu Persetujuan'), count: stats.pending, icon: Clock, badgeVariant: 'warning' as const },
-    { key: 'approved' as const, label: t('Disetujui'), count: stats.approved, icon: CheckCircle2, badgeVariant: 'success' as const },
-    { key: 'rejected' as const, label: t('Ditolak'), count: stats.rejected, icon: XCircle, badgeVariant: 'danger' as const },
+    { key: 'all' as const, label: t('Semua'), count: stats.total },
+    { key: 'pending' as const, label: t('Perlu Persetujuan'), count: stats.pending },
+    { key: 'approved' as const, label: t('Disetujui'), count: stats.approved },
+    { key: 'rejected' as const, label: t('Ditolak'), count: stats.rejected },
   ];
 
   // Filtered leaves according to status tab, type filter, and search
@@ -351,61 +351,57 @@ export function LeaveRequests() {
         </Card>
       </div>
 
-      {/* 2. TAB CONTROLS (Filament-style Pill Segmented Controls) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-        {/* Filament Tabs */}
-        <div className="inline-flex items-center gap-1 p-1 bg-muted/50 dark:bg-zinc-950/80 border border-border/80 dark:border-zinc-800 rounded-xl shadow-2xs overflow-x-auto max-w-full">
+      {/* 2. FILAMENT-STYLE STATUS TABS (Dedicated Segmented Control Row) */}
+      <div className="flex items-center overflow-x-auto no-scrollbar py-0.5">
+        <div className="inline-flex items-center gap-1.5 p-1 bg-zinc-950/80 dark:bg-zinc-900/90 border border-zinc-800/80 rounded-xl shadow-xs">
           {tabItems.map((tab) => {
-            const Icon = tab.icon;
             const isActive = activeTab === tab.key;
-            const isWarning = tab.badgeVariant === 'warning' && (tab.count || 0) > 0;
 
             return (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all select-none whitespace-nowrap ${
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all select-none whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'bg-card dark:bg-zinc-800 text-foreground dark:text-white font-semibold shadow-xs border border-border/80 dark:border-zinc-700/60'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-card/40'
+                    ? 'bg-zinc-800 text-white font-semibold shadow-xs border border-zinc-700/60'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
                 }`}
               >
-                <Icon className={`size-3.5 shrink-0 ${
-                  isActive 
-                    ? (tab.key === 'pending' ? 'text-amber-500' : tab.key === 'approved' ? 'text-emerald-500' : tab.key === 'rejected' ? 'text-rose-500' : 'text-primary')
-                    : isWarning 
-                      ? 'text-amber-500' 
-                      : 'text-muted-foreground'
-                }`} />
                 <span>{tab.label}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                  tab.key === 'pending'
-                    ? (tab.count > 0 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30' : 'bg-muted text-muted-foreground')
-                    : tab.key === 'approved'
-                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
-                      : tab.key === 'rejected'
-                        ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25'
-                        : 'bg-muted dark:bg-zinc-800 text-muted-foreground'
-                }`}>
+                <span
+                  className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold leading-none ${
+                    isActive
+                      ? 'bg-zinc-700 text-white'
+                      : tab.key === 'pending'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        : tab.key === 'approved'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : tab.key === 'rejected'
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
                   {tab.count}
                 </span>
               </button>
             );
           })}
         </div>
+      </div>
 
-        {/* Search, Filter Jenis, & Create Button Toolbar */}
-        <div className="flex flex-wrap items-center gap-2.5">
+      {/* 3. TABLE FILTER & ACTION TOOLBAR (Filament-style Filter Bar) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1">
           {/* Search Bar */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input 
               type="text" 
               placeholder={t('Cari nama karyawan, jenis, alasan...')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-8 bg-card border-border h-9 rounded-xl text-xs"
+              className="pl-9 pr-8 bg-card border-border h-9 rounded-xl text-xs shadow-2xs"
             />
             {search && (
               <button
@@ -423,7 +419,7 @@ export function LeaveRequests() {
             <select
               value={typeFilter}
               onChange={(e: any) => setTypeFilter(e.target.value)}
-              className="h-9 pl-8 pr-7 rounded-xl border border-border bg-card text-xs font-medium text-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
+              className="h-9 pl-8 pr-7 rounded-xl border border-border bg-card text-xs font-medium text-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer shadow-2xs"
             >
               <option value="all">{t('Semua Jenis')}</option>
               <option value="cuti">{t('Cuti Tahunan')}</option>
@@ -433,24 +429,24 @@ export function LeaveRequests() {
             </select>
             <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
           </div>
-
-          {/* Primary Action Button: Ajukan Permohonan */}
-          <Button 
-            onClick={() => {
-              setSelectedLeave(null);
-              setIsModalOpen(true);
-            }}
-            className="gap-2 h-9 px-4 rounded-xl font-semibold shadow-sm hover:shadow transition-all shrink-0 text-xs"
-          >
-            <Plus className="size-4" />
-            <span>{t('Ajukan Izin / Cuti')}</span>
-          </Button>
         </div>
+
+        {/* Primary Action Button: Ajukan Permohonan */}
+        <Button 
+          onClick={() => {
+            setSelectedLeave(null);
+            setIsModalOpen(true);
+          }}
+          className="gap-2 h-9 px-4 rounded-xl font-semibold shadow-sm hover:shadow transition-all shrink-0 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <Plus className="size-4" />
+          <span>{t('Ajukan Izin / Cuti')}</span>
+        </Button>
       </div>
 
       {/* 4. DATA TABLE (Clean & Modern Shadcn-style Card) */}
       <div className="rounded-2xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-sm text-left">
             <thead className="text-[11px] text-muted-foreground uppercase bg-muted/40 border-b border-border font-semibold tracking-wider">
               <tr>

@@ -4,27 +4,14 @@ import prisma from '@/lib/prisma'
 import { requireAuth, requireCrmPermission } from '@/lib/auth/authorization'
 import { revalidatePath } from 'next/cache'
 
-// Helper to record activity in crm_activities table
+// Helper to record activity in crm_activities table (no-op in clean setup)
 async function recordCrmActivity(
-  userId: number,
-  type: string,
-  description: string,
-  relations: { client_id?: number | null; lead_id?: number | null; deal_id?: number | null } = {}
+  _userId: number,
+  _type: string,
+  _description: string,
+  _relations: { client_id?: number | null; lead_id?: number | null; deal_id?: number | null } = {}
 ) {
-  try {
-    await prisma.crmActivity.create({
-      data: {
-        user_id: userId,
-        type,
-        description,
-        client_id: relations.client_id || null,
-        lead_id: relations.lead_id || null,
-        deal_id: relations.deal_id || null,
-      }
-    })
-  } catch (err) {
-    console.error('Failed to record CRM activity:', err)
-  }
+  // Activity logging removed in standard clean CRM
 }
 
 function triggerCrmRevalidation() {
@@ -33,9 +20,6 @@ function triggerCrmRevalidation() {
     revalidatePath('/crm/leads')
     revalidatePath('/crm/clients')
     revalidatePath('/crm/pipeline')
-    revalidatePath('/crm/follow-ups')
-    revalidatePath('/crm/activities')
-    revalidatePath('/crm/broadcast')
   } catch (e) {
     // revalidatePath might throw outside of request context in tests
   }
@@ -112,15 +96,6 @@ export async function getCrmClientById(id: number) {
           include: { pipeline_stage: true },
           orderBy: { created_at: 'desc' }
         },
-        follow_ups: {
-          include: { assigned_user: { select: { firstname: true, lastname: true } } },
-          orderBy: { due_date: 'asc' }
-        },
-        activities: {
-          include: { user: { select: { firstname: true, lastname: true } } },
-          orderBy: { created_at: 'desc' },
-          take: 20
-        },
         notes: {
           include: { author: { select: { firstname: true, lastname: true, avatar: true } } },
           orderBy: { created_at: 'desc' }
@@ -148,7 +123,7 @@ export async function createCrmClient(data: any) {
 
     // Check duplicate name
     const existing = await prisma.crmClient.findFirst({
-      where: { company_name: { equals: companyName, mode: 'insensitive' } }
+      where: { company_name: companyName }
     })
     if (existing) {
       return { success: false, error: `A client with the name "${companyName}" already exists.` }
@@ -211,7 +186,7 @@ export async function updateCrmClient(id: number, data: any) {
       const duplicate = await prisma.crmClient.findFirst({
         where: {
           id: { not: clientId },
-          company_name: { equals: companyName, mode: 'insensitive' }
+          company_name: { equals: companyName }
         }
       })
       if (duplicate) {
@@ -339,15 +314,6 @@ export async function getCrmLeadById(id: number) {
         },
         deals: {
           include: { pipeline_stage: true }
-        },
-        follow_ups: {
-          include: { assigned_user: { select: { firstname: true, lastname: true } } },
-          orderBy: { due_date: 'asc' }
-        },
-        activities: {
-          include: { user: { select: { firstname: true, lastname: true } } },
-          orderBy: { created_at: 'desc' },
-          take: 20
         },
         notes: {
           include: { author: { select: { firstname: true, lastname: true, avatar: true } } },
@@ -506,7 +472,7 @@ export async function convertCrmLead(id: number) {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Check or Create Client
       let client = await tx.crmClient.findFirst({
-        where: { company_name: { equals: clientName, mode: 'insensitive' } }
+        where: { company_name: { equals: clientName } }
       })
 
       if (!client) {
@@ -575,18 +541,6 @@ export async function convertCrmLead(id: number) {
       await tx.crmLead.update({
         where: { id: leadId },
         data: { status: 'Converted' }
-      })
-
-      // 5. Record CRM activity
-      await tx.crmActivity.create({
-        data: {
-          user_id: user.id,
-          type: 'Lead Converted',
-          description: `Converted Lead "${lead.name}" to Client "${client.company_name}" and created Deal "${deal.title}".`,
-          client_id: client.id,
-          lead_id: lead.id,
-          deal_id: deal.id
-        }
       })
 
       return { client, deal }
@@ -795,186 +749,7 @@ export async function getCrmPipelines() {
 }
 
 // ============================================================================
-// 4. FOLLOW-UPS ACTIONS
-// ============================================================================
-
-export async function getCrmFollowUps() {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'view')
-
-  try {
-    const followUps = await prisma.crmFollowUp.findMany({
-      include: {
-        client: { select: { id: true, company_name: true } },
-        lead: { select: { id: true, name: true, company: true } },
-        deal: { select: { id: true, title: true } },
-        assigned_user: {
-          select: { id: true, firstname: true, lastname: true, avatar: true }
-        }
-      },
-      orderBy: { due_date: 'asc' }
-    })
-    return { success: true, data: followUps }
-  } catch (error: any) {
-    console.error('Failed to get CRM follow-ups:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function createCrmFollowUp(data: any) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'create')
-
-  try {
-    if (!data.due_date) {
-      return { success: false, error: 'Due date is required.' }
-    }
-
-    const followUp = await prisma.crmFollowUp.create({
-      data: {
-        type: data.type || 'WhatsApp',
-        status: data.status || 'Pending',
-        due_date: new Date(data.due_date),
-        notes: data.notes?.trim() || null,
-        client_id: data.client_id ? Number(data.client_id) : null,
-        lead_id: data.lead_id ? Number(data.lead_id) : null,
-        deal_id: data.deal_id ? Number(data.deal_id) : null,
-        assigned_user_id: data.assigned_user_id ? Number(data.assigned_user_id) : user.id,
-      }
-    })
-
-    await recordCrmActivity(
-      user.id,
-      'Follow-Up Scheduled',
-      `Scheduled ${followUp.type} follow-up for ${new Date(followUp.due_date).toLocaleDateString()}`,
-      { client_id: followUp.client_id, lead_id: followUp.lead_id, deal_id: followUp.deal_id }
-    )
-    triggerCrmRevalidation()
-
-    return { success: true, data: followUp }
-  } catch (error: any) {
-    console.error('Failed to create CRM follow-up:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function updateCrmFollowUp(id: number, data: any) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'update')
-
-  try {
-    const followUpId = Number(id)
-    const existing = await prisma.crmFollowUp.findUnique({ where: { id: followUpId } })
-    if (!existing) return { success: false, error: 'Follow-up not found.' }
-
-    const updateData: any = {}
-    if (data.type) updateData.type = data.type
-    if (data.due_date) updateData.due_date = new Date(data.due_date)
-    if (data.notes !== undefined) updateData.notes = data.notes?.trim() || null
-    if (data.status) updateData.status = data.status
-    if (data.client_id !== undefined) updateData.client_id = data.client_id ? Number(data.client_id) : null
-    if (data.lead_id !== undefined) updateData.lead_id = data.lead_id ? Number(data.lead_id) : null
-    if (data.deal_id !== undefined) updateData.deal_id = data.deal_id ? Number(data.deal_id) : null
-    if (data.assigned_user_id !== undefined) updateData.assigned_user_id = data.assigned_user_id ? Number(data.assigned_user_id) : null
-
-    const followUp = await prisma.crmFollowUp.update({
-      where: { id: followUpId },
-      data: updateData
-    })
-
-    await recordCrmActivity(
-      user.id,
-      'Follow-Up Updated',
-      `Updated ${followUp.type} follow-up details`,
-      { client_id: followUp.client_id, lead_id: followUp.lead_id, deal_id: followUp.deal_id }
-    )
-    triggerCrmRevalidation()
-
-    return { success: true, data: followUp }
-  } catch (error: any) {
-    console.error('Failed to update CRM follow-up:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function updateCrmFollowUpStatus(id: number, status: string) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'update')
-
-  try {
-    const followUpId = Number(id)
-    const followUp = await prisma.crmFollowUp.update({
-      where: { id: followUpId },
-      data: { status }
-    })
-
-    if (status === 'Completed') {
-      await recordCrmActivity(
-        user.id,
-        'Follow-Up Completed',
-        `Completed follow-up: ${followUp.type}${followUp.notes ? ` ("${followUp.notes}")` : ''}`,
-        { client_id: followUp.client_id, lead_id: followUp.lead_id, deal_id: followUp.deal_id }
-      )
-    } else {
-      await recordCrmActivity(
-        user.id,
-        'Follow-Up Status Changed',
-        `Changed follow-up status to ${status}`,
-        { client_id: followUp.client_id, lead_id: followUp.lead_id, deal_id: followUp.deal_id }
-      )
-    }
-
-    triggerCrmRevalidation()
-    return { success: true, data: followUp }
-  } catch (error: any) {
-    console.error('Failed to update CRM follow-up status:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function deleteCrmFollowUp(id: number) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'delete')
-
-  try {
-    const followUpId = Number(id)
-    await prisma.crmFollowUp.delete({ where: { id: followUpId } })
-    triggerCrmRevalidation()
-    return { success: true }
-  } catch (error: any) {
-    console.error('Failed to delete CRM follow-up:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-// ============================================================================
-// 5. ACTIVITIES ACTIONS
-// ============================================================================
-
-export async function getCrmActivities(limit = 100) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'view')
-
-  try {
-    const activities = await prisma.crmActivity.findMany({
-      include: {
-        user: { select: { id: true, firstname: true, lastname: true, avatar: true } },
-        client: { select: { id: true, company_name: true } },
-        lead: { select: { id: true, name: true, company: true } },
-        deal: { select: { id: true, title: true } }
-      },
-      orderBy: { created_at: 'desc' },
-      take: Math.min(limit, 200)
-    })
-    return { success: true, data: activities }
-  } catch (error: any) {
-    console.error('Failed to get CRM activities:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-// ============================================================================
-// 6. NOTES ACTIONS
+// 4. NOTES ACTIONS
 // ============================================================================
 
 export async function getCrmNotes(filter: { client_id?: number; lead_id?: number }) {
@@ -1061,179 +836,7 @@ export async function deleteCrmNote(id: number) {
 }
 
 // ============================================================================
-// 7. BROADCAST CAMPAIGNS ACTIONS
-// ============================================================================
-
-export async function getCrmBroadcastCampaigns() {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'view')
-
-  try {
-    const campaigns = await prisma.crmBroadcastCampaign.findMany({
-      include: {
-        recipients: {
-          select: {
-            id: true,
-            status: true,
-            contact_info: true,
-            client_id: true,
-            lead_id: true
-          }
-        }
-      },
-      orderBy: { created_at: 'desc' }
-    })
-
-    const formatted = campaigns.map(c => ({
-      ...c,
-      totalRecipients: c.recipients.length,
-      pendingCount: c.recipients.filter(r => r.status === 'Pending').length,
-      sentCount: c.recipients.filter(r => r.status === 'Sent').length,
-      failedCount: c.recipients.filter(r => r.status === 'Failed').length,
-    }))
-
-    return { success: true, data: formatted }
-  } catch (error: any) {
-    console.error('Failed to get CRM broadcast campaigns:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function getCrmBroadcastCampaignById(id: number) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'view')
-
-  try {
-    const campaign = await prisma.crmBroadcastCampaign.findUnique({
-      where: { id: Number(id) },
-      include: {
-        recipients: true
-      }
-    })
-    if (!campaign) return { success: false, error: 'Campaign not found' }
-    return { success: true, data: campaign }
-  } catch (error: any) {
-    console.error('Failed to get CRM broadcast campaign by ID:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function createCrmBroadcastCampaign(data: {
-  name: string
-  audience_type: string
-  channel: string
-  message: string
-  scheduled_at?: string
-}) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'create')
-
-  try {
-    if (!data.name || !data.name.trim()) {
-      return { success: false, error: 'Campaign name is required.' }
-    }
-    if (!data.message || !data.message.trim()) {
-      return { success: false, error: 'Message content is required.' }
-    }
-
-    // Determine target recipients
-    type RecipientEntry = { contact_info: string; client_id?: number | null; lead_id?: number | null }
-    const recipientEntries: RecipientEntry[] = []
-
-    if (data.audience_type === 'all_leads' || data.audience_type === 'new_leads') {
-      const where: any = {}
-      if (data.audience_type === 'new_leads') where.status = 'New'
-
-      const leads = await prisma.crmLead.findMany({
-        where,
-        select: { id: true, name: true, phone: true, whatsapp: true, email: true }
-      })
-
-      for (const lead of leads) {
-        const contact = data.channel.toLowerCase() === 'email' ? lead.email : (lead.whatsapp || lead.phone)
-        if (contact) {
-          recipientEntries.push({ contact_info: contact, lead_id: lead.id })
-        }
-      }
-    } else if (data.audience_type === 'all_clients' || data.audience_type === 'active_clients') {
-      const where: any = {}
-      if (data.audience_type === 'active_clients') where.status = 'Active'
-
-      const clients = await prisma.crmClient.findMany({
-        where,
-        include: { contacts: true }
-      })
-
-      for (const client of clients) {
-        const primary = client.contacts.find(c => c.is_primary) || client.contacts[0]
-        if (primary) {
-          const contact = data.channel.toLowerCase() === 'email' ? primary.email : (primary.whatsapp || primary.phone)
-          if (contact) {
-            recipientEntries.push({ contact_info: contact, client_id: client.id })
-          }
-        }
-      }
-    }
-
-    // Save Campaign & Snapshot Recipients in a Transaction
-    const campaign = await prisma.$transaction(async (tx) => {
-      const newCampaign = await tx.crmBroadcastCampaign.create({
-        data: {
-          name: data.name.trim(),
-          audience_type: data.audience_type,
-          channel: data.channel,
-          message: data.message.trim(),
-          status: 'Ready', // Saved & queued ready for provider dispatch
-          scheduled_at: data.scheduled_at ? new Date(data.scheduled_at) : null,
-        }
-      })
-
-      if (recipientEntries.length > 0) {
-        await tx.crmBroadcastRecipient.createMany({
-          data: recipientEntries.map(r => ({
-            campaign_id: newCampaign.id,
-            contact_info: r.contact_info,
-            client_id: r.client_id || null,
-            lead_id: r.lead_id || null,
-            status: 'Pending'
-          }))
-        })
-      }
-
-      return newCampaign
-    })
-
-    await recordCrmActivity(
-      user.id,
-      'Broadcast Campaign Created',
-      `Created campaign "${campaign.name}" via ${campaign.channel} with ${recipientEntries.length} recipients queued.`
-    )
-    triggerCrmRevalidation()
-
-    return { success: true, data: campaign, recipientCount: recipientEntries.length }
-  } catch (error: any) {
-    console.error('Failed to create broadcast campaign:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-export async function deleteCrmBroadcastCampaign(id: number) {
-  const user = await requireAuth()
-  requireCrmPermission(user, 'delete')
-
-  try {
-    const campaignId = Number(id)
-    await prisma.crmBroadcastCampaign.delete({ where: { id: campaignId } })
-    triggerCrmRevalidation()
-    return { success: true }
-  } catch (error: any) {
-    console.error('Failed to delete broadcast campaign:', error)
-    return { success: false, error: error.message }
-  }
-}
-
-// ============================================================================
-// 8. OVERVIEW STATS & DASHBOARD
+// 5. OVERVIEW STATS & DASHBOARD
 // ============================================================================
 
 export async function getCrmOverviewStats() {
@@ -1254,58 +857,40 @@ export async function getCrmOverviewStats() {
       where: { stage: { notIn: ['Lost', 'Won'] } }
     })
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    const followUpsToday = await prisma.crmFollowUp.count({
-      where: {
-        due_date: {
-          gte: today,
-          lt: tomorrow
-        },
-        status: 'Pending'
-      }
-    })
-
-    // Fetch real recent activities
-    const recentActivities = await prisma.crmActivity.findMany({
-      include: {
-        user: { select: { id: true, firstname: true, lastname: true, avatar: true } },
-        client: { select: { id: true, company_name: true } },
-        lead: { select: { id: true, name: true, company: true } },
-        deal: { select: { id: true, title: true } }
-      },
-      orderBy: { created_at: 'desc' },
-      take: 6
-    })
-
-    // Fetch real upcoming tasks / follow-ups
-    const upcomingTasks = await prisma.crmFollowUp.findMany({
-      where: {
-        status: 'Pending',
-        due_date: { gte: today }
-      },
-      include: {
-        client: { select: { id: true, company_name: true } },
-        lead: { select: { id: true, name: true } },
-        deal: { select: { id: true, title: true } }
-      },
-      orderBy: { due_date: 'asc' },
-      take: 5
-    })
-
-    // Calculate real win-rate score if deals exist
-    const totalClosedDeals = await prisma.crmDeal.count({
-      where: { stage: { in: ['Won', 'Lost'] } }
-    })
     const wonDeals = await prisma.crmDeal.count({
       where: { stage: 'Won' }
     })
+
+    const totalClosedDeals = await prisma.crmDeal.count({
+      where: { stage: { in: ['Won', 'Lost'] } }
+    })
+
     const performanceScore = totalClosedDeals > 0
       ? Math.round((wonDeals / totalClosedDeals) * 100)
       : (totalClients > 0 || activeLeads > 0 ? 80 : 0)
+
+    const recentLeads = await prisma.crmLead.findMany({
+      orderBy: { created_at: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        company: true,
+        email: true,
+        phone: true,
+        status: true,
+        created_at: true,
+      }
+    })
+
+    const recentDeals = await prisma.crmDeal.findMany({
+      orderBy: { created_at: 'desc' },
+      take: 5,
+      include: {
+        client: { select: { company_name: true } },
+        lead: { select: { name: true } }
+      }
+    })
 
     return {
       success: true,
@@ -1314,10 +899,10 @@ export async function getCrmOverviewStats() {
         activeLeads,
         openDeals,
         openDealsValue: dealsAgg._sum.value || 0,
-        followUpsToday,
-        recentActivities,
-        upcomingTasks,
-        performanceScore
+        wonDeals,
+        performanceScore,
+        recentLeads,
+        recentDeals
       }
     }
   } catch (error: any) {

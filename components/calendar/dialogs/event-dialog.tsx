@@ -50,7 +50,7 @@ export function EventDialog({
       </Dialog>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[620px] p-6 border-border bg-card shadow-2xl">
+        <DialogContent className="sm:max-w-[620px] p-6 border-border bg-card shadow-2xl max-h-[90vh] overflow-y-auto">
           <form onSubmit={handleSaveEvent}>
             <DialogHeader className="pb-3 border-b border-border">
               <DialogTitle className="text-xl font-bold tracking-tight">

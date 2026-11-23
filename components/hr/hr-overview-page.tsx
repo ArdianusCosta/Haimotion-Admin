@@ -1,6 +1,10 @@
-import { useEmployees, useLeaves, useCandidates, useHrOverview } from './queries';
-import { HRPageHeader, LeaveStatusBadge } from './components';
-import { Users, CalendarRange, Building2, Briefcase, Clock } from 'lucide-react';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useEmployees, useLeaves, useHrOverview } from './queries';
+import { HRPageHeader, LeaveStatusBadge, EmployeeStatusBadge } from './components';
+import { Users, CalendarRange, Building2, UserCheck, ArrowRight, ChevronRight } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { useLanguage } from '@/components/language-provider';
@@ -13,19 +17,18 @@ const hiringTrends = [
 const chartConfig = { count: { label: 'Employees', color: 'var(--chart-1)' }, hires: { label: 'New Hires', color: 'var(--chart-2)' } } satisfies ChartConfig
 
 export function HROverviewPage() {
+  const router = useRouter();
   const { t, formatDate } = useLanguage();
   const { data: employees, isLoading: loadingEmp } = useEmployees();
   const { data: leaves, isLoading: loadingLeaves } = useLeaves();
-  const { data: candidates, isLoading: loadingCandidates } = useCandidates();
   const { data: overview, isLoading: loadingOverview } = useHrOverview();
 
-  if (loadingEmp || loadingLeaves || loadingCandidates || loadingOverview) {
+  if (loadingEmp || loadingLeaves || loadingOverview) {
     return <div className="p-8 text-center text-muted-foreground">Loading HR Overview...</div>;
   }
 
   const activeEmployees = employees?.filter((e: any) => e.status === 'Active').length || 0;
   const pendingLeaves = overview?.activeLeaveRequests || 0;
-  const openInterviews = candidates?.filter((c: any) => c.status === 'Interview').length || 0;
 
   const deptCount = employees?.reduce((acc: any, emp: any) => {
     acc[emp.department] = (acc[emp.department] || 0) + 1;
@@ -34,7 +37,7 @@ export function HROverviewPage() {
   const deptData = Object.entries(deptCount).map(([dept, count]) => ({ department: dept, count }));
 
   const recentLeaves = leaves?.slice(0, 4) || [];
-  const recentInterviews = candidates?.filter((c: any) => c.status === 'Interview').slice(0, 4) || [];
+  const recentEmployees = employees?.slice(0, 4) || [];
 
   return (
     <div className="p-8 flex-1 overflow-y-auto w-full">
@@ -46,21 +49,44 @@ export function HROverviewPage() {
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
+          <div 
+            onClick={() => router.push('/hr/employees')}
+            className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all group"
+            title="Buka Data Employees"
+          >
             <div className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <h3 className="tracking-tight text-sm font-medium">{t('Total Employees')}</h3>
-              <Users className="w-4 h-4 text-muted-foreground" />
+              <h3 className="tracking-tight text-sm font-medium group-hover:text-primary transition-colors">{t('Total Employees')}</h3>
+              <Users className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
             <div className="text-2xl font-bold">{overview?.totalEmployees || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {activeEmployees} {t('active')}
             </p>
           </div>
-          
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
+
+          <div 
+            onClick={() => router.push('/hr/employees')}
+            className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all group"
+            title="Buka Data Employees"
+          >
             <div className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <h3 className="tracking-tight text-sm font-medium">{t('Leave Requests')}</h3>
-              <CalendarRange className="w-4 h-4 text-muted-foreground" />
+              <h3 className="tracking-tight text-sm font-medium group-hover:text-primary transition-colors">{t('Karyawan Aktif')}</h3>
+              <UserCheck className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            </div>
+            <div className="text-2xl font-bold">{activeEmployees}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('Siap & bertugas aktif')}
+            </p>
+          </div>
+          
+          <div 
+            onClick={() => router.push('/hr/attendance')}
+            className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all group"
+            title="Buka Pengajuan Cuti & Izin"
+          >
+            <div className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <h3 className="tracking-tight text-sm font-medium group-hover:text-primary transition-colors">{t('Leave Requests')}</h3>
+              <CalendarRange className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
             <div className="text-2xl font-bold">{pendingLeaves}</div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -76,17 +102,6 @@ export function HROverviewPage() {
             <div className="text-2xl font-bold">{Object.keys(deptCount).length || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {t('Across the organization')}
-            </p>
-          </div>
-
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
-            <div className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <h3 className="tracking-tight text-sm font-medium">{t('Interviews')}</h3>
-              <Briefcase className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <div className="text-2xl font-bold">{openInterviews}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t('upcoming sessions')}
             </p>
           </div>
         </div>
@@ -138,43 +153,85 @@ export function HROverviewPage() {
 
         {/* Tables Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-            <div className="flex flex-col space-y-1.5 p-6 border-b">
-              <h3 className="font-semibold leading-none tracking-tight">{t('Recent Leave Requests')}</h3>
+          <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="space-y-1">
+                <h3 className="font-semibold leading-none tracking-tight">{t('Recent Leave Requests')}</h3>
+                <p className="text-xs text-muted-foreground">{t('Permohonan cuti dan izin kerja terkini')}</p>
+              </div>
+              <Link 
+                href="/hr/attendance"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors group cursor-pointer"
+              >
+                <span>{t('View all')}</span>
+                <ArrowRight className="size-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
             </div>
             <div className="p-0">
               <div className="divide-y divide-border">
                 {recentLeaves.map(leave => (
-                  <div key={leave.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+                  <div 
+                    key={leave.id} 
+                    onClick={() => router.push('/hr/attendance')}
+                    className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors cursor-pointer group"
+                    title="Buka Pengajuan Cuti & Izin"
+                  >
                     <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium">{leave.employee?.name}</span>
+                      <span className="text-sm font-medium group-hover:text-primary transition-colors">{leave.employee?.name}</span>
                       <span className="text-xs text-muted-foreground">{leave.type} • {formatDate(leave.start_date)}</span>
                     </div>
-                    <LeaveStatusBadge status={leave.status} />
+                    <div className="flex items-center gap-2">
+                      <LeaveStatusBadge status={leave.status} />
+                      <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                    </div>
                   </div>
                 ))}
+                {recentLeaves.length === 0 && (
+                  <div className="p-8 text-center text-sm text-muted-foreground">{t('No data found')}</div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-            <div className="flex flex-col space-y-1.5 p-6 border-b">
-              <h3 className="font-semibold leading-none tracking-tight">{t('Upcoming Interviews')}</h3>
+          <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="space-y-1">
+                <h3 className="font-semibold leading-none tracking-tight">{t('Recent Employees')}</h3>
+                <p className="text-xs text-muted-foreground">{t('Daftar staf dan karyawan yang terdaftar')}</p>
+              </div>
+              <Link 
+                href="/hr/employees"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors group cursor-pointer"
+              >
+                <span>{t('View all')}</span>
+                <ArrowRight className="size-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
             </div>
             <div className="p-0">
               <div className="divide-y divide-border">
-                {recentInterviews.map(candidate => (
-                  <div key={candidate.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium">{candidate.name}</span>
-                      <span className="text-xs text-muted-foreground">{candidate.role_applied}</span>
+                {recentEmployees.map((emp: any) => (
+                  <div 
+                    key={emp.id} 
+                    onClick={() => router.push('/hr/employees')}
+                    className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors cursor-pointer group"
+                    title="Buka Data Employees"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                        {emp.name ? emp.name.slice(0, 2).toUpperCase() : 'EM'}
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium group-hover:text-primary transition-colors">{emp.name}</span>
+                        <span className="text-xs text-muted-foreground">{emp.department || emp.position || 'Staff'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-md">
-                      <Clock className="size-3" /> Scheduled
+                    <div className="flex items-center gap-2">
+                      <EmployeeStatusBadge status={emp.status} />
+                      <ChevronRight className="size-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                     </div>
                   </div>
                 ))}
-                {recentInterviews.length === 0 && (
+                {recentEmployees.length === 0 && (
                   <div className="p-8 text-center text-sm text-muted-foreground">{t('No data found')}</div>
                 )}
               </div>

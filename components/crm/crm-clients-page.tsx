@@ -453,7 +453,7 @@ export function CrmClientsPage() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</Label>
-                  <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <Select value={formData.status || ''} onValueChange={v => setFormData({ ...formData, status: v || '' })}>
                     <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Active">Active</SelectItem>
@@ -529,7 +529,7 @@ export function CrmClientsPage() {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</Label>
-                <Select value={editFormData.status} onValueChange={v => setEditFormData({ ...editFormData, status: v })}>
+                <Select value={editFormData.status || ''} onValueChange={v => setEditFormData({ ...editFormData, status: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Active">Active</SelectItem>

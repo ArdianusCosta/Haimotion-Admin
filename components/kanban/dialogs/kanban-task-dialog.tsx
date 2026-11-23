@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Loader2, Paperclip, Plus, Send, Clock, MessageSquare, ExternalLink } from 'lucide-react'
+import { Loader2, Paperclip, Plus, Send, Clock, MessageSquare, ExternalLink, Trash2, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { useKanban } from '../kanban-provider'
 import { useQueryClient } from '@tanstack/react-query'
 import { pusherClient } from '@/lib/pusher-client'
@@ -24,7 +25,7 @@ export function KanbanTaskDialog() {
     columns, users, currentUser,
     isDetailsDialogOpen, setIsDetailsDialogOpen,
     selectedTask, taskDetails, detailsLoading,
-    addCommentMutation, uploadAttachmentMutation
+    addCommentMutation, uploadAttachmentMutation, deleteAttachmentMutation
   } = useKanban()
 
   const queryClient = useQueryClient()
@@ -183,30 +184,54 @@ export function KanbanTaskDialog() {
       }
 
       let fileUrl = ''
-      const res = await fetch('/api/chat/upload', {
-        method: 'POST',
-        body: formData
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.url) fileUrl = data.url
-      } else {
-        // Fallback to /api/upload
-        const res2 = await fetch('/api/upload', {
+      // 1. Try dedicated kanban upload first
+      try {
+        const res = await fetch('/api/kanban/upload', {
           method: 'POST',
           body: formData
         })
-        if (res2.ok) {
-          const data2 = await res2.json()
-          if (data2.url) fileUrl = data2.url
+        if (res.ok) {
+          const data = await res.json()
+          if (data.url) fileUrl = data.url
         }
+      } catch (_) {}
+
+      // 2. Fallback to /api/upload
+      if (!fileUrl) {
+        try {
+          const res2 = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+          })
+          if (res2.ok) {
+            const data2 = await res2.json()
+            if (data2.url) fileUrl = data2.url
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fallback to /api/chat/upload
+      if (!fileUrl) {
+        try {
+          const res3 = await fetch('/api/chat/upload', {
+            method: 'POST',
+            body: formData
+          })
+          if (res3.ok) {
+            const data3 = await res3.json()
+            if (data3.url) fileUrl = data3.url
+          }
+        } catch (_) {}
       }
 
       if (fileUrl) {
         uploadAttachmentMutation.mutate({ taskId: selectedTask.dbId, url: fileUrl, name: file.name })
+      } else {
+        toast.error('Gagal mengunggah berkas. Silakan coba lagi.')
       }
     } catch (err) {
       console.error('File upload error:', err)
+      toast.error('Terjadi kesalahan saat mengunggah berkas')
     } finally {
       e.target.value = ''
     }
@@ -254,60 +279,82 @@ export function KanbanTaskDialog() {
                       </label>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-border/50 bg-muted/20 p-2.5 max-h-[280px] overflow-y-auto">
+                  <div className="rounded-xl border border-border/50 bg-muted/20 p-3 max-h-[380px] overflow-y-auto">
                     {taskDetails.attachments.length > 0 ? (
-                      <div className="flex flex-col gap-2.5">
+                      <div className="flex flex-col gap-3">
                         {taskDetails.attachments.map((att: any) => {
                           const isImg = isImageFile(att.file_name, att.file_url)
                           return (
                             <div 
                               key={att.id} 
-                              className="flex flex-col p-2.5 rounded-lg border border-border/40 bg-background/70 text-xs transition-all shadow-2xs"
+                              className="flex flex-col p-3 rounded-xl border border-border/60 bg-background/80 text-xs transition-all shadow-xs hover:border-primary/40"
                             >
                               {/* Attachment Row Header */}
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Paperclip className="size-3.5 text-muted-foreground shrink-0" />
+                              <div className="flex items-center justify-between gap-2 pb-1">
+                                <div className="flex items-center gap-2 min-w-0 pr-2">
+                                  <Paperclip className="size-4 text-primary shrink-0" />
                                   <a 
                                     href={att.file_url} 
                                     target="_blank" 
                                     rel="noreferrer" 
-                                    className="font-medium hover:text-primary transition-colors truncate block text-xs"
+                                    className="font-semibold text-foreground hover:text-primary transition-colors truncate block text-xs"
                                     title={att.file_name}
                                   >
                                     {att.file_name}
                                   </a>
                                 </div>
-                                <a 
-                                  href={att.file_url} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors shrink-0"
-                                  title="Buka berkas di tab baru"
-                                >
-                                  <ExternalLink className="size-3.5" />
-                                </a>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <a 
+                                    href={att.file_url} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                    title="Buka berkas di tab baru"
+                                  >
+                                    <ExternalLink className="size-3.5" />
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteAttachmentMutation.mutate(att.id)}
+                                    disabled={deleteAttachmentMutation.isPending}
+                                    className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                                    title="Hapus lampiran ini"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                </div>
                               </div>
 
-                              {/* Direct Inline Image Preview directly underneath */}
+                              {/* Prominent Large Inline Image Preview */}
                               {isImg && (
-                                <div className="mt-2 rounded-lg overflow-hidden border border-border/50 bg-black/40 flex items-center justify-center p-1">
+                                <div className="mt-2 relative w-full h-48 sm:h-56 rounded-xl overflow-hidden border border-border/50 bg-zinc-950 flex items-center justify-center">
                                   <a
                                     href={att.file_url}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="block max-h-52 w-full cursor-zoom-in"
+                                    className="size-full flex items-center justify-center cursor-zoom-in"
                                     title="Klik untuk membuka ukuran penuh di tab baru"
                                   >
                                     <img 
                                       src={att.file_url} 
                                       alt={att.file_name} 
-                                      className="max-h-52 w-auto max-w-full mx-auto object-contain rounded" 
+                                      className="size-full object-contain p-1 rounded-lg" 
                                       loading="lazy"
                                       onError={(e) => {
-                                        (e.currentTarget as HTMLElement).style.display = 'none';
+                                        const target = e.currentTarget as HTMLElement;
+                                        target.style.display = 'none';
+                                        const fallback = target.nextElementSibling as HTMLElement;
+                                        if (fallback) fallback.style.display = 'flex';
                                       }}
                                     />
+                                    {/* Fallback info when image URL is dead or broken */}
+                                    <div className="hidden size-full flex-col items-center justify-center gap-2 text-muted-foreground p-4 text-center bg-muted/30">
+                                      <AlertCircle className="size-6 text-amber-500" />
+                                      <p className="text-xs font-semibold text-foreground">Foto tidak dapat dimuat</p>
+                                      <p className="text-[11px] text-muted-foreground max-w-xs">
+                                        URL berkas lama ini kedaluwarsa atau tidak ditemukan di server. Klik tombol tempat sampah di kanan atas untuk menghapus dan silakan unggah ulang.
+                                      </p>
+                                    </div>
                                   </a>
                                 </div>
                               )}
@@ -316,7 +363,7 @@ export function KanbanTaskDialog() {
                         })}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground px-1 py-0.5">No attachments.</p>
+                      <p className="text-xs text-muted-foreground px-1 py-1">No attachments.</p>
                     )}
                   </div>
                 </div>

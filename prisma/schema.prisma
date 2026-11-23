@@ -62,8 +62,6 @@ model User {
   crm_clients_assigned CrmClient[]   @relation("AssignedClients")
   crm_leads_assigned   CrmLead[]     @relation("AssignedLeads")
   crm_deals_assigned   CrmDeal[]     @relation("AssignedDeals")
-  crm_follow_ups       CrmFollowUp[] @relation("AssignedFollowUps")
-  crm_activities       CrmActivity[]
   crm_notes            CrmNote[]
 
   @@index([role_id], map: "users_role_id_fkey")
@@ -871,8 +869,6 @@ model CrmClient {
   contacts   CrmContact[]
   projects   project_list[]
   deals      CrmDeal[]
-  activities CrmActivity[]
-  follow_ups CrmFollowUp[]
   notes      CrmNote[]
   tags       CrmClientTag[]
 
@@ -921,8 +917,6 @@ model CrmLead {
   updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
 
   deals      CrmDeal[]
-  activities CrmActivity[]
-  follow_ups CrmFollowUp[]
   notes      CrmNote[]
   tags       CrmLeadTag[]
 
@@ -951,8 +945,6 @@ model CrmDeal {
   created_at DateTime @default(now()) @db.DateTime(0)
   updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
 
-  activities     CrmActivity[]
-  follow_ups     CrmFollowUp[]
   pipeline_id    Int?
   pipeline       CrmPipeline?      @relation(fields: [pipeline_id], references: [id])
   stage_id       Int?
@@ -962,62 +954,6 @@ model CrmDeal {
   @@index([lead_id])
   @@index([assigned_user_id])
   @@map("crm_deals")
-}
-
-model CrmActivity {
-  id      Int  @id @default(autoincrement())
-  user_id Int
-  user    User @relation(fields: [user_id], references: [id])
-
-  client_id Int?
-  client    CrmClient? @relation(fields: [client_id], references: [id])
-
-  lead_id Int?
-  lead    CrmLead? @relation(fields: [lead_id], references: [id])
-
-  deal_id Int?
-  deal    CrmDeal? @relation(fields: [deal_id], references: [id])
-
-  type        String @db.VarChar(50)
-  description String @db.Text
-
-  created_at DateTime @default(now()) @db.DateTime(0)
-
-  @@index([user_id])
-  @@index([client_id])
-  @@index([lead_id])
-  @@index([deal_id])
-  @@map("crm_activities")
-}
-
-model CrmFollowUp {
-  id Int @id @default(autoincrement())
-
-  client_id Int?
-  client    CrmClient? @relation(fields: [client_id], references: [id])
-
-  lead_id Int?
-  lead    CrmLead? @relation(fields: [lead_id], references: [id])
-
-  deal_id Int?
-  deal    CrmDeal? @relation(fields: [deal_id], references: [id])
-
-  assigned_user_id Int?
-  assigned_user    User? @relation("AssignedFollowUps", fields: [assigned_user_id], references: [id])
-
-  type     String   @db.VarChar(50)
-  status   String   @default("Pending") @db.VarChar(50)
-  due_date DateTime @db.DateTime(0)
-  notes    String?  @db.Text
-
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
-
-  @@index([client_id])
-  @@index([lead_id])
-  @@index([deal_id])
-  @@index([assigned_user_id])
-  @@map("crm_follow_ups")
 }
 
 model CrmNote {
@@ -1077,41 +1013,6 @@ model CrmLeadTag {
   @@index([lead_id])
   @@index([tag_id])
   @@map("crm_lead_tags")
-}
-
-model CrmBroadcastCampaign {
-  id            Int       @id @default(autoincrement())
-  name          String    @db.VarChar(255)
-  audience_type String    @db.VarChar(100)
-  channel       String    @default("WhatsApp") @db.VarChar(50)
-  message       String    @db.Text
-  status        String    @default("Draft") @db.VarChar(50)
-  scheduled_at  DateTime? @db.DateTime(0)
-
-  created_at DateTime @default(now()) @db.DateTime(0)
-  updated_at DateTime @default(now()) @updatedAt @db.DateTime(0)
-
-  recipients CrmBroadcastRecipient[]
-
-  @@map("crm_broadcast_campaigns")
-}
-
-model CrmBroadcastRecipient {
-  id          Int                  @id @default(autoincrement())
-  campaign_id Int
-  campaign    CrmBroadcastCampaign @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
-
-  client_id Int?
-  lead_id   Int?
-
-  contact_info String  @db.VarChar(255)
-  status       String  @default("Pending") @db.VarChar(50)
-  error_msg    String? @db.Text
-
-  sent_at DateTime? @db.DateTime(0)
-
-  @@index([campaign_id])
-  @@map("crm_broadcast_recipients")
 }
 
 // -------------------------------------------------------------

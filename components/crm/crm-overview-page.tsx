@@ -3,10 +3,25 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Activity, Users, Target, GitPullRequest, TrendingUp, ArrowUpRight, Zap, Star, ChevronRight, Calendar, Briefcase, Phone, MessageCircle, Folder } from 'lucide-react'
+import {
+  Users,
+  Target,
+  GitPullRequest,
+  TrendingUp,
+  ChevronRight,
+  Zap,
+  Star,
+  CheckCircle2,
+  DollarSign,
+  ArrowUpRight,
+  Building2,
+  Phone,
+  Mail
+} from 'lucide-react'
 import { getCrmOverviewStats } from '@/app/actions/crm'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 const formatDistanceToNow = (date: Date) => {
   const now = new Date()
@@ -60,18 +75,18 @@ export function CrmOverviewPage() {
       color: 'text-amber-500',
     },
     {
-      label: 'Follow-ups Today',
-      value: statsData?.followUpsToday || 0,
-      subtitle: 'Scheduled for today',
-      icon: Activity,
-      gradient: 'from-rose-500 to-pink-600',
-      bg: 'bg-rose-500/10',
-      color: 'text-rose-500',
+      label: 'Won Deals',
+      value: statsData?.wonDeals || 0,
+      subtitle: 'Successfully closed',
+      icon: CheckCircle2,
+      gradient: 'from-emerald-500 to-teal-600',
+      bg: 'bg-emerald-500/10',
+      color: 'text-emerald-500',
     },
   ]
 
-  const recentActivities = statsData?.recentActivities || []
-  const upcomingTasks = statsData?.upcomingTasks || []
+  const recentLeads = statsData?.recentLeads || []
+  const recentDeals = statsData?.recentDeals || []
 
   return (
     <div className="flex-1 space-y-8 p-4 md:p-8 pt-6">
@@ -92,7 +107,7 @@ export function CrmOverviewPage() {
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
               <Star className="h-4 w-4 text-yellow-300" />
-              <span className="text-sm font-medium">Performance Score</span>
+              <span className="text-sm font-medium">Win Rate</span>
               <span className="text-lg font-bold">{isLoading ? '--' : `${statsData?.performanceScore ?? 80}%`}</span>
             </div>
           </div>
@@ -130,23 +145,23 @@ export function CrmOverviewPage() {
         })}
       </div>
 
-      {/* Bottom Row */}
+      {/* Bottom Row: Recent Leads & Recent Deals */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        {/* Recent Activity */}
+        {/* Recent Leads */}
         <Card className="col-span-4 border-0 shadow-md">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Latest actions across leads, clients & deals</p>
+                <CardTitle className="text-base font-semibold">Recent Leads</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Latest prospective inquiries and contacts</p>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 className="gap-1 text-xs text-muted-foreground hover:text-primary"
-                onClick={() => router.push('/crm/activities')}
+                onClick={() => router.push('/crm/leads')}
               >
-                View All <ChevronRight className="h-3 w-3" />
+                View Leads <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </CardHeader>
@@ -154,34 +169,65 @@ export function CrmOverviewPage() {
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                  <Skeleton key={i} className="h-14 w-full rounded-xl" />
                 ))}
               </div>
-            ) : recentActivities.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3">
+            ) : recentLeads.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-44 gap-3">
                 <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
-                  <Activity className="h-5 w-5 text-muted-foreground/50" />
+                  <Target className="h-5 w-5 text-muted-foreground/50" />
                 </div>
-                <p className="text-sm text-muted-foreground">No recent CRM activities recorded yet.</p>
+                <p className="text-sm text-muted-foreground">No leads recorded yet.</p>
+                <Button size="sm" variant="outline" onClick={() => router.push('/crm/leads')}>
+                  Add First Lead
+                </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {recentActivities.map((act: any) => (
-                  <div key={act.id} className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-muted/30 transition-colors border border-border/30">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                        {act.user?.firstname?.[0] || 'U'}
+              <div className="space-y-2.5">
+                {recentLeads.map((lead: any) => (
+                  <div
+                    key={lead.id}
+                    onClick={() => router.push('/crm/leads')}
+                    className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/40 transition-colors border border-border/40 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-xl bg-sky-500/10 text-sky-600 flex items-center justify-center font-bold text-sm shrink-0">
+                        {lead.name?.[0]?.toUpperCase() || 'L'}
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-foreground leading-tight">{act.description}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          by {act.user?.firstname} {act.user?.lastname}
-                        </p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-semibold text-foreground truncate">{lead.name}</p>
+                          {lead.company && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                              <Building2 className="h-3 w-3 shrink-0" />
+                              {lead.company}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+                          {lead.phone && (
+                            <span className="flex items-center gap-1 truncate">
+                              <Phone className="h-3 w-3 shrink-0" />
+                              {lead.phone}
+                            </span>
+                          )}
+                          {lead.email && !lead.phone && (
+                            <span className="flex items-center gap-1 truncate">
+                              <Mail className="h-3 w-3 shrink-0" />
+                              {lead.email}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <span suppressHydrationWarning className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
-                      {formatDistanceToNow(new Date(act.created_at))}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="text-[10px] font-medium">
+                        {lead.status || 'New'}
+                      </Badge>
+                      <span suppressHydrationWarning className="text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(lead.created_at))}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -189,21 +235,21 @@ export function CrmOverviewPage() {
           </CardContent>
         </Card>
 
-        {/* Upcoming Tasks */}
+        {/* Recent Deals Pipeline */}
         <Card className="col-span-3 border-0 shadow-md">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base font-semibold">Upcoming Tasks</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Your scheduled follow-ups</p>
+                <CardTitle className="text-base font-semibold">Active Deals</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Deals moving through the pipeline</p>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 className="gap-1 text-xs text-muted-foreground hover:text-primary"
-                onClick={() => router.push('/crm/follow-ups')}
+                onClick={() => router.push('/crm/pipeline')}
               >
-                View All <ChevronRight className="h-3 w-3" />
+                View Pipeline <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </CardHeader>
@@ -211,51 +257,51 @@ export function CrmOverviewPage() {
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                  <Skeleton key={i} className="h-14 w-full rounded-xl" />
                 ))}
               </div>
-            ) : upcomingTasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 gap-3">
+            ) : recentDeals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-44 gap-3">
                 <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
-                  <ArrowUpRight className="h-5 w-5 text-muted-foreground/50" />
+                  <GitPullRequest className="h-5 w-5 text-muted-foreground/50" />
                 </div>
-                <p className="text-sm text-muted-foreground">You have no upcoming follow-ups scheduled.</p>
+                <p className="text-sm text-muted-foreground">No active deals found.</p>
+                <Button size="sm" variant="outline" onClick={() => router.push('/crm/pipeline')}>
+                  Create Deal
+                </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {upcomingTasks.map((task: any) => (
-                  <div key={task.id} className="p-3 rounded-xl border border-border/40 hover:bg-muted/30 transition-colors">
+              <div className="space-y-2.5">
+                {recentDeals.map((deal: any) => (
+                  <div
+                    key={deal.id}
+                    onClick={() => router.push('/crm/pipeline')}
+                    className="p-3 rounded-xl border border-border/40 hover:bg-muted/40 transition-colors cursor-pointer"
+                  >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-primary" />
-                        {task.type}
+                      <span className="text-xs font-semibold text-foreground truncate max-w-[180px]">
+                        {deal.title}
                       </span>
-                      <span suppressHydrationWarning className="text-[11px] font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                        {new Date(task.due_date).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}
+                      <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                        Rp {(deal.value || 0).toLocaleString('id-ID')}
                       </span>
                     </div>
-                    {task.notes && (
-                      <p className="text-xs text-muted-foreground line-clamp-1 mb-1">{task.notes}</p>
-                    )}
-                    <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-2 mt-1">
-                      {task.client && (
-                        <span className="inline-flex items-center gap-1">
-                          <Folder className="size-3 text-muted-foreground shrink-0" />
-                          {task.client.company_name}
-                        </span>
-                      )}
-                      {task.lead && (
-                        <span className="inline-flex items-center gap-1">
-                          <Target className="size-3 text-sky-600 shrink-0" />
-                          {task.lead.name}
-                        </span>
-                      )}
-                      {task.deal && (
-                        <span className="inline-flex items-center gap-1">
-                          <Briefcase className="size-3 text-muted-foreground shrink-0" />
-                          {task.deal.title}
-                        </span>
-                      )}
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-1">
+                      <span className="truncate max-w-[140px]">
+                        {deal.client?.company_name || deal.lead?.name || 'General Deal'}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className={`text-[10px] font-medium ${
+                          deal.stage === 'Won'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : deal.stage === 'Lost'
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                            : 'bg-primary/10 text-primary'
+                        }`}
+                      >
+                        {deal.stage}
+                      </Badge>
                     </div>
                   </div>
                 ))}

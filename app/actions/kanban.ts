@@ -417,3 +417,14 @@ export async function uploadAttachment(taskId: number, fileUrl: string, fileName
     return { success: false, error: error.message }
   }
 }
+
+export async function deleteAttachment(attachmentId: number) {
+  try {
+    await prisma.task_attachments.delete({
+      where: { id: attachmentId }
+    })
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

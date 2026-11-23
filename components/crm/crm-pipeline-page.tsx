@@ -462,7 +462,7 @@ export function CrmPipelinePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Stage</Label>
-                <Select value={formData.stage_id} onValueChange={v => setFormData({ ...formData, stage_id: v })}>
+                <Select value={formData.stage_id || ''} onValueChange={v => setFormData({ ...formData, stage_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select stage" /></SelectTrigger>
                   <SelectContent>
                     {stages.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
@@ -479,7 +479,7 @@ export function CrmPipelinePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Attach Client</Label>
-                <Select value={formData.client_id} onValueChange={v => setFormData({ ...formData, client_id: v })}>
+                <Select value={formData.client_id || ''} onValueChange={v => setFormData({ ...formData, client_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
                   <SelectContent>
                     {clients?.map((c: any) => (
@@ -491,7 +491,7 @@ export function CrmPipelinePage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Or Attach Lead</Label>
-                <Select value={formData.lead_id} onValueChange={v => setFormData({ ...formData, lead_id: v })}>
+                <Select value={formData.lead_id || ''} onValueChange={v => setFormData({ ...formData, lead_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select lead" /></SelectTrigger>
                   <SelectContent>
                     {leads?.map((l: any) => (
@@ -505,7 +505,7 @@ export function CrmPipelinePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assigned PIC</Label>
-                <Select value={formData.assigned_user_id} onValueChange={v => setFormData({ ...formData, assigned_user_id: v })}>
+                <Select value={formData.assigned_user_id || ''} onValueChange={v => setFormData({ ...formData, assigned_user_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
                   <SelectContent>
                     {users?.map((u: any) => (
@@ -554,7 +554,7 @@ export function CrmPipelinePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Stage</Label>
-                <Select value={editFormData.stage_id} onValueChange={v => setEditFormData({ ...editFormData, stage_id: v })}>
+                <Select value={editFormData.stage_id || ''} onValueChange={v => setEditFormData({ ...editFormData, stage_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select stage" /></SelectTrigger>
                   <SelectContent>
                     {stages.map((s: any) => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
@@ -571,7 +571,7 @@ export function CrmPipelinePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Attach Client</Label>
-                <Select value={editFormData.client_id} onValueChange={v => setEditFormData({ ...editFormData, client_id: v })}>
+                <Select value={editFormData.client_id || ''} onValueChange={v => setEditFormData({ ...editFormData, client_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
                   <SelectContent>
                     {clients?.map((c: any) => (
@@ -583,7 +583,7 @@ export function CrmPipelinePage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assigned PIC</Label>
-                <Select value={editFormData.assigned_user_id} onValueChange={v => setEditFormData({ ...editFormData, assigned_user_id: v })}>
+                <Select value={editFormData.assigned_user_id || ''} onValueChange={v => setEditFormData({ ...editFormData, assigned_user_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
                   <SelectContent>
                     {users?.map((u: any) => (

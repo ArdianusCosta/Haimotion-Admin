@@ -15,7 +15,7 @@ import {
 } from '@/app/actions/crm'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Search, MoreHorizontal, Trash, Mail, Phone, Target, GitPullRequest, UserCheck, Sparkles, Filter, Edit, Eye, MessageSquare, Building, FileText, Send, X } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, Trash, Mail, Phone, Target, GitPullRequest, UserCheck, Sparkles, Filter, Edit, Eye, MessageSquare, Building, FileText, Send, X, DollarSign, ExternalLink, User } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
@@ -483,7 +483,7 @@ export function CrmLeadsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Source</Label>
-                <Select value={formData.source} onValueChange={v => setFormData({ ...formData, source: v })}>
+                <Select value={formData.source || ''} onValueChange={v => setFormData({ ...formData, source: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
                   <SelectContent>
                     {SOURCES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -496,7 +496,7 @@ export function CrmLeadsPage() {
               </div>
               <div className="space-y-1.5 col-span-2">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assigned Sales / PIC</Label>
-                <Select value={formData.assigned_user_id} onValueChange={v => setFormData({ ...formData, assigned_user_id: v })}>
+                <Select value={formData.assigned_user_id || ''} onValueChange={v => setFormData({ ...formData, assigned_user_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select team member" /></SelectTrigger>
                   <SelectContent>
                     {users?.map((u: any) => (
@@ -552,7 +552,7 @@ export function CrmLeadsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</Label>
-                <Select value={editFormData.status} onValueChange={v => setEditFormData({ ...editFormData, status: v })}>
+                <Select value={editFormData.status || ''} onValueChange={v => setEditFormData({ ...editFormData, status: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="New">New</SelectItem>
@@ -568,7 +568,7 @@ export function CrmLeadsPage() {
               </div>
               <div className="space-y-1.5 col-span-2">
                 <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assigned Sales / PIC</Label>
-                <Select value={editFormData.assigned_user_id} onValueChange={v => setEditFormData({ ...editFormData, assigned_user_id: v })}>
+                <Select value={editFormData.assigned_user_id || ''} onValueChange={v => setEditFormData({ ...editFormData, assigned_user_id: v || '' })}>
                   <SelectTrigger><SelectValue placeholder="Select team member" /></SelectTrigger>
                   <SelectContent>
                     {users?.map((u: any) => (
@@ -592,137 +592,268 @@ export function CrmLeadsPage() {
 
       {/* View Details Drawer */}
       <Sheet open={!!selectedLeadId} onOpenChange={(open) => !open && setSelectedLeadId(null)}>
-        <SheetContent className="sm:max-w-[500px] overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:max-w-[540px] p-0 overflow-hidden flex flex-col border-l border-border/60 bg-background/95 backdrop-blur-xl shadow-2xl">
           {isLoadingDetails ? (
-            <div className="space-y-4 pt-6">
-              <Skeleton className="h-10 w-2/3" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-40 w-full" />
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-14 w-14 rounded-2xl" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-6 w-1/2" />
+                  <Skeleton className="h-4 w-1/3" />
+                </div>
+              </div>
+              <Skeleton className="h-32 w-full rounded-xl" />
+              <Skeleton className="h-32 w-full rounded-xl" />
             </div>
           ) : leadDetails ? (
-            <div className="space-y-6 pt-4">
-              <SheetHeader>
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-lg font-bold shadow-md">
-                    {leadDetails.name[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <SheetTitle className="text-xl font-bold">{leadDetails.name}</SheetTitle>
-                    <SheetDescription className="text-xs">
-                      {leadDetails.company || 'Individual Prospect'} • Source: {leadDetails.source || 'Website'}
-                    </SheetDescription>
-                  </div>
-                </div>
-              </SheetHeader>
-
-              {/* Status and Action Buttons */}
-              <div className="flex items-center gap-2">
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColors[leadDetails.status] || 'bg-muted'}`}>
-                  {leadDetails.status}
-                </span>
-                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1 bg-muted px-2.5 py-1 rounded-full">
-                  <GitPullRequest className="h-3 w-3" /> {leadDetails.pipeline_stage}
-                </span>
-                {leadDetails.status !== 'Converted' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="ml-auto text-xs gap-1 border-primary text-primary hover:bg-primary/10"
-                    onClick={() => convertMutation.mutate(leadDetails.id)}
-                    disabled={convertMutation.isPending}
-                  >
-                    <UserCheck className="h-3.5 w-3.5" /> Convert Lead
-                  </Button>
-                )}
-              </div>
-
-              {/* Contact Info Card */}
-              <Card className="border border-border/50 shadow-sm">
-                <CardContent className="p-4 space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> Email:</span>
-                    <span className="font-semibold">{leadDetails.email || '—'}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Phone / WA:</span>
-                    <span className="font-semibold">{leadDetails.phone || leadDetails.whatsapp || '—'}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground flex items-center gap-1.5"><Building className="h-3.5 w-3.5" /> Est. Value:</span>
-                    <span className="font-semibold text-emerald-600">
-                      {leadDetails.estimated_value ? `Rp ${leadDetails.estimated_value.toLocaleString('id-ID')}` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Assigned To:</span>
-                    <span className="font-semibold">
-                      {leadDetails.assigned_user ? `${leadDetails.assigned_user.firstname} ${leadDetails.assigned_user.lastname}` : 'Unassigned'}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Related Deals */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                  <GitPullRequest className="h-3.5 w-3.5" /> Related Deals ({leadDetails.deals?.length || 0})
-                </h4>
-                {leadDetails.deals?.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">No deals attached yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {leadDetails.deals.map((d: any) => (
-                      <div key={d.id} className="p-2.5 rounded-lg border border-border/50 bg-card text-xs flex justify-between items-center">
-                        <div>
-                          <p className="font-semibold">{d.title}</p>
-                          <p className="text-[11px] text-muted-foreground">Stage: {d.stage}</p>
-                        </div>
-                        <span className="font-bold text-emerald-600">
-                          {d.value ? `Rp ${d.value.toLocaleString('id-ID')}` : '—'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5" /> Internal Notes ({leadDetails.notes?.length || 0})
-                </h4>
-                <div className="space-y-2 mb-3">
-                  {leadDetails.notes?.map((n: any) => (
-                    <div key={n.id} className="p-2.5 rounded-lg bg-muted/40 border border-border/40 text-xs">
-                      <p className="text-foreground">{n.content}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        by {n.author?.firstname} • {new Date(n.created_at).toLocaleDateString()}
-                      </p>
+            <>
+              {/* Header */}
+              <div className="p-6 pb-4 bg-muted/20 border-b border-border/50">
+                <SheetHeader>
+                  <div className="flex items-start gap-3.5 pr-6">
+                    <div className="relative flex items-center justify-center h-12 w-12 rounded-2xl bg-gradient-to-tr from-sky-500/20 via-primary/15 to-violet-500/20 border border-primary/25 text-primary font-bold text-lg shadow-inner shrink-0">
+                      {leadDetails.name[0]?.toUpperCase() || 'L'}
                     </div>
-                  ))}
+                    <div className="min-w-0 flex-1">
+                      <SheetTitle className="text-xl font-bold tracking-tight text-foreground truncate">
+                        {leadDetails.name}
+                      </SheetTitle>
+                      <SheetDescription className="sr-only">
+                        Detail prospek {leadDetails.name}
+                      </SheetDescription>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-[11px] font-medium bg-muted/40 text-foreground/80 border-border/60 gap-1 px-2 py-0.5">
+                          <Building className="h-3 w-3 text-muted-foreground" />
+                          {leadDetails.company || 'Individual Prospect'}
+                        </Badge>
+                        {leadDetails.source && (
+                          <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                            via <span className="font-medium text-foreground/80">{leadDetails.source}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Bar & Action */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-4 pt-3 border-t border-border/40">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[leadDetails.status] || 'bg-muted text-muted-foreground'}`}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        {leadDetails.status}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border border-border/40 px-2.5 py-1 rounded-full">
+                        <GitPullRequest className="h-3 w-3 text-primary" /> {leadDetails.pipeline_stage}
+                      </span>
+                    </div>
+
+                    {leadDetails.status !== 'Converted' ? (
+                      <Button
+                        size="sm"
+                        className="text-xs font-semibold gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-sm transition-all shadow-emerald-500/20"
+                        onClick={() => convertMutation.mutate(leadDetails.id)}
+                        disabled={convertMutation.isPending}
+                      >
+                        <UserCheck className="h-3.5 w-3.5" />
+                        {convertMutation.isPending ? 'Converting...' : 'Convert to Deal'}
+                      </Button>
+                    ) : (
+                      <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-500 border-emerald-500/30 gap-1.5 py-1">
+                        <UserCheck className="h-3.5 w-3.5" /> Converted to Client
+                      </Badge>
+                    )}
+                  </div>
+                </SheetHeader>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                {/* Contact Info Card */}
+                <Card className="border border-border/60 bg-card/60 backdrop-blur-sm shadow-sm overflow-hidden">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center justify-between text-xs py-1 border-b border-border/30">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center">
+                          <Mail className="h-3.5 w-3.5" />
+                        </div>
+                        Email
+                      </span>
+                      {leadDetails.email ? (
+                        <a href={`mailto:${leadDetails.email}`} className="font-medium text-foreground hover:text-sky-400 transition-colors flex items-center gap-1 truncate max-w-[240px]">
+                          <span className="truncate">{leadDetails.email}</span>
+                          <ExternalLink className="h-3 w-3 opacity-60 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground italic">—</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs py-1 border-b border-border/30">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                          <Phone className="h-3.5 w-3.5" />
+                        </div>
+                        WhatsApp / Telp
+                      </span>
+                      {leadDetails.phone || leadDetails.whatsapp ? (
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground">{leadDetails.whatsapp || leadDetails.phone}</span>
+                          {leadDetails.whatsapp && (
+                            <a
+                              href={`https://wa.me/${leadDetails.whatsapp.replace(/[^0-9]/g, '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors flex items-center gap-1 font-semibold"
+                            >
+                              Chat WA
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground italic">—</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs py-1 border-b border-border/30">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                          <DollarSign className="h-3.5 w-3.5" />
+                        </div>
+                        Est. Value
+                      </span>
+                      <span className="font-bold text-sm text-emerald-400 font-mono">
+                        {leadDetails.estimated_value ? `Rp ${leadDetails.estimated_value.toLocaleString('id-ID')}` : '—'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs py-1">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                          <User className="h-3.5 w-3.5" />
+                        </div>
+                        Assigned To
+                      </span>
+                      {leadDetails.assigned_user ? (
+                        <div className="flex items-center gap-2 bg-muted/40 px-2.5 py-1 rounded-full border border-border/50">
+                          <Avatar className="h-5 w-5">
+                            <AvatarImage src={leadDetails.assigned_user.avatar || ''} />
+                            <AvatarFallback className="text-[10px] bg-primary/20 text-primary">
+                              {leadDetails.assigned_user.firstname[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium text-foreground text-xs">
+                            {leadDetails.assigned_user.firstname} {leadDetails.assigned_user.lastname}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground italic">Unassigned</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Related Deals */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <GitPullRequest className="h-3.5 w-3.5 text-primary" /> Related Deals
+                    </h4>
+                    <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                      {leadDetails.deals?.length || 0}
+                    </Badge>
+                  </div>
+                  {(!leadDetails.deals || leadDetails.deals.length === 0) ? (
+                    <div className="p-5 rounded-xl border border-dashed border-border/60 bg-muted/10 text-center">
+                      <p className="text-xs text-muted-foreground">Belum ada deal terhubung untuk prospek ini.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {leadDetails.deals.map((d: any) => (
+                        <div key={d.id} className="p-3.5 rounded-xl border border-border/60 bg-card/60 hover:border-border transition-all text-xs flex justify-between items-center shadow-sm">
+                          <div className="space-y-1">
+                            <p className="font-semibold text-foreground text-sm">{d.title}</p>
+                            <Badge variant="outline" className="text-[10px] px-2 py-0.5 text-muted-foreground border-border/60 bg-muted/30">
+                              Stage: {d.stage || d.pipeline_stage?.name || 'Prospect'}
+                            </Badge>
+                          </div>
+                          <span className="font-bold text-sm text-emerald-400 font-mono">
+                            {d.value ? `Rp ${Number(d.value).toLocaleString('id-ID')}` : '—'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2">
+
+                {/* Internal Notes */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <FileText className="h-3.5 w-3.5 text-primary" /> Internal Notes
+                    </h4>
+                    <Badge variant="secondary" className="text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                      {leadDetails.notes?.length || 0}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2.5 max-h-[260px] overflow-y-auto pr-1">
+                    {(!leadDetails.notes || leadDetails.notes.length === 0) ? (
+                      <div className="p-5 rounded-xl border border-dashed border-border/60 bg-muted/10 text-center">
+                        <p className="text-xs text-muted-foreground">Belum ada catatan internal untuk prospek ini.</p>
+                      </div>
+                    ) : (
+                      leadDetails.notes.map((n: any) => (
+                        <div key={n.id} className="p-3 rounded-xl bg-card/70 border border-border/50 text-xs space-y-1.5 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-5 w-5">
+                                <AvatarImage src={n.author?.avatar || ''} />
+                                <AvatarFallback className="text-[9px] bg-primary/20 text-primary">
+                                  {n.author?.firstname?.[0] || 'U'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="font-semibold text-foreground text-[11px]">
+                                {n.author ? `${n.author.firstname} ${n.author.lastname || ''}` : 'Staff'}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(n.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-foreground/90 pl-7 whitespace-pre-wrap leading-relaxed">{n.content}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Note Input Footer */}
+              <div className="p-4 bg-background/90 border-t border-border/50">
+                <div className="flex items-center gap-2 bg-muted/30 border border-border/60 rounded-xl px-3 py-1.5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
                   <Input
-                    placeholder="Add an internal note..."
+                    placeholder="Tulis catatan internal... (Tekan Enter)"
                     value={newNoteContent}
                     onChange={(e) => setNewNoteContent(e.target.value)}
-                    className="text-xs h-9"
+                    className="text-xs h-8 border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newNoteContent.trim()) {
+                      if (e.key === 'Enter' && newNoteContent.trim() && !addNoteMutation.isPending) {
+                        e.preventDefault()
                         addNoteMutation.mutate(newNoteContent.trim())
                       }
                     }}
                   />
                   <Button
                     size="sm"
+                    className="h-8 px-3 rounded-lg text-xs gap-1.5 shadow-sm"
                     disabled={!newNoteContent.trim() || addNoteMutation.isPending}
                     onClick={() => addNoteMutation.mutate(newNoteContent.trim())}
                   >
-                    <Send className="h-3.5 w-3.5" />
+                    <Send className="h-3 w-3" />
+                    <span>Kirim</span>
                   </Button>
                 </div>
               </div>
-            </div>
+            </>
           ) : null}
         </SheetContent>
       </Sheet>

@@ -10,7 +10,7 @@ export async function getEvents() {
     requirePermission(user, "calendar.view");
     
     // Safely query all sources with Promise.allSettled
-    const [eventsRes, projectsRes, tasksRes, meetingsRes, followUpsRes, leavesRes] = await Promise.allSettled([
+    const [eventsRes, projectsRes, tasksRes, meetingsRes, leavesRes] = await Promise.allSettled([
       // 1. Regular Events
       prisma.events.findMany({
         orderBy: { start_event: 'asc' }
@@ -49,15 +49,7 @@ export async function getEvents() {
         }
       }),
 
-      // 5. CRM Follow-ups
-      prisma.crmFollowUp.findMany({
-        include: {
-          lead: { select: { name: true } },
-          deal: { select: { title: true } }
-        }
-      }),
-
-      // 6. HR Leaves
+      // 5. HR Leaves
       prisma.hrLeaveRequest.findMany({
         include: {
           employee: { select: { name: true, firstname: true, lastname: true } }
@@ -69,7 +61,6 @@ export async function getEvents() {
     const projects = projectsRes.status === 'fulfilled' ? projectsRes.value : [];
     const tasks = tasksRes.status === 'fulfilled' ? tasksRes.value : [];
     const meetings = meetingsRes.status === 'fulfilled' ? meetingsRes.value : [];
-    const followUps = followUpsRes.status === 'fulfilled' ? followUpsRes.value : [];
     const leaves = leavesRes.status === 'fulfilled' ? leavesRes.value : [];
 
     const unifiedEvents: any[] = [
@@ -132,21 +123,7 @@ export async function getEvents() {
         };
       }),
 
-      ...followUps.map(f => {
-        const target = f.lead?.name || f.deal?.title || 'Client';
-        return {
-          id: `crm-${f.id}`,
-          title: `📞 Follow-up: ${target} (${f.type})`,
-          start_event: new Date(f.due_date),
-          end_event: new Date(f.due_date),
-          color: 'bg-rose-500/20 text-rose-700 dark:text-rose-400 border border-rose-500/30',
-          description: f.notes || '',
-          source: 'crm',
-          original_id: f.id
-        };
-      }),
-
-      ...leaves.map(l => {
+      ...leaves.map((l: any) => {
         const start = new Date(l.start_date);
         start.setHours(9, 0, 0, 0);
         const end = new Date(l.end_date);

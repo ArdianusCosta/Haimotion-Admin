@@ -1,13 +1,12 @@
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription
-} from '@/components/ui/dialog'
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription
+} from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import {
   Calendar,
@@ -171,35 +170,42 @@ export function EventDetailDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[620px] p-6 border-border bg-card shadow-2xl">
-        <DialogHeader className="gap-2 pb-2 border-b border-border">
-          <div className="flex items-center justify-between">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${config.badgeColor}`}
-            >
-              {config.icon}
-              {config.label}
-            </span>
-            {event.original_id && (
-              <span className="text-xs text-muted-foreground font-mono">
-                ID: #{event.original_id}
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-[540px] p-0 overflow-hidden flex flex-col border-l border-border/60 bg-background/95 backdrop-blur-xl shadow-2xl z-[60]"
+      >
+        {/* Header Section */}
+        <div className="p-6 pb-4 bg-muted/20 border-b border-border/50 shrink-0">
+          <SheetHeader className="gap-2.5">
+            <div className="flex items-center justify-between pr-6">
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${config.badgeColor}`}
+              >
+                {config.icon}
+                {config.label}
               </span>
-            )}
-          </div>
-          <DialogTitle className="text-xl font-bold tracking-tight text-foreground text-left mt-1">
-            {event.title}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground text-left">
-            Item ini disinkronkan langsung dari modul {config.moduleName}.
-          </DialogDescription>
-        </DialogHeader>
+              {event.original_id && (
+                <span className="text-xs text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded border border-border/40">
+                  ID: #{event.original_id}
+                </span>
+              )}
+            </div>
+            <SheetTitle className="text-xl font-bold tracking-tight text-foreground text-left mt-1 leading-snug break-words">
+              {event.title}
+            </SheetTitle>
+            <SheetDescription className="text-xs text-muted-foreground text-left">
+              Item ini disinkronkan langsung dari modul <span className="font-medium text-foreground">{config.moduleName}</span>.
+            </SheetDescription>
+          </SheetHeader>
+        </div>
 
-        <div className="grid gap-4 py-4">
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {/* Time & Date Card */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
                 <Calendar className="size-5" />
               </div>
               <div className="flex flex-col">
@@ -213,7 +219,7 @@ export function EventDetailDialog({
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground border border-border/50">
                 <Clock className="size-5" />
               </div>
               <div className="flex flex-col">
@@ -226,37 +232,40 @@ export function EventDetailDialog({
           </div>
 
           {/* Description Section */}
-          <div className="rounded-xl border border-border bg-background p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <FileText className="size-3.5" />
+          <div className="rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm p-4 flex flex-col gap-2.5 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              <FileText className="size-3.5 text-primary" />
               Deskripsi & Catatan
             </div>
             {cleanedDesc ? (
-              <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
-                {cleanedDesc}
-              </p>
+              <div className="rounded-lg bg-background/60 border border-border/40 p-3 max-h-[360px] overflow-y-auto custom-scrollbar">
+                <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+                  {cleanedDesc}
+                </p>
+              </div>
             ) : (
-              <p className="text-xs italic text-muted-foreground">
+              <p className="text-xs italic text-muted-foreground py-2">
                 Tidak ada deskripsi tambahan untuk item ini.
               </p>
             )}
           </div>
 
           {/* Module Synchronization Info Box */}
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground flex items-start gap-2.5">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-muted-foreground flex items-start gap-3">
             <span className="text-primary text-base">ℹ️</span>
-            <div>
-              <p className="font-medium text-foreground">
+            <div className="space-y-1">
+              <p className="font-semibold text-foreground">
                 Dikelola di Modul {config.moduleName}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
                 Perubahan status, deadline, anggota tim, dan detail item ini diatur langsung melalui modul asalnya agar tetap sinkron ke seluruh sistem.
               </p>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-2 pt-2 border-t border-border w-full">
+        {/* Footer Actions */}
+        <div className="p-4 bg-background/90 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-2 shrink-0">
           <Button
             type="button"
             variant="outline"
@@ -282,15 +291,15 @@ export function EventDetailDialog({
               <Button
                 type="button"
                 onClick={() => handleNavigate(config.actionRoute!)}
-                className="w-full sm:w-auto flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm"
               >
                 <ExternalLink className="size-4" />
                 {config.actionText}
               </Button>
             )}
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   )
 }

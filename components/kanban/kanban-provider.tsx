@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getKanbanTasks, updateTaskStatus, getTaskDetails, addComment, uploadAttachment } from '@/app/actions/kanban'
+import { getKanbanTasks, updateTaskStatus, getTaskDetails, addComment, uploadAttachment, deleteAttachment } from '@/app/actions/kanban'
 import { toast } from 'sonner'
 import { KanbanColumn, KanbanUser, KanbanTask } from '@/types/kanban'
 
@@ -37,6 +37,7 @@ interface KanbanContextType {
   moveTaskMutation: any
   addCommentMutation: any
   uploadAttachmentMutation: any
+  deleteAttachmentMutation: any
 }
 
 const KanbanContext = createContext<KanbanContextType | undefined>(undefined)
@@ -198,6 +199,18 @@ export function KanbanProvider({ children, user }: { children: React.ReactNode, 
     onError: (err: any) => toast.error(err.message || 'Upload failed')
   })
 
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: async (attachmentId: number) => {
+      return await deleteAttachment(attachmentId)
+    },
+    onSuccess: () => {
+      toast.success('Lampiran berhasil dihapus')
+      queryClient.invalidateQueries({ queryKey: ['taskDetails', selectedTask?.dbId] })
+      queryClient.invalidateQueries({ queryKey: ['kanbanTasks'] })
+    },
+    onError: (err: any) => toast.error(err.message || 'Gagal menghapus lampiran')
+  })
+
   const filteredColumns = columns.map((col: KanbanColumn) => ({
     ...col,
     tasks: col.tasks.filter((task: KanbanTask) => {
@@ -218,7 +231,7 @@ export function KanbanProvider({ children, user }: { children: React.ReactNode, 
       searchQuery, setSearchQuery,
       filterAssignees, setFilterAssignees,
       showFilterDropdown, setShowFilterDropdown,
-      moveTaskMutation, addCommentMutation, uploadAttachmentMutation
+      moveTaskMutation, addCommentMutation, uploadAttachmentMutation, deleteAttachmentMutation
     }}>
       {children}
     </KanbanContext.Provider>

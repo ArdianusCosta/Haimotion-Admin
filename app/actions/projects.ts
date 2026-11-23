@@ -221,7 +221,7 @@ export async function createProject(data: {
     } else if (!resolvedClientId && resolvedClientName) {
       // If client_name is given, check if matches an existing CRM client
       const matchedClient = await prisma.crmClient.findFirst({
-        where: { company_name: { equals: resolvedClientName, mode: 'insensitive' } }
+        where: { company_name: resolvedClientName }
       });
       if (matchedClient) resolvedClientId = matchedClient.id;
     }

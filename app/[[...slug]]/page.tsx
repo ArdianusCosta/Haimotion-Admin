@@ -104,8 +104,10 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'overview': 'HR Overview',
         'employees': 'Employees',
         'attendance': 'Attendance & Leave',
+        'leave': 'Attendance & Leave',
+        'leaves': 'Attendance & Leave',
         'payroll': 'Payroll',
-        'recruitment': 'Recruitment'
+        'recruitment': 'HR Overview'
       }
       initialSection = hrRouteMap[subRoute] || 'HR Overview'
     } else if (resolvedParams.slug[0].toLowerCase() === 'crm' && resolvedParams.slug.length > 1) {
@@ -115,9 +117,9 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'leads': 'Leads',
         'clients': 'Clients',
         'pipeline': 'Pipeline',
-        'follow-ups': 'Follow Ups',
-        'activities': 'Activities',
-        'broadcast': 'Broadcast'
+        'follow-ups': 'CRM Overview',
+        'activities': 'CRM Overview',
+        'broadcast': 'CRM Overview'
       }
       initialSection = crmRouteMap[subRoute] || 'CRM Overview'
     } else {
