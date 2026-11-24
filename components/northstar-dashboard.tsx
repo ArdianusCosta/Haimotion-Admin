@@ -405,6 +405,8 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
       'Barang & Jasa': 'finance/products-services',
       'Products & Services': 'finance/products-services',
       'Pengeluaran': 'finance/expenses',
+      'Pengeluaran Operasional': 'finance/expenses',
+      'Operational Expenses': 'finance/expenses',
       'Expenses': 'finance/expenses',
       'Laporan': 'finance/reports',
       'Reports': 'finance/reports'
