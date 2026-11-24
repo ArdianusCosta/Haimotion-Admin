@@ -89,8 +89,6 @@ const apps: MenuItem[] = [
 
 const financeMenu = [
   { label: 'Beranda', icon: LayoutDashboard },
-  { label: 'Kas & Bank', icon: Wallet },
-  { label: 'Akun Perkiraan', icon: Wallet },
   {
     label: 'Penjualan', icon: TrendingUp, subItems: [
       { label: 'Faktur Penjualan' },
@@ -98,13 +96,13 @@ const financeMenu = [
     ]
   },
   {
-    label: 'Pembelian', icon: TrendingDown, subItems: [
+    label: 'Pengeluaran', icon: TrendingDown, subItems: [
+      { label: 'Pengeluaran Operasional' },
       { label: 'Faktur Pembelian' },
       { label: 'Pemasok' }
     ]
   },
-  { label: 'Pengeluaran', icon: Receipt },
-  { label: 'Barang & Jasa', icon: Package },
+  { label: 'Kas & Bank', icon: Wallet },
   { label: 'Laporan', icon: BarChart3 },
 ]
 const hrMenu = [
@@ -156,6 +154,7 @@ const sectionPermissionMap: Record<string, string> = {
   'Faktur Pembelian': 'finance.view',
   'Pemasok': 'finance.view',
   'Pengeluaran': 'finance.view',
+  'Pengeluaran Operasional': 'finance.view',
   'Barang & Jasa': 'finance.view',
   'Laporan': 'finance.view',
   // HR
@@ -939,6 +938,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Products & Services': return clientCanAccess(user, 'Beranda') ? <BarangJasaPage /> : <AccessDenied section="Products & Services" />
 
               case 'Pengeluaran': return clientCanAccess(user, 'Beranda') ? <ExpensesPage /> : <AccessDenied section="Pengeluaran" />
+              case 'Pengeluaran Operasional': return clientCanAccess(user, 'Beranda') ? <ExpensesPage /> : <AccessDenied section="Pengeluaran Operasional" />
               case 'Expenses': return clientCanAccess(user, 'Beranda') ? <ExpensesPage /> : <AccessDenied section="Expenses" />
               case 'Laporan': return clientCanAccess(user, 'Beranda') ? <ReportsPage /> : <AccessDenied section="Laporan" />
               case 'Reports': return clientCanAccess(user, 'Beranda') ? <ReportsPage /> : <AccessDenied section="Reports" />

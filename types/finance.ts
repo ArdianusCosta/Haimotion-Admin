@@ -1,6 +1,12 @@
 export type InvoiceType = 'SALES' | 'PURCHASE'
 
-export type FinanceReportKind = 'profit-loss' | 'cash-flow' | 'expenses-by-category' | 'outstanding'
+export type FinanceReportKind =
+  | 'profit-loss'
+  | 'balance-sheet'
+  | 'general-ledger'
+  | 'cash-flow'
+  | 'expenses-by-category'
+  | 'outstanding'
 
 export interface FinanceReportDefinition {
   id: FinanceReportKind
@@ -12,7 +18,17 @@ export const FINANCE_REPORTS: FinanceReportDefinition[] = [
   {
     id: 'profit-loss',
     title: 'Laba Rugi',
-    description: 'Pendapatan, biaya pembelian, dan pengeluaran operasional pada periode terpilih (basis kas).'
+    description: 'Pendapatan, beban pembelian, dan beban operasional pada periode terpilih dengan perbandingan periode.'
+  },
+  {
+    id: 'balance-sheet',
+    title: 'Neraca Keuangan',
+    description: 'Posisi Aset, Liabilitas, dan Ekuitas perusahaan untuk memastikan keseimbangan neraca keuangan.'
+  },
+  {
+    id: 'general-ledger',
+    title: 'Buku Besar',
+    description: 'Rincian transaksi debit, kredit, dan saldo berjalan per akun kas/bank dan buku pembukuan.'
   },
   {
     id: 'cash-flow',
@@ -26,7 +42,7 @@ export const FINANCE_REPORTS: FinanceReportDefinition[] = [
   },
   {
     id: 'outstanding',
-    title: 'Piutang Faktur',
-    description: 'Faktur penjualan yang belum lunas beserta sisa tagihannya.'
+    title: 'Piutang & Utang Faktur',
+    description: 'Faktur penjualan dan pembelian yang belum lunas beserta sisa tagihannya.'
   }
 ]

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Download, Loader2, TrendingUp, Activity, FileText, Clock, Calendar } from 'lucide-react'
+import { Download, Loader2, TrendingUp, Activity, FileText, Clock, Calendar, Scale, BookOpen } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,8 @@ import { FINANCE_REPORTS, type FinanceReportKind } from '@/types/finance'
 
 const ICONS: Record<string, any> = {
   'profit-loss': TrendingUp,
+  'balance-sheet': Scale,
+  'general-ledger': BookOpen,
   'cash-flow': Activity,
   'expenses-by-category': FileText,
   outstanding: Clock
@@ -26,9 +28,13 @@ const isCurrencyKey = (key: string) => {
     'dibayar',
     'sisa',
     'total_dibayar',
-    'jumlah_transaksi',
     'saldo',
-    'nominal'
+    'nominal',
+    'debit',
+    'kredit',
+    'saldo_berjalan',
+    'periode_berjalan',
+    'periode_sebelumnya'
   ].some(c => k.includes(c))
 }
 

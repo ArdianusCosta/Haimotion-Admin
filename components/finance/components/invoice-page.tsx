@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Search, Download, Plus, Trash2, Pencil, Wallet, FileText, ArrowUp } from 'lucide-react'
+import { Search, Download, Plus, Trash2, Pencil, Wallet, FileText, ArrowUp, Printer, Ban } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogTitle, DialogClose } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogClose, DialogHeader, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   useInvoices,
   useContacts,
@@ -14,8 +15,10 @@ import {
   useCreateInvoice,
   useUpdateInvoice,
   useDeleteInvoice,
+  useCancelInvoice,
   useRecordInvoicePayment,
-  useExportInvoices
+  useExportInvoices,
+  useProductsServices
 } from '@/components/finance/queries'
 import { ConfirmDeleteModal } from '@/components/finance/components/modals'
 import { toast } from 'sonner'
@@ -90,10 +93,12 @@ export function InvoicePage({ type }: { type: InvoiceType }) {
   const { data: rows = [], isLoading: loading } = useInvoices({ type })
   const { data: contacts = [] } = useContacts({ type: partyType })
   const { data: accounts = [] } = useBankAccounts()
+  const { data: productsServices = [] } = useProductsServices()
 
   const createInvoiceMutation = useCreateInvoice()
   const updateInvoiceMutation = useUpdateInvoice()
   const deleteInvoiceMutation = useDeleteInvoice()
+  const cancelInvoiceMutation = useCancelInvoice()
   const recordPaymentMutation = useRecordInvoicePayment()
   const exportInvoicesMutation = useExportInvoices()
 
@@ -116,6 +121,13 @@ export function InvoicePage({ type }: { type: InvoiceType }) {
     accountId: '',
     notes: ''
   })
+
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<any | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+
+  const [printOpen, setPrintOpen] = useState(false)
+  const [printInvoice, setPrintInvoice] = useState<any | null>(null)
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
@@ -286,6 +298,32 @@ export function InvoicePage({ type }: { type: InvoiceType }) {
     }
   }
 
+  function openCancel(row: any) {
+    setCancelTarget(row)
+    setCancelReason('')
+    setCancelOpen(true)
+  }
+
+  async function confirmCancel() {
+    if (!cancelTarget || !cancelReason.trim()) return
+    try {
+      await cancelInvoiceMutation.mutateAsync({
+        invoiceId: cancelTarget.id,
+        reason: cancelReason.trim()
+      })
+      setCancelOpen(false)
+      setCancelTarget(null)
+      setCancelReason('')
+    } catch (err: any) {
+      console.error(err)
+    }
+  }
+
+  function openPrint(row: any) {
+    setPrintInvoice(row)
+    setPrintOpen(true)
+  }
+
   function handleExport() {
     exportInvoicesMutation.mutate(type)
   }
@@ -417,19 +455,36 @@ export function InvoicePage({ type }: { type: InvoiceType }) {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => openPayment(row)}
-                          disabled={Number(row.outstanding) <= 0}
+                          disabled={Number(row.outstanding) <= 0 || row.status === 'Cancelled'}
                           className="p-1.5 hover:bg-emerald-500/10 text-muted-foreground hover:text-emerald-600 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Catat Pembayaran"
                         >
                           <Wallet className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => openEdit(row)}
+                          onClick={() => openPrint(row)}
                           className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
+                          title="Cetak Faktur"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openEdit(row)}
+                          disabled={row.status === 'Cancelled'}
+                          className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer disabled:opacity-30"
                           title="Edit Faktur"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
+                        {row.status !== 'Cancelled' && (
+                          <button
+                            onClick={() => openCancel(row)}
+                            className="p-1.5 hover:bg-amber-500/10 text-muted-foreground hover:text-amber-600 rounded-lg transition-colors cursor-pointer"
+                            title="Batalkan Faktur"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setDeleteTarget(row.id)
@@ -563,6 +618,40 @@ export function InvoicePage({ type }: { type: InvoiceType }) {
                   <Plus className="w-3.5 h-3.5" /> Tambah Baris
                 </Button>
               </div>
+
+              {productsServices.length > 0 && (
+                <div className="flex items-center gap-2 text-xs py-1">
+                  <span className="text-muted-foreground font-medium">Katalog Barang & Jasa:</span>
+                  <select
+                    className="rounded-md border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-primary"
+                    onChange={e => {
+                      const val = e.target.value
+                      if (!val) return
+                      const item = productsServices.find((p: any) => p.id.toString() === val)
+                      if (item) {
+                        setForm(prev => {
+                          const existingFilled = prev.items.filter(it => it.description.trim() !== '')
+                          return {
+                            ...prev,
+                            items: [
+                              ...existingFilled,
+                              { description: item.name, quantity: 1, price: item.price || 0 }
+                            ]
+                          }
+                        })
+                      }
+                      e.target.value = ''
+                    }}
+                  >
+                    <option value="">+ Pilih item dari master katalog...</option>
+                    {productsServices.map((ps: any) => (
+                      <option key={ps.id} value={ps.id}>
+                        {ps.code ? `[${ps.code}] ` : ''}{ps.name} ({ps.type}) — Rp {Number(ps.price || 0).toLocaleString('id-ID')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {form.items.map((item, index) => (
@@ -723,6 +812,126 @@ export function InvoicePage({ type }: { type: InvoiceType }) {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Batalkan Faktur */}
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+              <Ban className="w-5 h-5" />
+              Batalkan Faktur {cancelTarget?.reference}
+            </DialogTitle>
+            <DialogDescription>
+              Faktur ini akan ditandai sebagai Dibatalkan. Jika ada pembayaran yang sudah masuk ke kas/bank, saldo akun akan disesuaikan kembali (reversal).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <Label htmlFor="cancel-reason" className="text-sm font-semibold">
+              Alasan Pembatalan <span className="text-red-500">*</span>
+            </Label>
+            <Textarea
+              id="cancel-reason"
+              placeholder="Contoh: Kesalahan input nominal / Dibatalkan oleh pelanggan..."
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              className="resize-none h-24"
+              required
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCancelOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!cancelReason.trim() || cancelInvoiceMutation.isPending}
+              onClick={confirmCancel}
+            >
+              {cancelInvoiceMutation.isPending ? 'Memproses...' : 'Konfirmasi Pembatalan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Cetak / Pratinjau Faktur */}
+      <Dialog open={printOpen} onOpenChange={setPrintOpen}>
+        <DialogContent className="!w-[94vw] !max-w-[760px] p-0 overflow-hidden border border-border bg-card shadow-2xl rounded-2xl">
+          <div className="p-8 space-y-6 max-h-[80vh] overflow-y-auto" id="printable-invoice">
+            <div className="flex justify-between items-start border-b border-border pb-6">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight text-primary">HAIMOTION ERP</h2>
+                <p className="text-xs text-muted-foreground mt-1">Sistem Manajemen & Keuangan Perusahaan</p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-muted">
+                  {printInvoice?.display_status || printInvoice?.status}
+                </span>
+                <p className="text-xl font-mono font-bold mt-2">{printInvoice?.reference}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 text-sm">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">{partyLabel}:</p>
+                <p className="font-semibold text-base mt-1">{printInvoice?.customer_name}</p>
+                {printInvoice?.customer_email && (
+                  <p className="text-xs text-muted-foreground">{printInvoice.customer_email}</p>
+                )}
+              </div>
+              <div className="text-right space-y-1 text-xs">
+                <p><span className="text-muted-foreground">Tanggal Faktur:</span> {printInvoice?.date ? new Date(printInvoice.date).toLocaleDateString('id-ID') : '-'}</p>
+                <p><span className="text-muted-foreground">Jatuh Tempo:</span> {printInvoice?.due_date ? new Date(printInvoice.due_date).toLocaleDateString('id-ID') : '-'}</p>
+              </div>
+            </div>
+
+            <table className="w-full text-left text-sm border-t border-b border-border">
+              <thead className="text-xs uppercase text-muted-foreground bg-muted/40">
+                <tr>
+                  <th className="py-2.5 px-3">Deskripsi Barang / Jasa</th>
+                  <th className="py-2.5 px-3 text-center">Qty</th>
+                  <th className="py-2.5 px-3 text-right">Harga Satuan</th>
+                  <th className="py-2.5 px-3 text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {printInvoice?.items?.map((it: any, idx: number) => (
+                  <tr key={idx}>
+                    <td className="py-2.5 px-3 font-medium">{it.description}</td>
+                    <td className="py-2.5 px-3 text-center">{it.quantity}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">{formatRupiah(it.price)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">{formatRupiah(it.quantity * it.price)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="flex justify-end">
+              <div className="w-64 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Tagihan:</span>
+                  <span className="font-mono font-bold">{formatRupiah(printInvoice?.amount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sudah Dibayar:</span>
+                  <span className="font-mono text-emerald-600">{formatRupiah(printInvoice?.paid_amount)}</span>
+                </div>
+                <div className="flex justify-between border-t border-border pt-2 font-bold">
+                  <span>Sisa Pembayaran:</span>
+                  <span className="font-mono text-primary">{formatRupiah(printInvoice?.outstanding)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="p-4 bg-muted/30 border-t border-border flex justify-between">
+            <Button variant="outline" onClick={() => setPrintOpen(false)}>
+              Tutup
+            </Button>
+            <Button onClick={() => window.print()} className="gap-2 cursor-pointer">
+              <Printer className="w-4 h-4" /> Cetak Dokumen
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
 import type { FinanceReportKind } from '@/types/finance'
+import { PostingEngine, COA_CODES } from '@/lib/finance-posting-engine'
 
 /**
  * Modul Finance.
@@ -149,15 +150,15 @@ export async function getFinanceSummary() {
     yearExpenses
   ] = await Promise.all([
     prisma.financeInvoice.findMany({
-      where: { type: 'SALES' },
+      where: { type: 'SALES', status: { not: 'Cancelled' } },
       select: { amount: true, status: true, date: true, due_date: true, payments: { select: { amount: true } } }
     }),
     prisma.financeInvoice.findMany({
-      where: { type: 'PURCHASE' },
+      where: { type: 'PURCHASE', status: { not: 'Cancelled' } },
       select: { amount: true, status: true, date: true, due_date: true, payments: { select: { amount: true } } }
     }),
     prisma.financeExpense.aggregate({ _sum: { amount: true }, where: { status: 'Paid' } }),
-    prisma.financeAccount.aggregate({ _sum: { balance: true } }),
+    prisma.financeAccount.aggregate({ _sum: { balance: true }, where: { type: { in: ['Cash', 'Bank'] } } }),
     // Faktur penjualan yang belum lunas (termasuk yang sudah lewat jatuh tempo)
     prisma.financeInvoice.findMany({
       where: { type: 'SALES', status: { notIn: ['Paid', 'Cancelled'] } },
@@ -567,23 +568,14 @@ export async function deleteInvoice(id: number) {
   const invoice = await prisma.financeInvoice.findUnique({ where: { id } })
   if (!invoice) throw new Error('Faktur tidak ditemukan.')
 
-  await prisma.$transaction(async tx => {
-    // Transaksi kas/bank yang lahir dari pembayaran faktur ini ikut dibatalkan,
-    // supaya saldo akun tidak menyisakan uang yang sebenarnya tidak ada.
-    const linked = await tx.financeTransaction.findMany({ where: { reference: invoice.reference } })
-    for (const txRow of linked) {
-      if (txRow.account_id) {
-        const delta = txRow.type === 'Income' ? -txRow.amount : txRow.amount
-        await tx.financeAccount.update({
-          where: { id: txRow.account_id },
-          data: { balance: { increment: delta } }
-        })
-      }
-    }
-    if (linked.length > 0) {
-      await tx.financeTransaction.deleteMany({ where: { id: { in: linked.map(t => t.id) } } })
-    }
+  if (invoice.status !== 'Draft') {
+    throw new Error(
+      `Faktur berstatus "${invoice.status}" tidak boleh dihapus secara permanen. Gunakan fitur Batalkan Faktur agar riwayat audit akuntansi tetap terjaga.`
+    )
+  }
 
+  await prisma.$transaction(async tx => {
+    await tx.financeInvoiceItem.deleteMany({ where: { invoice_id: id } })
     await tx.financeInvoice.delete({ where: { id } })
   })
 
@@ -594,6 +586,85 @@ export async function deleteInvoice(id: number) {
   })
 
   return invoice
+}
+
+/**
+ * Batalkan faktur secara akuntansi tanpa menghapus jejak audit.
+ * Jika invoice sudah pernah dibayar, lakukan transaksi pembalik (reversal)
+ * pada rekening kas/bank terkait.
+ */
+export async function cancelInvoice(data: { invoiceId: number; reason: string }) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.update')
+  const uid = await currentUserId()
+  const reason = (data.reason || '').trim()
+  if (!reason) throw new Error('Alasan pembatalan wajib diisi.')
+
+  const invoice = await prisma.financeInvoice.findUnique({
+    where: { id: Number(data.invoiceId) },
+    include: { payments: true }
+  })
+  if (!invoice) throw new Error('Faktur tidak ditemukan.')
+  if (invoice.status === 'Cancelled') throw new Error('Faktur ini sudah dibatalkan.')
+
+  const isSales = invoice.type !== 'PURCHASE'
+  const paidPayments = invoice.payments || []
+
+  const result = await prisma.$transaction(async (tx) => {
+    // Jika ada pembayaran yang sudah masuk ke rekening kas/bank, balikkan saldo rekening
+    // dengan mencatat transaksi reversal (tanpa menghapus riwayat pembayaran)
+    for (const payment of paidPayments) {
+      const linkedTxs = await tx.financeTransaction.findMany({
+        where: {
+          reference: invoice.reference,
+          amount: payment.amount
+        }
+      })
+
+      for (const linkedTx of linkedTxs) {
+        if (linkedTx.account_id) {
+          const reversalType = linkedTx.type === 'Income' ? 'Expense' : 'Income'
+          const reversalDelta = linkedTx.type === 'Income' ? -linkedTx.amount : linkedTx.amount
+
+          await tx.financeTransaction.create({
+            data: {
+              date: new Date(),
+              description: `[REVERSAL PEMBATALAN] ${isSales ? 'Pengembalian' : 'Koreksi'} faktur ${invoice.reference} (${invoice.customer_name}) - Alasan: ${reason}`,
+              type: reversalType,
+              amount: linkedTx.amount,
+              reference: `REV-${invoice.reference}`,
+              account_id: linkedTx.account_id,
+              created_by: uid
+            }
+          })
+
+          await tx.financeAccount.update({
+            where: { id: linkedTx.account_id },
+            data: { balance: { increment: reversalDelta } }
+          })
+        }
+      }
+    }
+
+    const updated = await tx.financeInvoice.update({
+      where: { id: invoice.id },
+      data: {
+        status: 'Cancelled',
+        notes: invoice.notes
+          ? `${invoice.notes}\n[Dibatalkan oleh User #${uid} pada ${new Date().toISOString()}: ${reason}]`
+          : `[Dibatalkan oleh User #${uid} pada ${new Date().toISOString()}: ${reason}]`
+      }
+    })
+
+    return updated
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Cancelled ${invoice.type === 'PURCHASE' ? 'purchase' : 'sales'} invoice: ${invoice.reference} - Alasan: ${reason}`
+  })
+
+  return result
 }
 
 export async function exportInvoicesCsv(type?: InvoiceType | string) {
@@ -665,12 +736,12 @@ export async function recordInvoicePayment(data: {
   const paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date()
   if (Number.isNaN(paymentDate.getTime())) throw new Error('Tanggal pembayaran tidak valid.')
 
-  let accountId: number | null = null
-  if (data.accountId) {
-    const account = await prisma.financeAccount.findUnique({ where: { id: Number(data.accountId) } })
-    if (!account) throw new Error('Akun kas/bank tidak ditemukan.')
-    accountId = account.id
+  if (!data.accountId) {
+    throw new Error('Rekening kas/bank tujuan pembayaran wajib dipilih.')
   }
+  const account = await prisma.financeAccount.findUnique({ where: { id: Number(data.accountId) } })
+  if (!account) throw new Error('Akun kas/bank tidak ditemukan.')
+  const accountId = account.id
 
   const paidAfter = round2(paidBefore + amount)
   const isFullyPaid = paidAfter >= invoice.amount - EPSILON
@@ -680,6 +751,7 @@ export async function recordInvoicePayment(data: {
     const payment = await tx.financePayment.create({
       data: {
         invoice_id: invoice.id,
+        account_id: accountId,
         amount,
         payment_date: paymentDate,
         payment_method: data.method || 'Transfer',
@@ -711,6 +783,46 @@ export async function recordInvoicePayment(data: {
         where: { id: accountId },
         data: { balance: { increment: isIncome ? amount : -amount } }
       })
+
+      // Posting Double-Entry General Ledger
+      try {
+        const bankCoaId = account.coa_id || (await PostingEngine.resolveCOAId(tx, account.type === 'Cash' ? COA_CODES.KAS_UTAMA : COA_CODES.BANK_BCA))
+        if (isIncome) {
+          const piutangCoaId = await PostingEngine.resolveCOAId(tx, COA_CODES.PIUTANG_USAHA)
+          await PostingEngine.postJournal(tx, {
+            entryDate: paymentDate,
+            sourceType: 'SALES_PAYMENT',
+            sourceId: payment.id,
+            postingType: 'ORIGINAL',
+            eventId: `PAY-${payment.id}`,
+            referenceNo: invoice.reference,
+            description: `Penerimaan Pembayaran Faktur ${invoice.reference} (${invoice.customer_name})`,
+            lines: [
+              { coa_id: bankCoaId, debit: amount, credit: 0, line_memo: `Kas masuk ${account.name}` },
+              { coa_id: piutangCoaId, debit: 0, credit: amount, line_memo: `Pelunasan piutang ${invoice.customer_name}` }
+            ],
+            createdBy: uid
+          })
+        } else {
+          const utangCoaId = await PostingEngine.resolveCOAId(tx, COA_CODES.UTANG_USAHA)
+          await PostingEngine.postJournal(tx, {
+            entryDate: paymentDate,
+            sourceType: 'PURCHASE_PAYMENT',
+            sourceId: payment.id,
+            postingType: 'ORIGINAL',
+            eventId: `PAY-${payment.id}`,
+            referenceNo: invoice.reference,
+            description: `Pembayaran Tagihan Pemasok ${invoice.reference} (${invoice.customer_name})`,
+            lines: [
+              { coa_id: utangCoaId, debit: amount, credit: 0, line_memo: `Pengurangan utang ${invoice.customer_name}` },
+              { coa_id: bankCoaId, debit: 0, credit: amount, line_memo: `Kas keluar ${account.name}` }
+            ],
+            createdBy: uid
+          })
+        }
+      } catch (postErr) {
+        console.error('Error posting double-entry journal for invoice payment:', postErr)
+      }
     }
 
     return { payment, updatedInvoice }
@@ -826,6 +938,7 @@ export async function createExpense(data: any) {
         vendor: (data.vendor || '').trim() || '-',
         status: data.status || 'Paid',
         category_id: categoryId,
+        account_id: accountId,
         created_by: uid
       }
     })
@@ -847,6 +960,40 @@ export async function createExpense(data: any) {
         where: { id: accountId },
         data: { balance: { increment: -amount } }
       })
+
+      // Posting Double-Entry General Ledger
+      if ((data.status || 'Paid') === 'Paid') {
+        try {
+          const account = await tx.financeAccount.findUnique({ where: { id: accountId } })
+          const bankCoaId = account?.coa_id || (await PostingEngine.resolveCOAId(tx, account?.type === 'Cash' ? COA_CODES.KAS_UTAMA : COA_CODES.BANK_BCA))
+          const isSalary = categoryName.toLowerCase().includes('gaji') || categoryName.toLowerCase().includes('salary')
+          const isFreelance = categoryName.toLowerCase().includes('freelance') || categoryName.toLowerCase().includes('project')
+          const expenseCoaId = isSalary
+            ? await PostingEngine.resolveCOAId(tx, COA_CODES.BEBAN_GAJI)
+            : isFreelance
+            ? await PostingEngine.resolveCOAId(tx, COA_CODES.HPP_FREELANCER)
+            : await PostingEngine.resolveCOAId(tx, COA_CODES.BEBAN_OPERASIONAL)
+
+          const projectId = data.projectId || data.project_id ? Number(data.projectId || data.project_id) : null
+
+          await PostingEngine.postJournal(tx, {
+            entryDate: created.date,
+            sourceType: 'OPERATIONAL_EXPENSE',
+            sourceId: created.id,
+            postingType: 'ORIGINAL',
+            eventId: `EXP-${created.id}`,
+            referenceNo: `EXP-${created.id}`,
+            description: `Pengeluaran: ${created.description} (${categoryName})`,
+            lines: [
+              { coa_id: expenseCoaId, debit: amount, credit: 0, project_id: projectId, line_memo: created.description },
+              { coa_id: bankCoaId, debit: 0, credit: amount, line_memo: `Pembayaran via ${account?.name || 'Kas/Bank'}` }
+            ],
+            createdBy: uid
+          })
+        } catch (postErr) {
+          console.error('Error posting double-entry journal for expense:', postErr)
+        }
+      }
     }
 
     return created
@@ -1073,11 +1220,12 @@ export async function getBankAccounts() {
   const user = await requireAuth()
   requirePermission(user, 'finance.view')
 
-  let accounts = await prisma.financeAccount.findMany({ orderBy: { name: 'asc' } })
+  let accounts = await prisma.financeAccount.findMany({
+    where: { type: { in: ['Cash', 'Bank'] } },
+    orderBy: { name: 'asc' }
+  })
 
   // Seed sekali pakai agar instalasi baru punya akun kas/bank dasar.
-  // Tidak lagi mengembalikan data palsu saat query gagal — error dibiarkan naik
-  // supaya masalah database terlihat, bukan disembunyikan.
   if (accounts.length === 0) {
     await prisma.financeAccount.createMany({
       data: [
@@ -1085,7 +1233,10 @@ export async function getBankAccounts() {
         { name: 'Bank Utama', type: 'Bank', balance: 0, currency: 'IDR' }
       ]
     })
-    accounts = await prisma.financeAccount.findMany({ orderBy: { name: 'asc' } })
+    accounts = await prisma.financeAccount.findMany({
+      where: { type: { in: ['Cash', 'Bank'] } },
+      orderBy: { name: 'asc' }
+    })
   }
 
   return accounts
@@ -1192,6 +1343,214 @@ export async function deleteTransaction(id: number) {
   })
 
   return { success: true }
+}
+
+/**
+ * Transfer antar rekening kas/bank secara atomik menggunakan Prisma Transaction.
+ * Rekening sumber didebit (dikurangi saldo), rekening tujuan dikredit (ditambah saldo).
+ * Tidak dihitung sebagai pemasukan atau pengeluaran pada laporan laba rugi.
+ */
+export async function transferAccount(data: {
+  fromAccountId: number
+  toAccountId: number
+  amount: number
+  date?: string
+  notes?: string
+}) {
+  const _u = await requireAuth(); requirePermission(_u, 'finance.create')
+  const uid = await currentUserId()
+  const amount = round2(Number(data.amount))
+
+  const fromId = Number(data.fromAccountId)
+  const toId = Number(data.toAccountId)
+
+  if (!fromId || !toId) {
+    throw new Error('Rekening sumber dan rekening tujuan wajib dipilih.')
+  }
+  if (fromId === toId) {
+    throw new Error('Rekening sumber dan tujuan tidak boleh sama.')
+  }
+  if (!amount || amount <= 0) {
+    throw new Error('Nominal transfer harus lebih besar dari 0.')
+  }
+
+  const [fromAccount, toAccount] = await Promise.all([
+    prisma.financeAccount.findUnique({ where: { id: fromId } }),
+    prisma.financeAccount.findUnique({ where: { id: toId } })
+  ])
+
+  if (!fromAccount) throw new Error('Rekening sumber tidak ditemukan.')
+  if (!toAccount) throw new Error('Rekening tujuan tidak ditemukan.')
+
+  if (fromAccount.balance < amount - EPSILON) {
+    throw new Error(
+      `Saldo rekening sumber (${fromAccount.name}: Rp ${fromAccount.balance.toLocaleString('id-ID')}) tidak mencukupi untuk transfer Rp ${amount.toLocaleString('id-ID')}.`
+    )
+  }
+
+  const transferDate = data.date ? new Date(data.date) : new Date()
+  const timestamp = Date.now().toString().slice(-4)
+  const refCode = `TRF-${transferDate.getFullYear()}${String(transferDate.getMonth() + 1).padStart(2, '0')}${String(transferDate.getDate()).padStart(2, '0')}-${timestamp}`
+
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Mutasi keluar dari rekening sumber
+    const txOut = await tx.financeTransaction.create({
+      data: {
+        date: transferDate,
+        description: `Transfer keluar ke ${toAccount.name}${data.notes ? ` (${data.notes})` : ''}`,
+        type: 'Transfer',
+        amount,
+        reference: refCode,
+        account_id: fromAccount.id,
+        created_by: uid
+      }
+    })
+
+    // 2. Mutasi masuk ke rekening tujuan
+    const txIn = await tx.financeTransaction.create({
+      data: {
+        date: transferDate,
+        description: `Transfer masuk dari ${fromAccount.name}${data.notes ? ` (${data.notes})` : ''}`,
+        type: 'Transfer',
+        amount,
+        reference: refCode,
+        account_id: toAccount.id,
+        created_by: uid
+      }
+    })
+
+    // 3. Update saldo rekening sumber (decrement)
+    await tx.financeAccount.update({
+      where: { id: fromAccount.id },
+      data: { balance: { increment: -amount } }
+    })
+
+    // 4. Update saldo rekening tujuan (increment)
+    await tx.financeAccount.update({
+      where: { id: toAccount.id },
+      data: { balance: { increment: amount } }
+    })
+
+    // 5. Posting Double-Entry General Ledger
+    try {
+      const fromCoaId = fromAccount.coa_id || (await PostingEngine.resolveCOAId(tx, fromAccount.type === 'Cash' ? COA_CODES.KAS_UTAMA : COA_CODES.BANK_BCA))
+      const toCoaId = toAccount.coa_id || (await PostingEngine.resolveCOAId(tx, toAccount.type === 'Cash' ? COA_CODES.KAS_UTAMA : COA_CODES.BANK_BCA))
+
+      await PostingEngine.postJournal(tx, {
+        entryDate: transferDate,
+        sourceType: 'BANK_TRANSFER',
+        sourceId: null,
+        postingType: 'ORIGINAL',
+        eventId: refCode,
+        referenceNo: refCode,
+        description: `Transfer saldo dari ${fromAccount.name} ke ${toAccount.name}${data.notes ? ` (${data.notes})` : ''}`,
+        lines: [
+          { coa_id: toCoaId, debit: amount, credit: 0, line_memo: `Penerimaan transfer dari ${fromAccount.name}` },
+          { coa_id: fromCoaId, debit: 0, credit: amount, line_memo: `Pengeluaran transfer ke ${toAccount.name}` }
+        ],
+        createdBy: uid
+      })
+    } catch (postErr) {
+      console.error('Error posting double-entry journal for bank transfer:', postErr)
+    }
+
+    return { txOut, txIn, reference: refCode }
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'create',
+    description: `Transfer saldo Rp ${amount.toLocaleString('id-ID')} dari ${fromAccount.name} ke ${toAccount.name} (${refCode})`
+  })
+
+  return result
+}
+
+export async function createBankAccount(data: {
+  name: string
+  type?: 'Cash' | 'Bank'
+  accountNumber?: string
+  openingBalance?: number
+  currency?: string
+}) {
+  const user = await requireAuth()
+  requirePermission(user, 'finance.create')
+  const uid = await currentUserId()
+
+  const name = (data.name || '').trim()
+  if (!name) throw new Error('Nama rekening / kas wajib diisi.')
+
+  const initialBalance = round2(Number(data.openingBalance) || 0)
+  const type = data.type === 'Cash' ? 'Cash' : 'Bank'
+
+  const account = await prisma.$transaction(async (tx) => {
+    const acc = await tx.financeAccount.create({
+      data: {
+        name,
+        type,
+        account_number: data.accountNumber?.trim() || null,
+        balance: initialBalance,
+        currency: data.currency || 'IDR'
+      }
+    })
+
+    // Jika ada saldo awal, catat sebagai mutasi transaksi saldo awal
+    if (initialBalance > 0) {
+      await tx.financeTransaction.create({
+        data: {
+          date: new Date(),
+          description: `Saldo Awal Akun: ${name}`,
+          type: 'Income',
+          amount: initialBalance,
+          reference: `INIT-${acc.id}`,
+          account_id: acc.id,
+          created_by: uid
+        }
+      })
+    }
+
+    return acc
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'create',
+    description: `Created bank account: ${account.name} (Saldo Awal: Rp ${initialBalance.toLocaleString('id-ID')})`
+  })
+
+  return account
+}
+
+export async function updateBankAccount(id: number, data: {
+  name?: string
+  type?: 'Cash' | 'Bank'
+  accountNumber?: string
+}) {
+  const user = await requireAuth()
+  requirePermission(user, 'finance.update')
+  const uid = await currentUserId()
+
+  const updateData: any = {}
+  if (data.name !== undefined) {
+    const name = data.name.trim()
+    if (!name) throw new Error('Nama rekening tidak boleh kosong.')
+    updateData.name = name
+  }
+  if (data.type !== undefined) updateData.type = data.type
+  if (data.accountNumber !== undefined) updateData.account_number = data.accountNumber?.trim() || null
+
+  const account = await prisma.financeAccount.update({
+    where: { id },
+    data: updateData
+  })
+
+  await logActivity({
+    userId: uid,
+    activityType: 'update',
+    description: `Updated bank account: ${account.name}`
+  })
+
+  return account
 }
 
 // -----------------------------------------------------------------------------
@@ -1422,6 +1781,16 @@ export async function getFinanceBudgets(projectId?: number) {
       include: { category: true, project: { select: { name: true } } },
       orderBy: { start_date: 'desc' }
     })
+
+    if (projectId && budgets.length > 0) {
+      const actualProjectSpent = await PostingEngine.calculateProjectRealization(prisma, projectId)
+      const enriched = budgets.map(b => ({
+        ...b,
+        spent: actualProjectSpent > 0 ? actualProjectSpent : b.spent
+      }))
+      return { success: true, data: enriched }
+    }
+
     return { success: true, data: budgets }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -1487,17 +1856,38 @@ export async function getFinanceReport(params: {
   }
 
   if (report === 'profit-loss') {
+    // Periode berjalan
     const [salesPayments, purchasePayments, paidExpenses] = await Promise.all([
       prisma.financePayment.findMany({
-        where: { payment_date: { gte: start, lte: end }, invoice: { type: 'SALES' } },
+        where: { payment_date: { gte: start, lte: end }, invoice: { type: 'SALES', status: { not: 'Cancelled' } } },
         select: { amount: true }
       }),
       prisma.financePayment.findMany({
-        where: { payment_date: { gte: start, lte: end }, invoice: { type: 'PURCHASE' } },
+        where: { payment_date: { gte: start, lte: end }, invoice: { type: 'PURCHASE', status: { not: 'Cancelled' } } },
         select: { amount: true }
       }),
       prisma.financeExpense.findMany({
         where: { status: 'Paid', date: { gte: start, lte: end } },
+        select: { amount: true, category: true }
+      })
+    ])
+
+    // Periode pembanding (durasi yang sama sebelum periode berjalan)
+    const durationMs = end.getTime() - start.getTime()
+    const prevStart = new Date(start.getTime() - durationMs)
+    const prevEnd = new Date(start.getTime() - 1)
+
+    const [prevSales, prevPurchases, prevExpenses] = await Promise.all([
+      prisma.financePayment.findMany({
+        where: { payment_date: { gte: prevStart, lte: prevEnd }, invoice: { type: 'SALES', status: { not: 'Cancelled' } } },
+        select: { amount: true }
+      }),
+      prisma.financePayment.findMany({
+        where: { payment_date: { gte: prevStart, lte: prevEnd }, invoice: { type: 'PURCHASE', status: { not: 'Cancelled' } } },
+        select: { amount: true }
+      }),
+      prisma.financeExpense.findMany({
+        where: { status: 'Paid', date: { gte: prevStart, lte: prevEnd } },
         select: { amount: true }
       })
     ])
@@ -1508,23 +1898,233 @@ export async function getFinanceReport(params: {
     const grossProfit = round2(revenue - purchaseCost)
     const netProfit = round2(grossProfit - operatingExpenses)
 
+    const prevRev = round2(prevSales.reduce((s, p) => s + p.amount, 0))
+    const prevPur = round2(prevPurchases.reduce((s, p) => s + p.amount, 0))
+    const prevExp = round2(prevExpenses.reduce((s, e) => s + e.amount, 0))
+    const prevGross = round2(prevRev - prevPur)
+    const prevNet = round2(prevGross - prevExp)
+
+    const calcGrowth = (curr: number, prev: number) => {
+      if (prev === 0) return curr > 0 ? '+100%' : '0%'
+      const pct = round2(((curr - prev) / Math.abs(prev)) * 100)
+      return `${pct >= 0 ? '+' : ''}${pct}%`
+    }
+
     return {
       ...empty,
       summary: [
-        { label: 'Pendapatan (pembayaran faktur penjualan)', value: revenue },
-        { label: 'Biaya pembelian (pembayaran faktur pembelian)', value: purchaseCost },
-        { label: 'Laba kotor', value: grossProfit },
-        { label: 'Pengeluaran operasional (lunas)', value: operatingExpenses },
-        { label: 'Laba bersih', value: netProfit }
+        { label: 'Pendapatan Penjualan', value: revenue },
+        { label: 'Beban Pokok Pembelian', value: purchaseCost },
+        { label: 'Laba Kotor', value: grossProfit },
+        { label: 'Beban Operasional', value: operatingExpenses },
+        { label: 'Laba Bersih Periode Ini', value: netProfit },
+        { label: 'Laba Bersih Periode Lalu', value: prevNet },
+        { label: 'Pertumbuhan Laba Bersih', value: calcGrowth(netProfit, prevNet) }
       ],
-      columns: ['Keterangan', 'Jumlah'],
+      columns: ['Komponen Keuangan', 'Periode Berjalan', 'Periode Sebelumnya', 'Pertumbuhan'],
       rows: [
-        { keterangan: 'Pendapatan', jumlah: revenue },
-        { keterangan: 'Biaya Pembelian', jumlah: -purchaseCost },
-        { keterangan: 'Laba Kotor', jumlah: grossProfit },
-        { keterangan: 'Pengeluaran Operasional', jumlah: -operatingExpenses },
-        { keterangan: 'Laba Bersih', jumlah: netProfit }
+        { komponen_keuangan: 'Pendapatan Penjualan', periode_berjalan: revenue, periode_sebelumnya: prevRev, pertumbuhan: calcGrowth(revenue, prevRev) },
+        { komponen_keuangan: 'Beban Pokok Pembelian', periode_berjalan: purchaseCost, periode_sebelumnya: prevPur, pertumbuhan: calcGrowth(purchaseCost, prevPur) },
+        { komponen_keuangan: 'Laba Kotor', periode_berjalan: grossProfit, periode_sebelumnya: prevGross, pertumbuhan: calcGrowth(grossProfit, prevGross) },
+        { komponen_keuangan: 'Beban Operasional', periode_berjalan: operatingExpenses, periode_sebelumnya: prevExp, pertumbuhan: calcGrowth(operatingExpenses, prevExp) },
+        { komponen_keuangan: 'Laba Bersih', periode_berjalan: netProfit, periode_sebelumnya: prevNet, pertumbuhan: calcGrowth(netProfit, prevNet) }
       ]
+    }
+  }
+
+  if (report === 'balance-sheet') {
+    const asOfDate = end
+
+    const [liquidAccounts, unpaidSalesInvoices, unpaidPurchaseInvoices, pendingExpenses, coaAccounts] = await Promise.all([
+      // Aset Lancar: Kas & Bank
+      prisma.financeAccount.findMany({
+        where: { type: { in: ['Cash', 'Bank'] } },
+        select: { id: true, name: true, type: true, balance: true, account_number: true }
+      }),
+      // Aset Lancar: Piutang Usaha (Sales Invoice belum lunas, exclude Cancelled)
+      prisma.financeInvoice.findMany({
+        where: { type: 'SALES', status: { notIn: ['Paid', 'Cancelled'] }, date: { lte: asOfDate } },
+        select: { amount: true, payments: { select: { amount: true } } }
+      }),
+      // Liabilitas Lancar: Utang Usaha (Purchase Invoice belum lunas, exclude Cancelled)
+      prisma.financeInvoice.findMany({
+        where: { type: 'PURCHASE', status: { notIn: ['Paid', 'Cancelled'] }, date: { lte: asOfDate } },
+        select: { amount: true, payments: { select: { amount: true } } }
+      }),
+      // Liabilitas Lancar: Beban Operasional Pending
+      prisma.financeExpense.findMany({
+        where: { status: 'Pending', date: { lte: asOfDate } },
+        select: { amount: true }
+      }),
+      // Akun COA lainnya (Aset Tetap, Liabilitas Jangka Panjang, Ekuitas)
+      prisma.financeAccount.findMany({
+        where: { type: { notIn: ['Cash', 'Bank'] } },
+        select: { id: true, name: true, type: true, balance: true, code: true }
+      })
+    ])
+
+    const totalCashBank = round2(liquidAccounts.reduce((sum, a) => sum + (a.balance || 0), 0))
+    const totalPiutang = round2(
+      unpaidSalesInvoices.reduce((sum, inv) => {
+        const paid = (inv.payments || []).reduce((pSum, p) => pSum + p.amount, 0)
+        return sum + Math.max(0, inv.amount - paid)
+      }, 0)
+    )
+    const currentAssets = round2(totalCashBank + totalPiutang)
+
+    // Non-current assets from COA
+    const nonCurrentAssetsAccounts = coaAccounts.filter(a => a.type === 'Asset')
+    const totalNonCurrentAssets = round2(nonCurrentAssetsAccounts.reduce((sum, a) => sum + (a.balance || 0), 0))
+    const totalAssets = round2(currentAssets + totalNonCurrentAssets)
+
+    // Current Liabilities
+    const totalUtangUsaha = round2(
+      unpaidPurchaseInvoices.reduce((sum, inv) => {
+        const paid = (inv.payments || []).reduce((pSum, p) => pSum + p.amount, 0)
+        return sum + Math.max(0, inv.amount - paid)
+      }, 0)
+    )
+    const totalPendingExpenses = round2(pendingExpenses.reduce((sum, e) => sum + e.amount, 0))
+    const currentLiabilities = round2(totalUtangUsaha + totalPendingExpenses)
+
+    // Non-current Liabilities from COA
+    const nonCurrentLiabAccounts = coaAccounts.filter(a => a.type === 'Liability')
+    const totalNonCurrentLiab = round2(nonCurrentLiabAccounts.reduce((sum, a) => sum + (a.balance || 0), 0))
+    const totalLiabilities = round2(currentLiabilities + totalNonCurrentLiab)
+
+    // Equity from COA (Equity accounts)
+    const equityAccounts = coaAccounts.filter(a => a.type === 'Equity')
+    const totalRecordedEquity = round2(equityAccounts.reduce((sum, a) => sum + (a.balance || 0), 0))
+
+    // Retained Earnings (Laba Ditahan) = Total Aset - Total Liabilitas - Ekuitas Tercatat
+    const retainedEarnings = round2(totalAssets - totalLiabilities - totalRecordedEquity)
+    const totalEquity = round2(totalRecordedEquity + retainedEarnings)
+
+    // Validasi keseimbangan neraca
+    const isBalanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) <= EPSILON
+
+    return {
+      ...empty,
+      summary: [
+        { label: 'Total Aset', value: totalAssets },
+        { label: 'Total Liabilitas', value: totalLiabilities },
+        { label: 'Total Ekuitas', value: totalEquity },
+        { label: 'Status Persamaan Neraca', value: isBalanced ? 'Seimbang (Aset = Kewajiban + Modal)' : 'Selisih' }
+      ],
+      columns: ['Klasifikasi Akuntansi', 'Komponen Neraca', 'Saldo (IDR)'],
+      rows: [
+        { klasifikasi_akuntansi: 'Aset Lancar', komponen_neraca: 'Kas & Rekening Bank', saldo_idr: totalCashBank },
+        { klasifikasi_akuntansi: 'Aset Lancar', komponen_neraca: 'Piutang Usaha (Tagihan Penjualan Aktif)', saldo_idr: totalPiutang },
+        { klasifikasi_akuntansi: 'Subtotal Aset Lancar', komponen_neraca: 'Jumlah Aset Lancar', saldo_idr: currentAssets },
+        { klasifikasi_akuntansi: 'Aset Tidak Lancar', komponen_neraca: 'Aset Tetap & Investasi', saldo_idr: totalNonCurrentAssets },
+        { klasifikasi_akuntansi: 'TOTAL ASET', komponen_neraca: 'Total Keseluruhan Aset', saldo_idr: totalAssets },
+        { klasifikasi_akuntansi: 'Liabilitas Lancar', komponen_neraca: 'Utang Usaha (Tagihan Pemasok Belum Lunas)', saldo_idr: totalUtangUsaha },
+        { klasifikasi_akuntansi: 'Liabilitas Lancar', komponen_neraca: 'Beban Operasional Belum Dibayar', saldo_idr: totalPendingExpenses },
+        { klasifikasi_akuntansi: 'Subtotal Liabilitas Lancar', komponen_neraca: 'Jumlah Liabilitas Lancar', saldo_idr: currentLiabilities },
+        { klasifikasi_akuntansi: 'Liabilitas Jangka Panjang', komponen_neraca: 'Kewajiban Jangka Panjang', saldo_idr: totalNonCurrentLiab },
+        { klasifikasi_akuntansi: 'TOTAL LIABILITAS', komponen_neraca: 'Total Keseluruhan Liabilitas', saldo_idr: totalLiabilities },
+        { klasifikasi_akuntansi: 'Ekuitas', komponen_neraca: 'Modal Disetor & Ekuitas Awal', saldo_idr: totalRecordedEquity },
+        { klasifikasi_akuntansi: 'Ekuitas', komponen_neraca: 'Laba Ditahan & Berjalan (Retained Earnings)', saldo_idr: retainedEarnings },
+        { klasifikasi_akuntansi: 'TOTAL EKUITAS', komponen_neraca: 'Total Keseluruhan Ekuitas', saldo_idr: totalEquity },
+        { klasifikasi_akuntansi: 'TOTAL PASIVA', komponen_neraca: 'Liabilitas + Ekuitas (Keseimbangan)', saldo_idr: round2(totalLiabilities + totalEquity) }
+      ]
+    }
+  }
+
+  if (report === 'general-ledger') {
+    const journalLines = await prisma.journalEntryLine.findMany({
+      where: {
+        journal: {
+          entry_date: { gte: start, lte: end },
+          status: 'POSTED'
+        }
+      },
+      include: {
+        journal: true,
+        account: true,
+        project: { select: { name: true } }
+      },
+      orderBy: [
+        { journal: { entry_date: 'asc' } },
+        { journal_id: 'asc' },
+        { id: 'asc' }
+      ]
+    })
+
+    if (journalLines.length > 0) {
+      let runningBalance = 0
+      const rows = journalLines.map(line => {
+        const debit = Number(line.debit)
+        const credit = Number(line.credit)
+        const isDebitNormal = line.account.normal_balance === 'DEBIT'
+        runningBalance = round2(runningBalance + (isDebitNormal ? debit - credit : credit - debit))
+
+        return {
+          tanggal: line.journal.entry_date.toISOString().slice(0, 10),
+          akun: line.account.account_name,
+          kode_akun: line.account.account_code,
+          referensi: line.journal.entry_number,
+          keterangan: line.line_memo || line.journal.description,
+          debit,
+          kredit: credit,
+          saldo_berjalan: runningBalance
+        }
+      })
+
+      const totalDebit = round2(rows.reduce((sum, r) => sum + r.debit, 0))
+      const totalCredit = round2(rows.reduce((sum, r) => sum + r.kredit, 0))
+
+      return {
+        ...empty,
+        summary: [
+          { label: 'Total Baris Jurnal Double-Entry', value: rows.length },
+          { label: 'Total Debit', value: totalDebit },
+          { label: 'Total Kredit', value: totalCredit },
+          { label: 'Status Keseimbangan', value: Math.abs(totalDebit - totalCredit) <= EPSILON ? 'Seimbang (Zero Variance)' : 'Selisih' }
+        ],
+        columns: ['Tanggal', 'Akun', 'Kode Akun', 'Referensi', 'Keterangan', 'Debit', 'Kredit', 'Saldo Berjalan'],
+        rows
+      }
+    }
+
+    const transactions = await prisma.financeTransaction.findMany({
+      where: { date: { gte: start, lte: end } },
+      orderBy: [{ date: 'asc' }, { id: 'asc' }],
+      include: { account: true }
+    })
+
+    let runningBalance = 0
+    const rows = transactions.map(tx => {
+      const isDebit = tx.type === 'Income' || (tx.type === 'Transfer' && tx.description.includes('masuk'))
+      const debit = isDebit ? tx.amount : 0
+      const credit = !isDebit ? tx.amount : 0
+      runningBalance = round2(runningBalance + debit - credit)
+
+      return {
+        tanggal: tx.date.toISOString().slice(0, 10),
+        akun: tx.account?.name || 'Kas/Bank',
+        kode_akun: tx.account?.code || tx.account?.account_number || `ACC-${tx.account_id}`,
+        referensi: tx.reference || `TX-${tx.id}`,
+        keterangan: tx.description,
+        debit,
+        kredit: credit,
+        saldo_berjalan: runningBalance
+      }
+    })
+
+    const totalDebit = round2(rows.reduce((sum, r) => sum + r.debit, 0))
+    const totalCredit = round2(rows.reduce((sum, r) => sum + r.kredit, 0))
+
+    return {
+      ...empty,
+      summary: [
+        { label: 'Total Baris Jurnal Transaksi', value: rows.length },
+        { label: 'Total Debit', value: totalDebit },
+        { label: 'Total Kredit', value: totalCredit },
+        { label: 'Saldo Berjalan Akhir', value: runningBalance }
+      ],
+      columns: ['Tanggal', 'Akun', 'Kode Akun', 'Referensi', 'Keterangan', 'Debit', 'Kredit', 'Saldo Berjalan'],
+      rows
     }
   }
 

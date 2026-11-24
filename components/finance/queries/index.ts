@@ -10,12 +10,16 @@ import {
   payExpense,
   createTransaction,
   deleteTransaction,
+  transferAccount,
+  createBankAccount,
+  updateBankAccount,
   exportExpensesCsv,
   importExpensesCsv,
   getInvoices,
   createInvoice,
   updateInvoice,
   deleteInvoice,
+  cancelInvoice,
   exportInvoicesCsv,
   recordInvoicePayment,
   getContacts,
@@ -452,6 +456,65 @@ export function useDeleteAccount() {
       toast.success('Akun perkiraan berhasil dihapus.')
     },
     onError: (err: any) => toast.error(err.message || 'Gagal menghapus akun perkiraan.')
+  })
+}
+
+// --- Bank Transfer & Bank Account Mutations ---
+export function useTransferAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { fromAccountId: number; toAccountId: number; amount: number; date?: string; notes?: string }) =>
+      transferAccount(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finance', 'bankAccounts'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'overview'] })
+      toast.success('Transfer antar rekening berhasil diproses.')
+    },
+    onError: (err: any) => toast.error(err.message || 'Gagal melakukan transfer.')
+  })
+}
+
+export function useCreateBankAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; type?: 'Cash' | 'Bank'; accountNumber?: string; openingBalance?: number; currency?: string }) =>
+      createBankAccount(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finance', 'bankAccounts'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'overview'] })
+      toast.success('Rekening kas/bank berhasil ditambahkan.')
+    },
+    onError: (err: any) => toast.error(err.message || 'Gagal menambahkan rekening.')
+  })
+}
+
+export function useUpdateBankAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateBankAccount(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finance', 'bankAccounts'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'overview'] })
+      toast.success('Rekening kas/bank berhasil diperbarui.')
+    },
+    onError: (err: any) => toast.error(err.message || 'Gagal memperbarui rekening.')
+  })
+}
+
+export function useCancelInvoice() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { invoiceId: number; reason: string }) => cancelInvoice(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['finance', 'invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'overview'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'bankAccounts'] })
+      queryClient.invalidateQueries({ queryKey: ['finance', 'transactions'] })
+      toast.success('Faktur berhasil dibatalkan.')
+    },
+    onError: (err: any) => toast.error(err.message || 'Gagal membatalkan faktur.')
   })
 }
 

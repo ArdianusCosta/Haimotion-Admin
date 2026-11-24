@@ -105,7 +105,22 @@ export function LoginPage({ onLogin, initialError }: LoginPageProps) {
           setError('Anda sudah resign mohon hubungi admin')
           return
         }
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
+        // Save user data to localStorage with full role & permissions from /api/auth/me if available
+        try {
+          const meRes = await fetch('/api/auth/me')
+          if (meRes.ok) {
+            const meData = await meRes.json()
+            if (meData?.user) {
+              localStorage.setItem('auth_user', JSON.stringify(meData.user))
+            } else {
+              localStorage.setItem('auth_user', JSON.stringify(data.user))
+            }
+          } else {
+            localStorage.setItem('auth_user', JSON.stringify(data.user))
+          }
+        } catch (e) {
+          localStorage.setItem('auth_user', JSON.stringify(data.user))
+        }
         localStorage.setItem('play_welcome_voice', 'true')
         
         try {

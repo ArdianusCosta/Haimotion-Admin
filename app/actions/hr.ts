@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { requireAuth, requirePermission } from '@/lib/auth/authorization'
 import { logActivity } from '@/lib/activity-log'
+import { PostingEngine, COA_CODES } from '@/lib/finance-posting-engine'
 
 // -----------------------------------------------------------------------------
 // OVERVIEW & SUMMARY
@@ -633,18 +634,40 @@ export async function updatePayroll(data: {
         where: { name: { contains: 'Gaji' } }
       })
 
-      await prisma.financeExpense.create({
+      const createdExpense = await prisma.financeExpense.create({
         data: {
           date: paymentDateVal || new Date(),
-          description: `Gaji Karyawan: ${updated.employee.name} (Periode ${updated.period})`,
+          description: `Gaji Karyawan: ${updated.employee.name || 'Karyawan'} (Periode ${updated.period})`,
           category: category?.name || categoryName,
           category_id: category?.id || null,
           amount: updated.net_pay,
-          vendor: updated.employee.name,
+          vendor: updated.employee.name || 'Karyawan',
           status: 'Paid',
           created_by: uid
         }
       })
+
+      // Posting Double-Entry General Ledger untuk Payroll
+      try {
+        const salaryCoaId = await PostingEngine.resolveCOAId(prisma, COA_CODES.BEBAN_GAJI)
+        const bankCoaId = await PostingEngine.resolveCOAId(prisma, COA_CODES.BANK_MANDIRI)
+        await PostingEngine.postJournal(prisma, {
+          entryDate: paymentDateVal || new Date(),
+          sourceType: 'PAYROLL_PAYMENT',
+          sourceId: updated.id,
+          postingType: 'ORIGINAL',
+          eventId: `PAY-${updated.id}`,
+          referenceNo: `PAYROLL-${updated.period}-${updated.id}`,
+          description: `Pembayaran Gaji Karyawan: ${updated.employee.name} (Periode ${updated.period})`,
+          lines: [
+            { coa_id: salaryCoaId, debit: updated.net_pay, credit: 0, line_memo: `Beban Gaji ${updated.employee.name}` },
+            { coa_id: bankCoaId, debit: 0, credit: updated.net_pay, line_memo: `Pencairan via Rekening Payroll Mandiri` }
+          ],
+          createdBy: uid
+        })
+      } catch (postErr) {
+        console.error('Error posting double-entry journal for payroll:', postErr)
+      }
     } catch (err) {
       console.error('Error syncing payroll to finance expense:', err)
     }

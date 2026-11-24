@@ -1,17 +1,22 @@
-import React, { useState } from 'react'
-import { Plus, Search, Wallet, Landmark, Banknote, Trash2 } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import { Plus, Search, Wallet, Landmark, Banknote, Trash2, ArrowLeftRight } from 'lucide-react'
 import { FinancePageHeader } from '../components'
-import { TransactionModal, ConfirmDeleteModal } from '../components/modals'
-import { useBankAccounts, useTransactions, useCreateTransaction, useDeleteTransaction } from '../queries'
+import { TransactionModal, ConfirmDeleteModal, TransferModal, AddBankAccountModal } from '../components/modals'
+import { useBankAccounts, useTransactions, useCreateTransaction, useDeleteTransaction, useTransferAccount, useCreateBankAccount } from '../queries'
 import { formatCurrency } from '../utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useLanguage } from '@/components/language-provider'
 
-export function CashBankPage() {  const { t, formatDate } = useLanguage()
+export function CashBankPage() {
+  const { t, formatDate } = useLanguage()
   const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('ALL')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isTransferOpen, setIsTransferOpen] = useState(false)
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<number | null>(null)
 
@@ -19,6 +24,8 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
   const { data: transactions, isLoading: isTxLoading } = useTransactions({ search })
   const createTransaction = useCreateTransaction()
   const deleteTransaction = useDeleteTransaction()
+  const transferAccountMutation = useTransferAccount()
+  const createBankAccountMutation = useCreateBankAccount()
 
   const handleSave = (data: any) => {
     createTransaction.mutate(data, {
@@ -27,6 +34,28 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
       }
     })
   }
+
+  const handleTransfer = (data: any) => {
+    transferAccountMutation.mutate(data, {
+      onSuccess: () => {
+        setIsTransferOpen(false)
+      }
+    })
+  }
+
+  const handleAddAccount = (data: any) => {
+    createBankAccountMutation.mutate(data, {
+      onSuccess: () => {
+        setIsAddAccountOpen(false)
+      }
+    })
+  }
+
+  const filteredTransactions = useMemo(() => {
+    if (!transactions) return []
+    if (typeFilter === 'ALL') return transactions
+    return transactions.filter((tx: any) => tx.type === typeFilter)
+  }, [transactions, typeFilter])
 
   const totalBank = bankAccounts?.filter(a => a.type !== 'Cash').reduce((acc, curr) => acc + curr.balance, 0) || 0
   const totalCash = bankAccounts?.filter(a => a.type === 'Cash').reduce((acc, curr) => acc + curr.balance, 0) || 0
@@ -38,9 +67,17 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
         title={t('Cash & Bank')} 
         description={t('Manage your bank and cash accounts.')}
         actions={
-          <Button size="sm" className="gap-2" onClick={() => setIsModalOpen(true)}>
-            <Plus className="size-4" /> {t('Add Transaction')}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-2 cursor-pointer" onClick={() => setIsAddAccountOpen(true)}>
+              <Plus className="size-4" /> Tambah Rekening
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2 cursor-pointer" onClick={() => setIsTransferOpen(true)}>
+              <ArrowLeftRight className="size-4" /> Transfer Antar Rekening
+            </Button>
+            <Button size="sm" className="gap-2 cursor-pointer" onClick={() => setIsModalOpen(true)}>
+              <Plus className="size-4" /> Catat Transaksi
+            </Button>
+          </div>
         }
       />
 
@@ -111,6 +148,17 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
                 className="h-9 w-full sm:w-[280px] rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary transition-colors"
               />
             </div>
+            <Select value={typeFilter} onValueChange={(val: any) => setTypeFilter(val)}>
+              <SelectTrigger className="w-[160px] h-9 bg-background">
+                <SelectValue placeholder="Semua Tipe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Jenis</SelectItem>
+                <SelectItem value="Income">Pemasukan (Income)</SelectItem>
+                <SelectItem value="Expense">Pengeluaran (Expense)</SelectItem>
+                <SelectItem value="Transfer">Transfer Kas/Bank</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -139,14 +187,14 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
                     <td className="px-5 py-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
                   </tr>
                 ))
-              ) : transactions?.length === 0 ? (
+              ) : filteredTransactions?.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center text-muted-foreground">
                     {t('No data found')}
                   </td>
                 </tr>
               ) : (
-                transactions?.map((tx: any) => (
+                filteredTransactions?.map((tx: any) => (
                   <tr key={tx.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                     <td className="px-5 py-4 text-muted-foreground whitespace-nowrap">{formatDate(tx.date)}</td>
                     <td className="px-5 py-4 font-medium">{tx.description}</td>
@@ -168,7 +216,7 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-rose-500"
+                        className="h-8 w-8 text-muted-foreground hover:text-rose-500 cursor-pointer"
                         onClick={() => { setDeleteId(tx.id); setDeleteOpen(true) }}
                         title={t('Delete')}
                       >
@@ -188,6 +236,19 @@ export function CashBankPage() {  const { t, formatDate } = useLanguage()
         onOpenChange={setIsModalOpen} 
         onSave={handleSave}
         accounts={bankAccounts || []}
+      />
+
+      <TransferModal
+        open={isTransferOpen}
+        onOpenChange={setIsTransferOpen}
+        onTransfer={handleTransfer}
+        accounts={bankAccounts || []}
+      />
+
+      <AddBankAccountModal
+        open={isAddAccountOpen}
+        onOpenChange={setIsAddAccountOpen}
+        onSave={handleAddAccount}
       />
 
       <ConfirmDeleteModal

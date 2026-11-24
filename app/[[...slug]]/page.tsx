@@ -82,8 +82,13 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
         'services': 'Barang & Jasa',
 
         // Pengeluaran / Expenses
-        'expenses': 'Pengeluaran',
-        'pengeluaran': 'Pengeluaran',
+        'expenses': 'Pengeluaran Operasional',
+        'pengeluaran': 'Pengeluaran Operasional',
+        'expenses/operasional': 'Pengeluaran Operasional',
+        'pengeluaran-operasional': 'Pengeluaran Operasional',
+        'operational-expenses': 'Pengeluaran Operasional',
+        'expenses/faktur-pembelian': 'Faktur Pembelian',
+        'expenses/pemasok': 'Pemasok',
 
         // Laporan / Reports (menggantikan Buku Besar)
         'reports': 'Laporan',

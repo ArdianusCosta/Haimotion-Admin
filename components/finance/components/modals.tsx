@@ -684,3 +684,260 @@ export function ReceiptPreviewModal({
   )
 }
 
+// --- Transfer Antar Rekening Modal ---
+interface TransferModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onTransfer: (data: { fromAccountId: number; toAccountId: number; amount: number; date?: string; notes?: string }) => void
+  accounts: any[]
+}
+
+export function TransferModal({ open, onOpenChange, onTransfer, accounts = [] }: TransferModalProps) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [fromAccountId, setFromAccountId] = useState('')
+  const [toAccountId, setToAccountId] = useState('')
+  const [amount, setAmount] = useState('')
+  const [notes, setNotes] = useState('')
+
+  React.useEffect(() => {
+    if (open) {
+      setDate(new Date().toISOString().slice(0, 10))
+      setFromAccountId(accounts[0]?.id?.toString() || '')
+      setToAccountId(accounts.length > 1 ? accounts[1].id.toString() : '')
+      setAmount('')
+      setNotes('')
+    }
+  }, [open, accounts])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!fromAccountId || !toAccountId) {
+      toast.error('Pilih rekening sumber dan tujuan')
+      return
+    }
+    if (fromAccountId === toAccountId) {
+      toast.error('Rekening sumber dan tujuan tidak boleh sama')
+      return
+    }
+    const val = Number(amount)
+    if (!val || val <= 0) {
+      toast.error('Nominal harus lebih besar dari 0')
+      return
+    }
+    const fromAcc = accounts.find(a => a.id.toString() === fromAccountId)
+    if (fromAcc && fromAcc.balance < val) {
+      toast.error(`Saldo ${fromAcc.name} tidak mencukupi (Rp ${Number(fromAcc.balance || 0).toLocaleString('id-ID')})`)
+      return
+    }
+
+    onTransfer({
+      fromAccountId: Number(fromAccountId),
+      toAccountId: Number(toAccountId),
+      amount: val,
+      date,
+      notes
+    })
+    onOpenChange(false)
+  }
+
+  const fromAcc = accounts.find(a => a.id.toString() === fromAccountId)
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[450px]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Transfer Antar Rekening</DialogTitle>
+            <DialogDescription>
+              Pindahkan dana antara kas dan bank secara atomik dan aman tanpa mempengaruhi laba rugi.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Rekening Sumber (Pengirim)</Label>
+              <Select value={fromAccountId} onValueChange={(val: string | null) => setFromAccountId(val || '')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih rekening sumber" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map(a => (
+                    <SelectItem key={a.id} value={a.id.toString()}>
+                      {a.name} — Rp {Number(a.balance || 0).toLocaleString('id-ID')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fromAcc && (
+                <p className="text-xs text-muted-foreground">
+                  Saldo tersedia: <span className="font-semibold text-foreground">Rp {Number(fromAcc.balance || 0).toLocaleString('id-ID')}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Rekening Tujuan (Penerima)</Label>
+              <Select value={toAccountId} onValueChange={(val: string | null) => setToAccountId(val || '')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih rekening tujuan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.filter(a => a.id.toString() !== fromAccountId).map(a => (
+                    <SelectItem key={a.id} value={a.id.toString()}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Nominal Transfer (Rp)</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  min="1"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Tanggal</Label>
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Catatan / Keterangan</Label>
+              <Input
+                placeholder="Contoh: Tarik tunai kas operasional / Setor bank"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Batal
+            </Button>
+            <Button type="submit">
+              Proses Transfer
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// --- Tambah Rekening Kas/Bank Modal ---
+interface AddBankAccountModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSave: (data: { name: string; type: 'Cash' | 'Bank'; accountNumber?: string; openingBalance?: number }) => void
+}
+
+export function AddBankAccountModal({ open, onOpenChange, onSave }: AddBankAccountModalProps) {
+  const [name, setName] = useState('')
+  const [type, setType] = useState<'Bank' | 'Cash'>('Bank')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [openingBalance, setOpeningBalance] = useState('')
+
+  React.useEffect(() => {
+    if (open) {
+      setName('')
+      setType('Bank')
+      setAccountNumber('')
+      setOpeningBalance('')
+    }
+  }, [open])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) {
+      toast.error('Nama rekening wajib diisi')
+      return
+    }
+    onSave({
+      name: name.trim(),
+      type,
+      accountNumber: accountNumber.trim() || undefined,
+      openingBalance: Number(openingBalance) || 0
+    })
+    onOpenChange(false)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Tambah Rekening Kas / Bank</DialogTitle>
+            <DialogDescription>
+              Tambahkan rekening bank resmi atau kas tunai perusahaan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Nama Akun / Bank</Label>
+              <Input
+                placeholder="Contoh: Bank BCA Operasional / Kasir Utama"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Tipe Akun</Label>
+                <Select value={type} onValueChange={(val: any) => setType(val)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bank">Rekening Bank</SelectItem>
+                    <SelectItem value="Cash">Kas Fisik / Tunai</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Nomor Rekening</Label>
+                <Input
+                  placeholder={type === 'Bank' ? '123-456-789' : 'Fisik'}
+                  value={accountNumber}
+                  onChange={e => setAccountNumber(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Saldo Awal (Rp)</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={openingBalance}
+                onChange={e => setOpeningBalance(e.target.value)}
+                min="0"
+              />
+              <p className="text-xs text-muted-foreground">Saldo awal akan otomatis dicatat sebagai transaksi pembukaan.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Batal
+            </Button>
+            <Button type="submit">
+              Simpan Rekening
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+

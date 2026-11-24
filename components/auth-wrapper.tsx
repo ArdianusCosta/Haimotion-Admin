@@ -23,7 +23,22 @@ export function AuthWrapper({ initialSection = 'Dashboard', slug, serverUser }: 
     }
   }, [])
 
-  const activeUser = serverUser || session?.user || localUser;
+  // If serverUser is provided, that is our authoritative source with full permissions
+  // If serverUser is null and isPending is false, check if session?.user exists.
+  // CRITICAL FIX: If neither serverUser nor session?.user exists (or if serverUser was explicitly passed as null/undefined),
+  // do NOT trust stale localUser from localStorage alone, because its session on the server has expired
+  // and it lacks role.permissions.
+  const hasValidSession = Boolean(serverUser || session?.user);
+  const activeUser = serverUser || (session?.user ? (localUser || session.user) : null);
+
+  useEffect(() => {
+    // If the client has loaded and confirmed there is NO valid session at all,
+    // clear the stale local storage so the user doesn't get stuck in a ghost session
+    if (mounted && !isPending && !hasValidSession && localUser) {
+      localStorage.removeItem('auth_user');
+      setLocalUser(null);
+    }
+  }, [mounted, isPending, hasValidSession, localUser]);
 
   useEffect(() => {
     if (activeUser && activeUser.status === 'resign') {
