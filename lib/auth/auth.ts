@@ -78,19 +78,6 @@ const prismaWithHooks = prisma.$extends({
         if (data?.userId && typeof data.userId === 'string') {
           data.userId = Number(data.userId);
         }
-        // Protect against VARCHAR(191) column overflow on MySQL for long Google OAuth tokens
-        if (data?.idToken && data.idToken.length > 191) {
-          delete data.idToken;
-        }
-        if (data?.accessToken && data.accessToken.length > 191) {
-          data.accessToken = data.accessToken.substring(0, 191);
-        }
-        if (data?.refreshToken && data.refreshToken.length > 191) {
-          data.refreshToken = data.refreshToken.substring(0, 191);
-        }
-        if (data?.scope && data.scope.length > 191) {
-          data.scope = data.scope.substring(0, 191);
-        }
         return query(args);
       },
       async update({ args, query }) {
@@ -101,18 +88,6 @@ const prismaWithHooks = prisma.$extends({
         }
         if (data?.userId && typeof data.userId === 'string') {
           data.userId = Number(data.userId);
-        }
-        if (data?.idToken && data.idToken.length > 191) {
-          delete data.idToken;
-        }
-        if (data?.accessToken && data.accessToken.length > 191) {
-          data.accessToken = data.accessToken.substring(0, 191);
-        }
-        if (data?.refreshToken && data.refreshToken.length > 191) {
-          data.refreshToken = data.refreshToken.substring(0, 191);
-        }
-        if (data?.scope && data.scope.length > 191) {
-          data.scope = data.scope.substring(0, 191);
         }
         return query(args);
       },
