@@ -29,6 +29,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ConfirmDeleteDialog } from '@/components/ui/confirm-delete-dialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { LeadActionMenu } from '@/components/crm/lead-action-menu'
 
 const statusColors: Record<string, string> = {
   'New': 'bg-sky-500/10 text-sky-600 border border-sky-500/20',
@@ -398,49 +399,18 @@ export function CrmLeadsPage() {
                     )}
                   </TableCell>
                   <TableCell className="pr-6">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52">
-                        <DropdownMenuItem onClick={() => setSelectedLeadId(lead.id)} className="cursor-pointer">
-                          <Eye className="mr-2 h-4 w-4 text-sky-500" /> View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenEdit(lead)} className="cursor-pointer">
-                          <Edit className="mr-2 h-4 w-4 text-violet-500" /> Edit Lead
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {lead.status !== 'Converted' && (
-                          <DropdownMenuItem
-                            onClick={() => convertMutation.mutate(lead.id)}
-                            className="font-medium text-primary focus:text-primary focus:bg-primary/10 cursor-pointer"
-                          >
-                            <UserCheck className="mr-2 h-4 w-4" />
-                            Convert to Client & Deal
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => updateStageMutation.mutate({ id: lead.id, stage: 'Qualified', status: 'In Progress' })} className="cursor-pointer">
-                          <Sparkles className="mr-2 h-4 w-4 text-emerald-500" />
-                          Mark as Qualified
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => updateStageMutation.mutate({ id: lead.id, stage: 'Lost', status: 'Lost' })} className="cursor-pointer">
-                          Mark as Lost
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive cursor-pointer"
-                          onClick={() => {
-                            setLeadToDelete({ id: lead.id, name: lead.name })
-                            setDeleteModalOpen(true)
-                          }}
-                        >
-                          <Trash className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <LeadActionMenu
+                      lead={lead}
+                      onViewDetails={(id) => setSelectedLeadId(id)}
+                      onEdit={(item) => handleOpenEdit(item)}
+                      onConvert={(id) => convertMutation.mutate(id)}
+                      onMarkQualified={(id) => updateStageMutation.mutate({ id, stage: 'Qualified', status: 'In Progress' })}
+                      onMarkLost={(id) => updateStageMutation.mutate({ id, stage: 'Lost', status: 'Lost' })}
+                      onDelete={(item) => {
+                        setLeadToDelete(item)
+                        setDeleteModalOpen(true)
+                      }}
+                    />
                   </TableCell>
                 </TableRow>
               ))

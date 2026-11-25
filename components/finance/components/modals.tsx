@@ -146,7 +146,7 @@ export function ExpenseModal({ open, onOpenChange, onSave, initialData, accounts
               <div className="grid gap-2">
                 <Label>Kategori</Label>
                 <Select value={category} onValueChange={(value: string | null) => setCategory(value || 'Operations')}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Pilih kategori">
                       {EXPENSE_CATEGORY_LABELS[category] || category || 'Pilih kategori'}
                     </SelectValue>
@@ -165,7 +165,7 @@ export function ExpenseModal({ open, onOpenChange, onSave, initialData, accounts
               <div className="grid gap-2">
                 <Label>Status</Label>
                 <Select value={status} onValueChange={(value: string | null) => setStatus(value || 'Paid')}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue>
                       {status === 'Paid' ? 'Lunas' : 'Belum Dibayar'}
                     </SelectValue>
@@ -189,7 +189,7 @@ export function ExpenseModal({ open, onOpenChange, onSave, initialData, accounts
               <div className="grid gap-2">
                 <Label>Bayar dari akun</Label>
                 <Select value={accountId || 'none'} onValueChange={(value: string | null) => setAccountId(!value || value === 'none' ? '' : value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Tidak mengurangi kas/bank">
                       {!accountId || accountId === 'none'
                         ? 'Tidak mengurangi kas/bank'
@@ -267,7 +267,7 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
               <div className="grid gap-2">
                 <Label>Jenis</Label>
                 <Select value={type} onValueChange={(value: string | null) => setType(value || 'Expense')}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue>
                       {type === 'Income' ? 'Uang Masuk' : 'Uang Keluar'}
                     </SelectValue>
@@ -281,7 +281,7 @@ export function TransactionModal({ open, onOpenChange, onSave, accounts = [] }: 
               <div className="grid gap-2">
                 <Label>Akun</Label>
                 <Select value={accountId} onValueChange={(value: string | null) => setAccountId(value || '')}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Pilih akun">
                       {accounts.find(acc => acc.id.toString() === accountId)?.name || (accountId ? `Akun #${accountId}` : 'Pilih akun')}
                     </SelectValue>
@@ -756,7 +756,7 @@ export function TransferModal({ open, onOpenChange, onTransfer, accounts = [] }:
             <div className="grid gap-2">
               <Label>Rekening Sumber (Pengirim)</Label>
               <Select value={fromAccountId} onValueChange={(val: string | null) => setFromAccountId(val || '')}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Pilih rekening sumber" />
                 </SelectTrigger>
                 <SelectContent>
@@ -777,7 +777,7 @@ export function TransferModal({ open, onOpenChange, onTransfer, accounts = [] }:
             <div className="grid gap-2">
               <Label>Rekening Tujuan (Penerima)</Label>
               <Select value={toAccountId} onValueChange={(val: string | null) => setToAccountId(val || '')}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Pilih rekening tujuan" />
                 </SelectTrigger>
                 <SelectContent>
@@ -897,7 +897,7 @@ export function AddBankAccountModal({ open, onOpenChange, onSave }: AddBankAccou
               <div className="grid gap-2">
                 <Label>Tipe Akun</Label>
                 <Select value={type} onValueChange={(val: any) => setType(val)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

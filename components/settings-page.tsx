@@ -1,24 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { Globe, Bell, Shield, Palette } from 'lucide-react'
+import { Bell, Shield, Palette } from 'lucide-react'
 import { useLanguage } from '@/components/language-provider'
 import { SecuritySettings } from './security-settings'
-import { GeneralSettings } from './settings/general-settings'
 import { AppearanceSettings } from './settings/appearance-settings'
 import { NotificationSettings } from './settings/notification-settings'
 
 export function SettingsPage({ user }: { user?: any }) {
   const { t } = useLanguage()
-  const [activeTab, setActiveTab] = useState<'General' | 'Notifications' | 'Security' | 'Appearance'>('General')
+  const [activeTab, setActiveTab] = useState<'Notifications' | 'Security' | 'Appearance'>('Notifications')
 
   const tabs = [
-    { id: 'General', label: 'General', icon: Globe },
     { id: 'Notifications', label: 'Notifications', icon: Bell },
     { id: 'Security', label: 'Security', icon: Shield },
     { id: 'Appearance', label: 'Appearance', icon: Palette },
   ] as const
-
+ 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full pb-16">
       {/* Page Header */}
@@ -61,7 +59,6 @@ export function SettingsPage({ user }: { user?: any }) {
 
       {/* Main Tab Content */}
       <div className="w-full mt-2">
-        {activeTab === 'General' && <GeneralSettings />}
         {activeTab === 'Notifications' && <NotificationSettings />}
         {activeTab === 'Security' && <SecuritySettings />}
         {activeTab === 'Appearance' && <AppearanceSettings />}
