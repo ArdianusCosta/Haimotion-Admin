@@ -267,7 +267,7 @@ export function ProjectTaskTable({
   const isTableLoading = isLoading || isDirectLoading
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden mb-6">
+    <div className="shrink-0 rounded-xl border border-border bg-card shadow-sm overflow-hidden mb-6">
       {/* ═══════════════════ HEADER: TASK LIST & + ADD TASK BUTTON ═══════════════════ */}
       <div className="p-5 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

@@ -61,7 +61,7 @@ export function ProjectDetailView({
 
   return (
     <div className="flex h-[calc(100vh-140px)] min-h-[600px] flex-col overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pr-2 pb-24">
+      <div className="min-h-0 flex-1 overflow-y-auto pr-2 pb-24">
         
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
