@@ -16,8 +16,6 @@ export function SettingsPage({ user }: { user?: any }) {
     { id: 'Security', label: 'Security', icon: Shield },
     { id: 'Appearance', label: 'Appearance', icon: Palette },
   ] as const
- 
-
   
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full pb-16">
