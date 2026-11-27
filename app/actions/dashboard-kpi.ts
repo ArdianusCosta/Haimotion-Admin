@@ -133,16 +133,21 @@ function buildPeriodDates(dateRangeStr: string): { startDate: Date; endDate: Dat
  * Score = (completionRate × 0.50) + (workloadScore × 0.30) + (timelinessScore × 0.20)
  *
  * - completionRate   = (completed / totalAssigned) × 100  [0–100]
- * - workloadScore    = min(totalAssigned / 10, 1) × 100   [10+ tasks = full score; proportional below]
+ * - workloadScore    = min(completed / workloadTarget, 1) × 100  [workloadTarget = max(maxCompleted * 0.75, 10)]
  * - timelinessScore  = (onTimeCount / completed) × 100    [among completed: how many were on-time]
- *                      = 100 if no tasks completed (no penalty until tasks are completed)
+ *                      = 0 if no tasks completed
  *
- * Tie-break order: performanceScore DESC → completionRate DESC → onTimeCount DESC → totalAssigned DESC → name ASC
+ * Tie-break order: performanceScore DESC → completed DESC → completionRate DESC → onTimeCount DESC → totalAssigned DESC → name ASC
  */
-function computePerformanceScore(totalAssigned: number, completed: number, onTimeCount: number): number {
+function computePerformanceScore(
+  totalAssigned: number,
+  completed: number,
+  onTimeCount: number,
+  workloadTarget: number = 10
+): number {
   if (totalAssigned === 0) return 0
   const completionRate = (completed / totalAssigned) * 100
-  const workloadScore = Math.min(totalAssigned / 10, 1) * 100
+  const workloadScore = Math.min(completed / Math.max(workloadTarget, 10), 1) * 100
   const timelinessScore = completed > 0 ? (onTimeCount / completed) * 100 : 0
   const score = (completionRate * 0.50) + (workloadScore * 0.30) + (timelinessScore * 0.20)
   return Math.round(score * 10) / 10
@@ -307,8 +312,15 @@ export async function getKpiPerformanceData(
       completionRate: memberCompletionRate,
       projectCount,
       onTimeCount,
-      performanceScore: computePerformanceScore(totalAssigned, completed, onTimeCount)
+      performanceScore: 0
     })
+  }
+
+  // Scale workload target dynamically based on top completed volume in this period
+  const maxCompleted = memberKpisRaw.reduce((max, m) => Math.max(max, m.completed), 0)
+  const workloadTarget = Math.max(maxCompleted * 0.75, 10)
+  for (const m of memberKpisRaw) {
+    m.performanceScore = computePerformanceScore(m.totalAssigned, m.completed, m.onTimeCount, workloadTarget)
   }
 
   // Sort with documented tie-break rules

@@ -308,6 +308,8 @@ export function TeamKpiSection({
   // Merge performance score and calculate metrics
   const enrichedTeamData = useMemo(() => {
     const kpiMap = new Map<number, MemberKpi>((kpiData?.memberKpis || []).map(k => [k.id, k]))
+    const maxDone = teamPool.reduce((max: number, m: any) => Math.max(max, m.done || 0), 0)
+    const workloadTarget = Math.max(maxDone * 0.75, 10)
 
     return teamPool.map((m: any) => {
       const kpi = kpiMap.get(m.id)
@@ -315,10 +317,9 @@ export function TeamKpiSection({
 
       if (score === undefined) {
         // Fallback transparent formula
-        const assigned = m.assigned || 0
         const done = m.done || 0
         const rate = m.completionRate || 0
-        const workloadScore = Math.min(assigned / 10, 1) * 100
+        const workloadScore = Math.min(done / workloadTarget, 1) * 100
         const overdue = m.overdue || 0
         const timelinessScore = done > 0 ? Math.max(0, 100 - (overdue / done) * 50) : 0
         score = Math.round(((rate * 0.50) + (workloadScore * 0.30) + (timelinessScore * 0.20)) * 10) / 10
