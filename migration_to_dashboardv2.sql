@@ -134,6 +134,39 @@ INSERT INTO `_tmp_old_users` (`id`, `firstname`, `lastname`, `email`, `notificat
 (89, 'Felicia Catlyn Lunardi', '(Creative - Digitial Marketing)', 'Felicia@haimotion.com', 'catlyn.haimotion@gmail.com', '8f29b3b45f3f62404b526920331174c0', 3, 1, 'ava_6aeaa5dec8a705.07703318_avatar.png', '2026-11-04 10:01:19', 'HMHODM0016', 'panggilan saya Catlyn'),
 (90, 'Charissa Chika', '(Creative - Customer Service)', 'charissa@haimotion.com', 'charissa.haimotion@gmail.com', '71b10ce78735d9f6eab4096fd8c8f083', 3, 1, 'ava_6af529af882466.83701160_avatar.png', '2026-11-09 09:21:31', '000', 'panggil aku charissa');
 
+-- ============================================================
+-- Seed default roles & permissions if missing
+-- ============================================================
+INSERT IGNORE INTO `roles` (`id`, `name`, `description`) VALUES
+(1, 'Administrator', 'Full access to all system features and settings.'),
+(2, 'Developer', 'Can manage modules, flows, and API endpoints.'),
+(3, 'Editor', 'Can edit content but cannot manage users or settings.'),
+(4, 'Viewer', 'Read-only access to specific project data.'),
+(5, 'Staff', 'Standard staff access for day-to-day operations.');
+
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission`)
+SELECT r.id, p.perm FROM `roles` r
+JOIN (
+  SELECT 'dashboard.view' AS perm UNION ALL SELECT 'projects.view' UNION ALL SELECT 'projects.create' UNION ALL SELECT 'projects.update'
+  UNION ALL SELECT 'tasks.view' UNION ALL SELECT 'tasks.create' UNION ALL SELECT 'tasks.update'
+  UNION ALL SELECT 'calendar.view' UNION ALL SELECT 'calendar.create' UNION ALL SELECT 'calendar.update'
+  UNION ALL SELECT 'meetings.view' UNION ALL SELECT 'meetings.create'
+  UNION ALL SELECT 'chat.view' UNION ALL SELECT 'chat.create' UNION ALL SELECT 'chat.call'
+  UNION ALL SELECT 'ai_chat.view' UNION ALL SELECT 'ai_chat.create'
+  UNION ALL SELECT 'files.view' UNION ALL SELECT 'files.upload' UNION ALL SELECT 'files.download' UNION ALL SELECT 'folders.view'
+  UNION ALL SELECT 'settings.view'
+) p
+WHERE r.name IN ('Staff', 'Editor', 'Developer');
+
+INSERT IGNORE INTO `role_permissions` (`role_id`, `permission`)
+SELECT r.id, p.perm FROM `roles` r
+JOIN (
+  SELECT 'dashboard.view' AS perm UNION ALL SELECT 'projects.view' UNION ALL SELECT 'tasks.view'
+  UNION ALL SELECT 'calendar.view' UNION ALL SELECT 'meetings.view'
+  UNION ALL SELECT 'files.view' UNION ALL SELECT 'files.download' UNION ALL SELECT 'folders.view'
+) p
+WHERE r.name = 'Viewer';
+
 INSERT INTO `users` (
   `id`, `firstname`, `lastname`, `email`, `notification_email`,
   `password`, `avatar`, `date_created`, `nik`, `address`,
@@ -143,7 +176,7 @@ SELECT
   `id`,
   `firstname`,
   `lastname`,
-  `email`,
+  LOWER(TRIM(`email`)),
   `notification_email`,
   `password`,
   `avatar`,
@@ -153,15 +186,39 @@ SELECT
   0,
   CASE 
     WHEN `status` = 1 THEN 'active'
-    WHEN `status` = 0 THEN 'inactive'
+    WHEN `status` = 0 THEN 'resign'
     ELSE 'active'
   END,
-  NULL,
+  CASE
+    WHEN `type` = 1 THEN (SELECT `id` FROM `roles` WHERE `name` = 'Administrator' LIMIT 1)
+    WHEN `type` = 2 THEN (SELECT `id` FROM `roles` WHERE `name` = 'Editor' LIMIT 1)
+    WHEN `type` = 4 THEN (SELECT `id` FROM `roles` WHERE `name` = 'Viewer' LIMIT 1)
+    ELSE (SELECT `id` FROM `roles` WHERE `name` = 'Staff' LIMIT 1)
+  END,
   `date_created`,
   TRIM(CONCAT(`firstname`, ' ', `lastname`))
 FROM `_tmp_old_users`;
 
 DROP TABLE IF EXISTS `_tmp_old_users`;
+
+-- ============================================================
+-- Table: account (BetterAuth credential rows for email+password login)
+-- ============================================================
+DELETE FROM `account` WHERE `providerId` = 'credential';
+INSERT INTO `account` (
+  `id`, `accountId`, `providerId`, `userId`, `password`, `createdAt`, `updatedAt`
+)
+SELECT
+  CONCAT('cred_', `id`),
+  CAST(`id` AS CHAR),
+  'credential',
+  `id`,
+  `password`,
+  `date_created`,
+  `date_created`
+FROM `users`
+WHERE `password` IS NOT NULL AND `password` != '';
+
 
 -- ============================================================
 -- Table: project_list + project_members
