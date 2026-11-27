@@ -26,7 +26,7 @@ export function RecentActivitiesCard({ data }: RecentActivitiesCardProps) {
   })
 
   const handleNavigate = (act: any) => {
-    const url = act.targetUrl || (act.projectId ? `/project/${act.projectId}` : act.taskId ? '/tasks' : '/projects')
+    const url = act.targetUrl || (act.projectId ? `/project/${act.projectId}` : act.taskId ? '/tasks' : '/activity-log')
     if (url) {
       router.push(url)
     }

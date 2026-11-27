@@ -730,31 +730,55 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
 
       const roleName = u?.role?.name || (u?.address && u.address !== '--' ? u.address : '');
 
-      // Determine target navigation URL
+      // Determine target navigation URL matching exact app/[[...slug]]/page.tsx routes
       let targetUrl = '';
       const typeLower = (act.type || '').toLowerCase();
       const descLower = (act.description || '').toLowerCase();
 
       if (act.projectId) {
         targetUrl = `/project/${act.projectId}`;
-      } else if (act.taskId) {
+      } else if (typeLower.includes('role') || descLower.includes('role') || descLower.includes('permission')) {
+        targetUrl = '/roles-permissions';
+      } else if (typeLower.includes('user') || descLower.includes('user ') || descLower.includes('pengguna')) {
+        targetUrl = '/user-management';
+      } else if (act.taskId || typeLower.includes('task') || descLower.includes('task') || descLower.includes('tugas')) {
         targetUrl = '/tasks';
-      } else if (typeLower.includes('finance') || descLower.includes('transaksi') || descLower.includes('invoice') || descLower.includes('kas')) {
-        targetUrl = '/finance/overview';
-      } else if (typeLower.includes('hr') || descLower.includes('cuti') || descLower.includes('absensi') || descLower.includes('payroll') || descLower.includes('karyawan')) {
-        targetUrl = '/hr';
-      } else if (typeLower.includes('meet') || descLower.includes('meeting')) {
-        targetUrl = '/calendar';
       } else if (typeLower.includes('kanban')) {
         targetUrl = '/kanban';
-      } else if (typeLower.includes('crm') || descLower.includes('client') || descLower.includes('lead') || descLower.includes('deal')) {
-        targetUrl = '/crm';
-      } else if (typeLower.includes('file') || descLower.includes('file') || descLower.includes('dokumen')) {
-        targetUrl = '/files';
       } else if (typeLower.includes('project') || descLower.includes('project') || descLower.includes('proyek')) {
-        targetUrl = '/projects';
-      } else if (typeLower.includes('task') || descLower.includes('task') || descLower.includes('tugas')) {
-        targetUrl = '/tasks';
+        targetUrl = '/project';
+      } else if (descLower.includes('faktur penjualan') || descLower.includes('invoice')) {
+        targetUrl = '/finance/sales/faktur';
+      } else if (descLower.includes('kas') || descLower.includes('bank') || descLower.includes('transfer')) {
+        targetUrl = '/finance/cash-bank';
+      } else if (descLower.includes('pengeluaran') || descLower.includes('expense')) {
+        targetUrl = '/finance/expenses';
+      } else if (typeLower.includes('finance') || descLower.includes('transaksi') || descLower.includes('keuangan')) {
+        targetUrl = '/finance/overview';
+      } else if (descLower.includes('cuti') || descLower.includes('absensi') || descLower.includes('attendance') || descLower.includes('leave')) {
+        targetUrl = '/hr/attendance';
+      } else if (descLower.includes('payroll') || descLower.includes('gaji')) {
+        targetUrl = '/hr/payroll';
+      } else if (typeLower.includes('hr') || descLower.includes('karyawan') || descLower.includes('employee')) {
+        targetUrl = '/hr/employees';
+      } else if (typeLower.includes('meet') || descLower.includes('meeting')) {
+        targetUrl = '/meetings';
+      } else if (typeLower.includes('calendar') || typeLower.includes('event') || descLower.includes('jadwal') || descLower.includes('kalender')) {
+        targetUrl = '/calendar';
+      } else if (descLower.includes('lead')) {
+        targetUrl = '/crm/leads';
+      } else if (descLower.includes('client') || descLower.includes('klien')) {
+        targetUrl = '/crm/clients';
+      } else if (descLower.includes('deal') || descLower.includes('pipeline')) {
+        targetUrl = '/crm/pipeline';
+      } else if (typeLower.includes('crm')) {
+        targetUrl = '/crm/overview';
+      } else if (typeLower.includes('file') || typeLower.includes('folder') || descLower.includes('file') || descLower.includes('folder') || descLower.includes('dokumen')) {
+        targetUrl = '/file-manager';
+      } else if (typeLower.includes('chat') || typeLower.includes('message') || descLower.includes('pesan') || descLower.includes('grup')) {
+        targetUrl = '/messenger';
+      } else if (typeLower.includes('setting') || descLower.includes('setting') || descLower.includes('pengaturan')) {
+        targetUrl = '/settings';
       }
 
       return {
@@ -766,7 +790,7 @@ export async function getDashboardData(dateRangeStr: string, projectFilter?: str
         projectName: projectName || 'General',
         projectId: act.projectId || null,
         taskId: act.taskId || null,
-        targetUrl: targetUrl || (act.projectId ? `/project/${act.projectId}` : '/projects'),
+        targetUrl: targetUrl || '/activity-log',
         type: act.type,
         time: act.created_at,
         timeAgo: getRelativeTime(act.created_at)
