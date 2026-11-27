@@ -194,6 +194,12 @@ function AccessDenied({ section }: { section: string }) {
   )
 }
 
+function getAvatarSrc(avatar?: string | null): string | undefined {
+  if (!avatar) return undefined
+  if (avatar.startsWith('http') || avatar.startsWith('/') || avatar.startsWith('data:')) return avatar
+  return `/avatars/${avatar}`
+}
+
 function Icon({ icon: I, className = '' }: { icon: React.ElementType; className?: string }) { return <I className={className} aria-hidden="true" /> }
 
 function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { initialSection?: string, user?: any, slug?: string[] }) {
@@ -878,7 +884,7 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-full hover:ring-2 hover:ring-ring outline-none cursor-pointer transition-all">
                   <Avatar className="size-8">
-                    <AvatarImage src={user?.avatar || undefined} />
+                    <AvatarImage src={getAvatarSrc(user?.avatar)} />
                     <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
                       {user?.firstname ? (user.firstname[0] + (user.lastname?.[0] || '')).toUpperCase() : (user?.name ? user.name.slice(0, 2).toUpperCase() : 'A')}
                     </AvatarFallback>
@@ -961,15 +967,15 @@ function HaiMotionDashboard({ initialSection = 'Dashboard', user, slug }: { init
               case 'Account Settings': return (
                 <div className="relative min-h-[85vh] w-full">
                   {/* Background Bubbles */}
-                  {user?.avatar && (
+                  {getAvatarSrc(user?.avatar) && (
                     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                      <img src={user.avatar} className="bg-bubble" style={{ width: '250px', height: '250px', top: '2%', left: '5%', animationDelay: '0s' }} alt="" />
-                      <img src={user.avatar} className="bg-bubble" style={{ width: '350px', height: '350px', top: '15%', right: '-2%', animationDelay: '-3s' }} alt="" />
-                      <img src={user.avatar} className="bg-bubble" style={{ width: '180px', height: '180px', top: '35%', left: '15%', animationDelay: '-7s' }} alt="" />
-                      <img src={user.avatar} className="bg-bubble" style={{ width: '280px', height: '280px', top: '55%', right: '10%', animationDelay: '-12s' }} alt="" />
-                      <img src={user.avatar} className="bg-bubble" style={{ width: '150px', height: '150px', top: '70%', left: '35%', animationDelay: '-5s' }} alt="" />
-                      <img src={user.avatar} className="bg-bubble" style={{ width: '220px', height: '220px', top: '85%', right: '25%', animationDelay: '-9s' }} alt="" />
-                      <img src={user.avatar} className="bg-bubble" style={{ width: '120px', height: '120px', top: '25%', left: '45%', animationDelay: '-1s' }} alt="" />
+                      <img src={getAvatarSrc(user?.avatar)} className="bg-bubble" style={{ width: '250px', height: '250px', top: '2%', left: '5%', animationDelay: '0s' }} alt="" />
+                      <img src={getAvatarSrc(user?.avatar)} className="bg-bubble" style={{ width: '350px', height: '350px', top: '15%', right: '-2%', animationDelay: '-3s' }} alt="" />
+                      <img src={getAvatarSrc(user?.avatar)} className="bg-bubble" style={{ width: '180px', height: '180px', top: '35%', left: '15%', animationDelay: '-7s' }} alt="" />
+                      <img src={getAvatarSrc(user?.avatar)} className="bg-bubble" style={{ width: '280px', height: '280px', top: '55%', right: '10%', animationDelay: '-12s' }} alt="" />
+                      <img src={getAvatarSrc(user?.avatar)} className="bg-bubble" style={{ width: '150px', height: '150px', top: '70%', left: '35%', animationDelay: '-5s' }} alt="" />
+                      <img src={getAvatarSrc(user?.avatar)} className="bg-bubble" style={{ width: '220px', height: '220px', top: '85%', right: '25%', animationDelay: '-9s' }} alt="" />
+                      <img src={getAvatarSrc(user?.avatar)} className="bg-bubble" style={{ width: '120px', height: '120px', top: '25%', left: '45%', animationDelay: '-1s' }} alt="" />
                     </div>
                   )}
 
