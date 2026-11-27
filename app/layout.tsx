@@ -23,21 +23,9 @@ export const metadata: Metadata = {
     title: 'HaiMotion',
   },
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: 'https://haisys.haimotion.com/logohm-transparent.png',
+    shortcut: 'https://haisys.haimotion.com/logohm-transparent.png',
+    apple: 'https://haisys.haimotion.com/logohm-transparent.png',
   },
 }
 
