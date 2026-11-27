@@ -25,10 +25,25 @@ function Avatar({
   )
 }
 
-function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
+function normalizeAvatarSrc(src?: string | null): string | undefined {
+  if (!src) return undefined
+  if (
+    src.startsWith('/') ||
+    src.startsWith('http://') ||
+    src.startsWith('https://') ||
+    src.startsWith('data:') ||
+    src.startsWith('blob:')
+  ) {
+    return src
+  }
+  return `/avatars/${src}`
+}
+
+function AvatarImage({ className, src, ...props }: AvatarPrimitive.Image.Props) {
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
+      src={typeof src === 'string' ? normalizeAvatarSrc(src) : src}
       className={cn(
         "aspect-square size-full rounded-full object-cover",
         className

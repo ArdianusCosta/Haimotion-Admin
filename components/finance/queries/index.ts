@@ -172,7 +172,13 @@ export function usePayExpense() {
 export function useDeleteExpense() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: number) => deleteExpense(id),
+    mutationFn: async (id: number) => {
+      const res = await deleteExpense(id)
+      if (res && typeof res === 'object' && 'error' in res && res.error) {
+        throw new Error(res.error)
+      }
+      return res
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['finance', 'expenses'] })
       queryClient.invalidateQueries({ queryKey: ['finance', 'overview'] })

@@ -1066,32 +1066,51 @@ export async function updateExpense(id: number, data: any) {
   return updated
 }
 
-export async function deleteExpense(id: number) {
-  const _u = await requireAuth(); requirePermission(_u, 'finance.delete')
-  const uid = await currentUserId()
-
-  await prisma.$transaction(async tx => {
-    // Batalkan transaksi kas yang terkait lalu kembalikan saldo akun.
-    const linked = await tx.financeTransaction.findFirst({ where: { reference: `EXP-${id}` } })
-    if (linked) {
-      if (linked.account_id) {
-        await tx.financeAccount.update({
-          where: { id: linked.account_id },
-          data: { balance: { increment: linked.amount } }
-        })
-      }
-      await tx.financeTransaction.delete({ where: { id: linked.id } })
+export async function deleteExpense(id: number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const _u = await requireAuth(); requirePermission(_u, 'finance.delete')
+    const uid = await currentUserId()
+    const expenseId = Number(id)
+    if (!Number.isFinite(expenseId) || expenseId <= 0) {
+      return { success: false, error: 'ID pengeluaran tidak valid.' }
     }
-    await tx.financeExpense.delete({ where: { id } })
-  })
 
-  await logActivity({
-    userId: uid,
-    activityType: 'delete',
-    description: `Deleted expense #${id}`
-  })
+    const existing = await prisma.financeExpense.findUnique({ where: { id: expenseId } })
+    if (!existing) {
+      return { success: false, error: 'Pengeluaran tidak ditemukan.' }
+    }
 
-  return { success: true }
+    await prisma.$transaction(async tx => {
+      // Batalkan transaksi kas yang terkait lalu kembalikan saldo akun.
+      const linkedTransactions = await tx.financeTransaction.findMany({
+        where: { reference: `EXP-${expenseId}` }
+      })
+      for (const linked of linkedTransactions) {
+        if (linked.account_id) {
+          const account = await tx.financeAccount.findUnique({ where: { id: linked.account_id } })
+          if (account) {
+            await tx.financeAccount.update({
+              where: { id: linked.account_id },
+              data: { balance: { increment: linked.amount } }
+            })
+          }
+        }
+        await tx.financeTransaction.delete({ where: { id: linked.id } })
+      }
+      await tx.financeExpense.delete({ where: { id: expenseId } })
+    })
+
+    await logActivity({
+      userId: uid,
+      activityType: 'delete',
+      description: `Deleted expense #${expenseId}`
+    })
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('deleteExpense error:', err)
+    return { success: false, error: err?.message || 'Gagal menghapus pengeluaran.' }
+  }
 }
 
 export async function payExpense(data: {
